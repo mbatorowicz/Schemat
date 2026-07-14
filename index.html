@@ -49,6 +49,12 @@
   #left { background:var(--panel); border-right:1px solid var(--line); overflow:auto; padding:8px; }
   #symlist, #schlist, #elemList { list-style:none; margin:0 0 6px; padding:0; }
   #schlist li, #elemList li { padding:6px 8px; border-radius:4px; cursor:pointer; font:13px Arial; color:#0f172a; }
+  #schlist li { display:flex; align-items:flex-start; min-width:0; }
+  .sch-labels { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .sch-title { font:600 13px Arial; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sch-file { font:10px Arial; color:#64748b; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sch-file:empty { display:none; }
+  #schlist li.sel .sch-file { color:#dbeafe; }
   #symlist li { display:flex; align-items:flex-start; gap:6px; min-width:0; padding:4px 4px; border-radius:4px; cursor:pointer; font:13px Arial; color:#0f172a; }
   #symlist li:hover, #schlist li:hover, #elemList li:hover { background:#e2e8f0; }
   #symlist li.sel, #schlist li.sel, #elemList li.sel { background:var(--accent); color:#fff; }

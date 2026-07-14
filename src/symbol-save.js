@@ -3,7 +3,7 @@
 
 
 import { libSymbolGroups } from "./symbol-resolver.js";
-
+import { symbolEffectiveDisplayName, symbolListSubtitle } from "./symbol-display.js";
 import { status as Wstatus } from "./ui-wording.js";
 
 
@@ -26,17 +26,14 @@ export function symbolDisplayName(node) {
 
 /** Etykieta główna w listach, breadcrumb i nagłówku zaznaczenia. Nazwa > oznaczenie > id. */
 export function symbolCatalogLabel(node, id = "") {
-  const name = symbolDisplayName(node);
+  const name = symbolEffectiveDisplayName(node, id);
   if (name) return name;
   return symbolDesignation(node, id) || id || "";
 }
 
 /** Druga linia listy symboli — oznaczenie techniczne, gdy główna linia to nazwa. */
 export function symbolCatalogSubtitle(node, id = "") {
-  const name = symbolDisplayName(node);
-  const ozn = symbolDesignation(node, id);
-  if (!name || !ozn || ozn === name) return "";
-  return ozn;
+  return symbolListSubtitle(node, id);
 }
 
 /** Etykieta na liście: nazwa wyświetlana lub oznaczenie (nie legacy id typu B1). */

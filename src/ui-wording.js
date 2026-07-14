@@ -43,14 +43,14 @@ export const W = {
     file: "Zapisz zawarto\u015b\u0107 pliku na dysk",
     project: "Zapisz bibliotek\u0119, zmienione schematy i projekt.json",
     symbol: "Zapisz nazw\u0119, oznaczenie (id techniczne) i domy\u015bln\u0105 numeracj\u0119 na schemacie",
-    sheet: "Zmie\u0144 nazw\u0119 pliku schematu",
+    sheet: "Zapisz nazw\u0119 wy\u015bwietlan\u0105 schematu (lista, breadcrumb, tytu\u0142 w ramce)",
     library: "Zmie\u0144 nazw\u0119 pliku biblioteki",
     projectRename: "Zmie\u0144 nazw\u0119 folderu projektu",
   },
   placeholder: {
     symbolName: "Czujnik fotooptyczny",
     designation: "B",
-    sheet: "E-01",
+    sheet: "1. Zasilanie",
     library: "E-00_symbole.svg",
     project: "CS-TB-48",
   },
@@ -140,6 +140,11 @@ export const status = {
   projectRenameFailed: "Nie uda\u0142o si\u0119 zmieni\u0107 nazwy folderu \u2014 zmie\u0144 r\u0119cznie w eksploratorze i otw\u00f3rz projekt ponownie.",
   resourceEmpty: "Nazwa nie mo\u017ce by\u0107 pusta.",
   resourceInvalidSheet: "Nazwa schematu: litery, cyfry, _, - (bez .svg).",
+  sheetTitleInvalid: "Nazwa schematu nie mo\u017ce by\u0107 pusta (max. 120 znak\u00f3w).",
+  sheetTitleMissingNode: "Brak grupy schematu w pliku SVG.",
+  sheetTitleSaved(title) {
+    return `Zapisano nazw\u0119 schematu: ${title}`;
+  },
   resourceInvalidLibrary: "Nazwa biblioteki musi ko\u0144czy\u0107 si\u0119 na .svg.",
   resourceInvalidProject: "Nazwa projektu nie mo\u017ce zawiera\u0107 \\ ani /.",
 };
@@ -162,6 +167,8 @@ export function collectWordingStrings() {
     status.projectRenameFailed,
     status.resourceEmpty,
     status.resourceInvalidSheet,
+    status.sheetTitleInvalid,
+    status.sheetTitleMissingNode,
     status.resourceInvalidLibrary,
     status.resourceInvalidProject,
   ];

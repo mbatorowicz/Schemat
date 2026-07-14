@@ -91,7 +91,14 @@ import {
 } from './ui-wording.js';
 import { applySymbolForm, readSymbolFormFromDom, symbolDisplayName, symbolCatalogLabel, symbolCatalogSubtitle, symbolDesignation } from './symbol-save.js';
 import {
-  renameSheetOnDisk,
+  sheetDisplayTitle,
+  sheetCatalogLabel,
+  sheetCatalogSubtitle,
+  applySheetDisplayTitle,
+  SHEET_TITLE_ATTR,
+} from './sheet-catalog.js';
+import { inferSymbolDisplayName } from './symbol-display.js';
+import {
   renameLibraryOnDisk,
   renameProjectFolderOnDisk,
 } from './resource-rename.js';
@@ -451,7 +458,7 @@ function syncResourceNameFields(mode){
   if(inp){
     inp.placeholder=resourceNamePlaceholder(mode);
     if(mode==="sheet"&&state.active&&state.active!==state.lib){
-      inp.value=linkedSheetBasename(state.active.name||"");
+      inp.value=sheetDisplayTitle(state.active);
     } else if(mode==="library"&&state.lib){
       inp.value=state.lib.name||"";
     } else if(mode==="project"&&state.dir){
@@ -467,7 +474,7 @@ function syncLibrarySelectionInfo(){
   if(sym){
     const label=symbolCatalogLabel(sym.node, sym.id);
     const ozn=symbolDesignation(sym.node, sym.id);
-    const showOzn=!!symbolDisplayName(sym.node)&&ozn&&ozn!==label;
+    const showOzn=!!label&&!!ozn&&ozn!==label;
     info.textContent=symbolSelectionSummary(label, showOzn?ozn:null);
     info.title=W.selection.symbolTitle(label);
   } else {
@@ -484,6 +491,7 @@ function syncNameFields(){
     const sym=state.symbols.find(s=>s.id===state.selId);
     if(sym){
       symInp.value=symbolDisplayName(sym.node);
+      symInp.placeholder=symInp.value?W.placeholder.symbolName:(inferSymbolDisplayName(sym.node,sym.id)||W.placeholder.symbolName);
       symInp.disabled=false; if(btnSym) btnSym.disabled=false;
       const rule=refBaseForSymbol(state.selId);
       if(prefixInp){
@@ -542,13 +550,15 @@ async function saveResourceName(){
   const v=(inp?.value||"").trim();
   const rw={ writeHandle, getFileHandleByPath };
   if(mode==="sheet"){
-    if(!state.active?.handle&&!state.dir){ setStatus("Brak pliku schematu na dysku."); return; }
-    const res=await renameSheetOnDisk({ sheet: state.active, newBase: v, dir: state.dir, readWrite: rw });
+    if(!state.active||state.active===state.lib){ setStatus("Wybierz schemat na liście po lewej."); return; }
+    pushUndo();
+    const res=applySheetDisplayTitle(state.active, v);
     if(!res.ok){ setStatus(res.message); return; }
-    if(!res.unchanged) buildSymbolList();
+    buildSymbolList();
     syncResourceNameFields("sheet");
     syncContextBreadcrumb();
-    setStatus(res.message||status.sheetRenamed("", v));
+    render();
+    setStatus(res.message);
     saveProject();
     return;
   }
@@ -806,6 +816,18 @@ function buildElementList(){
   syncElementListSelection();
 }
 function liEl(label,id,onClick){ const li=document.createElement("li"); li.textContent=label; li.dataset.id=id; li.onclick=onClick; return li; }
+function sheetListItem(sh){
+  const li=document.createElement("li"); li.dataset.id=sh.id;
+  const labels=document.createElement("span"); labels.className="sch-labels";
+  const titleEl=document.createElement("span"); titleEl.className="sch-title"; titleEl.textContent=sheetCatalogLabel(sh);
+  const subEl=document.createElement("span"); subEl.className="sch-file"; subEl.textContent=sheetCatalogSubtitle(sh);
+  labels.append(titleEl,subEl);
+  li.appendChild(labels);
+  li.title=[sh.relPath||sh.name, subEl.textContent?"(plik: "+linkedSheetBasename(sh.name)+")":""].filter(Boolean).join(" ");
+  li.onclick=()=>selectSheet(sh); li._sheet=sh;
+  li.classList.toggle("sel",state.active===sh);
+  return li;
+}
 const listCollator=new Intl.Collator("pl",{numeric:true,sensitivity:"base"});
 const listCollatorStrict=new Intl.Collator("pl",{numeric:true,sensitivity:"variant"});
 let sidebarBuildSeq=0, sidebarPrefix="sidebar-";
@@ -877,11 +899,11 @@ function buildSymbolList(){
       state.symbols.push({id:g.id, node:g});
     });
   }
-  state.symbols.sort((a,b)=>compareListText(a.id,b.id)); buildSidebarSymbolDefs();
+  state.symbols.sort((a,b)=>compareListText(symbolCatalogLabel(a.node,a.id),symbolCatalogLabel(b.node,b.id))); buildSidebarSymbolDefs();
   validateSymbolConnections();
   state.symbols.forEach(sym=>symlist.appendChild(symbolListItem(sym)));
-  state.sheets.sort((a,b)=>compareListText(a.name,b.name));
-  state.sheets.forEach(sh=>{ const label=linkedSheetBasename(sh); const li=liEl(label,sh.id,()=>selectSheet(sh)); li.title=sh.relPath||sh.name; li._sheet=sh; schlist.appendChild(li); });
+  state.sheets.sort((a,b)=>compareListText(sheetCatalogLabel(a),sheetCatalogLabel(b)));
+  state.sheets.forEach(sh=>schlist.appendChild(sheetListItem(sh)));
   syncListSelection();
   const ins=document.getElementById("insertSym");
   if(ins){ const prev=ins.value; ins.innerHTML=""; state.symbols.forEach(s=>{ const o=document.createElement("option"); o.value=s.id; const label=symbolCatalogLabel(s.node, s.id); const ozn=symbolDesignation(s.node, s.id); o.textContent=symbolDisplayName(s.node)&&ozn!==label?label+" \u00b7 "+ozn:label; ins.appendChild(o); }); if([...ins.options].some(o=>o.value===prev)) ins.value=prev; }
@@ -919,7 +941,7 @@ function activateTarget(target,id,keepView){
   if(keepView) applyView(); else fitView();
   savePrefs();
 }
-function selectSheet(sheet,keepView){ if(!sheet||state.sheets.indexOf(sheet)<0) return; activateTarget(sheet,sheet.id,keepView); if(state.dir){ autoLoadNetlistForSheet(sheet,state.dir,{silent:true}).then(ok=>{ if(state.active!==sheet) return; if(ok) setStatus("Arkusz "+linkedSheetBasename(sheet.name)+", spis: "+state.netlist.name+" ("+state.netlist.connections.length+" po\u0142\u0105cze\u0144)."); else setStatus("Arkusz "+linkedSheetBasename(sheet.name)+" \u2014 brak pliku polaczenia_<arkusz>.md."); }); } }
+function selectSheet(sheet,keepView){ if(!sheet||state.sheets.indexOf(sheet)<0) return; activateTarget(sheet,sheet.id,keepView); if(state.dir){ autoLoadNetlistForSheet(sheet,state.dir,{silent:true}).then(ok=>{ if(state.active!==sheet) return; const title=sheetDisplayTitle(sheet); if(ok) setStatus("Schemat "+title+", spis: "+state.netlist.name+" ("+state.netlist.connections.length+" po\u0142\u0105cze\u0144)."); else setStatus("Schemat "+title+" \u2014 brak pliku polaczenia_<arkusz>.md."); }); } }
 function selectSymbol(id, keepView){
   if(!id) return;
   if(state.symbols.some(s=>s.id===id)){
@@ -1242,7 +1264,7 @@ function syncContextBreadcrumb(){
     const sym=state.symbols.find(s=>s.id===state.selId);
     parts.push(breadcrumbLibrary(sym?symbolCatalogLabel(sym.node,sym.id):state.selId||""));
   } else if(state.active&&state.sheets.includes(state.active)){
-    parts.push(breadcrumbSheet(linkedSheetBasename(state.active)||state.active.name||""));
+    parts.push(breadcrumbSheet(sheetDisplayTitle(state.active)||state.active.name||""));
   }
   breadcrumbEl.textContent=parts.length?parts.join(" / "):"\u2014";
   breadcrumbEl.title=breadcrumbEl.textContent;
@@ -2006,9 +2028,11 @@ function buildSheetGroup(id,cfg){
   const land = cfg.orient!=="portrait";
   const W = land?1485:1050, H = land?1050:1485;
   const g=document.createElementNS(SVGNS,"g"); g.setAttribute("id",id);
+  const docTitle=cfg.doc||"Schemat elektryczny";
+  g.setAttribute(SHEET_TITLE_ATTR, docTitle);
   g.appendChild(mkChromeEl("rect",{x:12,y:12,width:W-24,height:H-24,class:"fr"}));
   g.appendChild(mkChromeEl("rect",{x:20,y:20,width:W-40,height:H-40,class:"fr2"}));
-  g.appendChild(mkChromeText(34,52,"ttl",cfg.doc||"Schemat elektryczny"));
+  g.appendChild(mkChromeText(34,52,"ttl",docTitle));
   g.appendChild(mkChromeText(34,72,"sub",(cfg.maker||"")+((cfg.norm)?("  \u00b7  "+cfg.norm):"")));
   // tabelka opisowa (d&oacute;&#322;)
   const tH=120, tX=34, tW=W-68, tY=H-34-tH;

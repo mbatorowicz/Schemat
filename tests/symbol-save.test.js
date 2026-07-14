@@ -248,7 +248,9 @@ describe("symbolDisplayName / symbolDesignation", () => {
 
     expect(symbolListPrimaryLabel(sym.node, sym.node.id)).toBe("Czujnik");
 
-    expect(symbolListPrimaryLabel(mockSym("SK", {}).node, "SK")).toBe("SK");
+    const skLabel = symbolListPrimaryLabel(mockSym("SK", {}).node, "SK");
+    expect(skLabel).toContain("bezpiecze");
+    expect(symbolCatalogSubtitle(mockSym("SK", {}).node, "SK")).toBe("SK");
 
   });
 

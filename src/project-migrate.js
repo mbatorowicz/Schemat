@@ -5,6 +5,9 @@ import { symbolAliasMigrations, SYMBOL_ID_ALIASES } from "./symbol-aliases.js";
 import { stripSheetEmbeddedSymbols, resolveLibSymbol, libSymbolGroups } from "./symbol-resolver.js";
 import { migrateInstanceRefsOnRoot } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
+import { migrateSheetDisplayTitle } from "./sheet-catalog.js";
+import { inferSymbolDisplayName } from "./symbol-display.js";
+import { SYMBOL_NAME_ATTR, symbolDisplayName } from "./symbol-save.js";
 export function createProjectMigrator(deps) {
   const {
     state,
@@ -113,6 +116,29 @@ export function createProjectMigrator(deps) {
     if (!node.getAttribute("data-inst-start")) node.setAttribute("data-inst-start", String(startNum || 1));
   }
 
+  function migrateSheetDisplayTitles() {
+    let changed = false;
+    state.sheets.forEach((sh) => {
+      if (migrateSheetDisplayTitle(sh)) changed = true;
+    });
+    return changed;
+  }
+
+  function migrateLibraryDisplayNames() {
+    if (!state.lib?.svg) return false;
+    let changed = false;
+    libSymbolGroups(state.lib.svg).forEach((g) => {
+      if (symbolDisplayName(g)) return;
+      const inferred = inferSymbolDisplayName(g, g.id);
+      const ozn = (g.getAttribute("data-inst-prefix") || g.id || "").trim();
+      if (inferred && inferred !== ozn) {
+        g.setAttribute(SYMBOL_NAME_ATTR, inferred);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   function migrateProject() {
     let changed = false;
     if (state.lib && state.lib.svg) {
@@ -120,10 +146,12 @@ export function createProjectMigrator(deps) {
       if (stripSymPrefixInSvg(state.lib.svg, XLINK)) changed = true;
       if (migrateLibrarySymbolNames()) changed = true;
       if (migrateLibraryDesignationIds()) changed = true;
+      if (migrateLibraryDisplayNames()) changed = true;
     }
     state.sheets.forEach((sh) => {
       if (sh.svg && stripSymPrefixInSvg(sh.svg, XLINK)) changed = true;
     });
+    if (migrateSheetDisplayTitles()) changed = true;
     if (migrateSheetEmbeddedSymbolIds()) changed = true;
     if (stripDuplicateEmbeddedSymbols()) changed = true;
     if (migrateInstanceRefs()) changed = true;
