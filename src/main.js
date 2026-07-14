@@ -32,7 +32,8 @@ import {
   inlineSheetDefsSafe,
   sheetKey
 } from './sheet-persistence.js';
-import { readFontSizePx, applyTextStyle } from './element-styles.js';
+import { readFontSizePx, applyTextStyle, applyPrimaryColor, applyStrokeWidth, applyStrokeDash, applyFill, applyFont } from './element-styles.js';
+import { resolveStyleTargetsForRecords, primaryColorFromRecord } from './style-targets.js';
 import { SVGNS, XLINK } from './svg-constants.js';
 import {
   mkEl,
@@ -73,6 +74,28 @@ import { qsById } from './dom-selectors.js';
 import { mkChromeEl, mkChromeText, mkHandle, mkPrev } from './element-factory.js';
 import { createNetlistUi } from './netlist-ui.js';
 import { createFileIo } from './file-io.js';
+import { resolveBootCachePlan, resolveReloadSheetsOutcome, projectCacheScore, libraryCacheScore } from './boot-cache.js';
+import { resolveToolbarGroups } from './toolbar-context.js';
+import {
+  W,
+  saveFileLabel,
+  saveFileTip,
+  resourceNameLabel,
+  resourceNamePlaceholder,
+  paramsSaveTip,
+  symbolSelectionSummary,
+  breadcrumbProject,
+  breadcrumbLibrary,
+  breadcrumbSheet,
+  status,
+} from './ui-wording.js';
+import { applySymbolForm, readSymbolFormFromDom, symbolDisplayName, symbolCatalogLabel, symbolCatalogSubtitle, symbolDesignation } from './symbol-save.js';
+import {
+  renameSheetOnDisk,
+  renameLibraryOnDisk,
+  renameProjectFolderOnDisk,
+} from './resource-rename.js';
+import './toolbar-form.css';
 
 
 "use strict";
@@ -82,6 +105,7 @@ const ICONS = {
   btnOpen:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   btnGrant:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="15" cy="14" r="2.2"/><path d="M15 16v3M15 19h2"/>',
   btnSave:'<path d="M4 4h11l5 5v11H4z"/><path d="M8 4v5h7"/><rect x="8" y="13" width="8" height="7"/>',
+  btnSaveProject:'<path d="M4 4h8l2 2h8v12H4z"/><path d="M8 4v5h6"/><rect x="7" y="14" width="6" height="5"/><path d="M14 4v3h4"/>',
   btnSaveAs:'<path d="M4 4h10l4 4v5"/><path d="M8 4v5h7"/><path d="M13.5 20.5l6-6 2 2-6 6h-2z"/>',
   btnNewSheet:'<rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="15" width="10" height="4"/><path d="M7 7h10"/>',
   btnLib:'<path d="M4 5a2 2 0 0 1 2-2h4v16H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-4v16h4a2 2 0 0 1 2 2z"/>',
@@ -106,7 +130,8 @@ const ICONS = {
   btnRotL:'<path d="M5 12a7 7 0 1 0 2-4.9"/><path d="M4 4v4h4"/>',
   btnRotR:'<path d="M19 12a7 7 0 1 1-2-4.9"/><path d="M20 4v4h-4"/>',
   btnDelShape:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
-  btnRename:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  btnSaveSymbol:'<path d="M20 6L9 17l-5-5"/>',
+  btnSaveResource:'<path d="M20 6L9 17l-5-5"/>',
   btnAddSym:'<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M12 8v8M8 12h8"/>',
   btnDupSym:'<path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5"/>',
   btnExportSym:'<path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 19h16"/>',
@@ -117,9 +142,15 @@ const ICONS = {
   btnFit:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
 };
 function injectIcons(){
+  const svgFor=id=>'<svg viewBox="0 0 24 24" aria-hidden="true">'+ICONS[id]+'</svg>';
   for(const id in ICONS){
     const b=document.getElementById(id); if(!b) continue;
-    b.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true">'+ICONS[id]+'</svg>';
+    const ico=b.querySelector(".btn-ico");
+    if(ico) ico.innerHTML=svgFor(id);
+    else if(b.classList.contains("btn-labeled")){
+      const span=document.createElement("span"); span.className="btn-ico"; span.innerHTML=svgFor(id);
+      b.insertBefore(span,b.firstChild);
+    } else b.innerHTML=svgFor(id);
   }
 }
 
@@ -170,9 +201,9 @@ function clearHighlight(){ if(scene?.sel) scene.sel.innerHTML=""; updateTextBar(
 function selEls(){ return state.selection.length ? state.selection : (state.activeEl?[state.activeEl]:[]); }
 
 let childPair, bboxInRoot, rebuildEditDefs, rebuildHost;
-let targetSheet, connectionDiagnostics, routeSelectedConnection, collectNetlistProposals, nextProposalId;
-let refreshNetlistUI, loadNetlistText, autoLoadNetlistForSheet;
-let ensurePerm, writeHandle, saveFile, saveAs, hasPerm;
+let targetSheet=()=>null, connectionDiagnostics=()=>({ok:true,reason:""}), routeSelectedConnection=()=>{}, collectNetlistProposals=()=>[], nextProposalId=()=>"NEW1";
+let refreshNetlistUI=()=>{}, loadNetlistText=async()=>false, autoLoadNetlistForSheet=async()=>false;
+let ensurePerm, writeHandle, saveFile, saveAs, saveProjectToDisk, hasPerm;
 let selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue;
 
 function wireRenderPipeline(){
@@ -214,10 +245,14 @@ function wireFileIo(){
     syncListSelection,
     idbSet,
     XLINK,
+    saveProjectSettings,
+    getFileHandleByPath,
   });
-  ({ ensurePerm, writeHandle, saveFile, saveAs, hasPerm }=f);
+  ({ ensurePerm, writeHandle, saveFile, saveAs, saveProjectToDisk, hasPerm }=f);
   document.getElementById("btnSave").onclick=saveFile;
   document.getElementById("btnSaveAs").onclick=saveAs;
+  const btnProj=document.getElementById("btnSaveProject");
+  if(btnProj) btnProj.onclick=()=>{ void saveProjectToDisk(); };
 }
 
 function wireSelectionModel(){
@@ -345,13 +380,6 @@ document.getElementById("fileInput").onchange = e=>{ const f=e.target.files[0]; 
 function resolveLibSymbolNode(id){ return resolveLibSymbol(state.lib?.svg, id); }
 function resolveSheetSymbolNode(id, sheetSvg){ return resolveSheetSymbol(sheetSvg||state.srcSvg, id); }
 function resolveSymbolNode(id, sheetSvg){ return resolveSymbol(state.lib?.svg, sheetSvg||state.srcSvg, id); }
-function isValidSymbolId(v){ return !!v && /^[\p{L}_][\p{L}\p{N}_\-]*$/u.test(v); }
-function svgIdExists(svg,id,exceptId){
-  if(!svg||!id) return false;
-  const nodes=svg.querySelectorAll('[id]');
-  for(const n of nodes){ if(n.id===id && n.id!==exceptId) return true; }
-  return false;
-}
 function migrateProjectSymbolNames(){
   if(!migrateProject) return false;
   return migrateProject();
@@ -380,54 +408,199 @@ function selectedConnOnSheet(){
   const el=state.selection[0], node=currentSymNode();
   return el&&node&&isConnGroup(el)&&el.parentNode===node?el:null;
 }
+function applyStaticWording(){
+  const set=(id,text)=>{ const el=document.getElementById(id); if(el) el.textContent=text; };
+  set("lblSymName", W.field.name);
+  set("lblInstPrefix", W.field.designation);
+  set("lblInstStart", W.field.numberFrom);
+  set("lblGroupSymbol", W.group.symbol);
+  set("txtSaveSymbol", W.save.params);
+  set("txtSaveResource", W.save.params);
+  set("txtInstNumbered", W.field.numberToggle);
+  const tip=(id,text)=>{ const el=document.getElementById(id); if(el) el.title=text; };
+  tip("lblSymName", W.fieldTip.symbolName);
+  tip("symName", W.fieldTip.symbolName);
+  tip("lblInstPrefix", W.fieldTip.symbolDesignation);
+  tip("instPrefix", W.fieldTip.symbolDesignation);
+  tip("lblInstNumbered", W.fieldTip.numberToggle);
+  tip("txtInstNumbered", W.fieldTip.numberToggle);
+  const symName=document.getElementById("symName");
+  const instPrefix=document.getElementById("instPrefix");
+  if(symName) symName.placeholder=W.placeholder.symbolName;
+  if(instPrefix) instPrefix.placeholder=W.placeholder.designation;
+  const btnSaveSymbol=document.getElementById("btnSaveSymbol");
+  if(btnSaveSymbol) btnSaveSymbol.title=W.saveTip.symbol;
+  const btnProj=document.getElementById("btnSaveProject");
+  if(btnProj){
+    const lbl=btnProj.querySelector(".btn-text");
+    if(lbl) lbl.textContent=W.save.project;
+    btnProj.title=W.saveTip.project;
+  }
+}
+function syncResourceNameFields(mode){
+  const lbl=document.getElementById("lblResourceName");
+  const grp=document.getElementById("lblGroupResource");
+  const inp=document.getElementById("resourceNameInput");
+  const btn=document.getElementById("btnSaveResource");
+  if(!mode||!inp){ if(inp) inp.value=""; return; }
+  if(lbl) lbl.textContent=resourceNameLabel(mode);
+  if(grp){
+    const g={ sheet: W.group.sheet, library: W.group.library, project: W.group.project };
+    grp.textContent=g[mode]||"";
+  }
+  if(inp){
+    inp.placeholder=resourceNamePlaceholder(mode);
+    if(mode==="sheet"&&state.active&&state.active!==state.lib){
+      inp.value=linkedSheetBasename(state.active.name||"");
+    } else if(mode==="library"&&state.lib){
+      inp.value=state.lib.name||"";
+    } else if(mode==="project"&&state.dir){
+      inp.value=state.dir.name||"";
+    } else inp.value="";
+    inp.disabled=mode==="project"?!state.dir:mode==="library"?!state.lib:mode==="sheet"?!state.active:false;
+  }
+  if(btn) btn.title=paramsSaveTip(mode);
+}
+function syncLibrarySelectionInfo(){
+  const info=document.getElementById("selectionInfo"); if(!info) return;
+  const sym=state.symbols.find(s=>s.id===state.selId);
+  if(sym){
+    const label=symbolCatalogLabel(sym.node, sym.id);
+    const ozn=symbolDesignation(sym.node, sym.id);
+    const showOzn=!!symbolDisplayName(sym.node)&&ozn&&ozn!==label;
+    info.textContent=symbolSelectionSummary(label, showOzn?ozn:null);
+    info.title=W.selection.symbolTitle(label);
+  } else {
+    info.textContent=W.selection.pickSymbol;
+    info.title=W.selection.pickSymbolTitle;
+  }
+}
 function syncNameFields(){
-  const symInp=document.getElementById("symId"), prefixInp=document.getElementById("instPrefix");
+  const symInp=document.getElementById("symName"), prefixInp=document.getElementById("instPrefix");
   const numChk=document.getElementById("instNumbered"), startInp=document.getElementById("instStart");
-  const btnSym=document.getElementById("btnRename");
+  const btnSym=document.getElementById("btnSaveSymbol");
   if(!symInp) return;
   if(state.active===state.lib){
     const sym=state.symbols.find(s=>s.id===state.selId);
     if(sym){
-      symInp.value=state.selId||"";
+      symInp.value=symbolDisplayName(sym.node);
       symInp.disabled=false; if(btnSym) btnSym.disabled=false;
       const rule=refBaseForSymbol(state.selId);
-      if(prefixInp){ prefixInp.disabled=false; prefixInp.value=(sym.node.getAttribute("data-inst-prefix")||"").trim()||rule.base||""; }
+      if(prefixInp){
+        prefixInp.disabled=false;
+        prefixInp.value=symbolDesignation(sym.node, sym.id);
+        const suggested=refBaseForSymbol(sym.id, sym.node).base;
+        prefixInp.placeholder=suggested||W.placeholder.designation;
+      }
       if(numChk){
         numChk.disabled=false;
         const numbered=sym.node.getAttribute("data-inst-numbered");
         numChk.checked=numbered===""?!!rule.numbered:numbered!=="0";
       }
       if(startInp){ startInp.disabled=false; startInp.value=sym.node.getAttribute("data-inst-start")||String(rule.start||1); }
-      syncSymbolToolbar();
+      syncLibrarySelectionInfo();
+      syncToolbarContext();
       return;
     }
   }
   symInp.disabled=true; if(btnSym) btnSym.disabled=true;
-  if(prefixInp){ prefixInp.disabled=true; prefixInp.value=""; }
+  if(prefixInp){ prefixInp.disabled=true; prefixInp.value=""; prefixInp.placeholder=W.placeholder.designation; }
   if(numChk){ numChk.disabled=true; }
   if(startInp){ startInp.disabled=true; startInp.value="1"; }
-  syncSymbolToolbar();
+  if(state.active===state.lib) syncLibrarySelectionInfo();
+  syncToolbarContext();
 }
-function saveInstPrefixSettings(){
-  if(state.active!==state.lib) return;
-  const sym=state.symbols.find(s=>s.id===state.selId); if(!sym) return;
-  const prefixInp=document.getElementById("instPrefix"), numChk=document.getElementById("instNumbered"), startInp=document.getElementById("instStart");
-  const prefix=(prefixInp&&prefixInp.value||"").trim();
-  if(prefix) sym.node.setAttribute("data-inst-prefix",prefix); else sym.node.removeAttribute("data-inst-prefix");
-  if(numChk) sym.node.setAttribute("data-inst-numbered",numChk.checked?"1":"0");
-  if(startInp) sym.node.setAttribute("data-inst-start",String(parseInt(startInp.value,10)||1));
+function saveSymbol(){
+  const sym=state.symbols.find(s=>s.id===state.selId);
+  if(!sym||state.active!==state.lib){ setStatus(status.symbolPickLibrary); return; }
+  const form=readSymbolFormFromDom();
+  const undoBefore=state.undo.length;
+  pushUndo();
+  const result=applySymbolForm({
+    sym, libSvg: state.lib.svg, sheets: state.sheets, form,
+    rewriteSymbolIdRefs, XLINK,
+  });
+  if(!result.ok){
+    if(state.undo.length>undoBefore) state.undo.pop();
+    setStatus(result.message);
+    return;
+  }
+  if(result.newId) state.selId=result.newId;
   buildSymbolList();
+  syncListSelection();
   syncNameFields();
-  markDirty();
+  markSheetDirty(state.lib);
+  setStatus(result.message);
+  saveProject();
 }
-function syncSymbolToolbar(){
-  const libRow=document.getElementById("symbolLibRow"), sheetRow=document.getElementById("symbolSheetRow");
-  if(!libRow||!sheetRow) return;
+async function saveResourceName(){
   const onLib=state.active===state.lib;
   const onSheet=state.active&&state.active!==state.lib;
-  libRow.classList.toggle("context-hidden",!onLib);
-  sheetRow.classList.toggle("context-hidden",!onSheet);
+  const mode=onSheet?"sheet":onLib?"library":state.dir?"project":null;
+  if(!mode){ return; }
+  const inp=document.getElementById("resourceNameInput");
+  const v=(inp?.value||"").trim();
+  const rw={ writeHandle, getFileHandleByPath };
+  if(mode==="sheet"){
+    if(!state.active?.handle&&!state.dir){ setStatus("Brak pliku schematu na dysku."); return; }
+    const res=await renameSheetOnDisk({ sheet: state.active, newBase: v, dir: state.dir, readWrite: rw });
+    if(!res.ok){ setStatus(res.message); return; }
+    if(!res.unchanged) buildSymbolList();
+    syncResourceNameFields("sheet");
+    syncContextBreadcrumb();
+    setStatus(res.message||status.sheetRenamed("", v));
+    saveProject();
+    return;
+  }
+  if(mode==="library"){
+    if(!state.lib){ return; }
+    const res=await renameLibraryOnDisk({ lib: state.lib, newFileName: v, dir: state.dir, settingsCfg, readWrite: rw });
+    if(!res.ok){ setStatus(res.message); return; }
+    if(!res.unchanged) await saveProjectSettings();
+    syncResourceNameFields("library");
+    syncContextBreadcrumb();
+    syncSaveButtons();
+    setStatus(res.message);
+    saveProject();
+    return;
+  }
+  if(mode==="project"){
+    if(!state.dir){ return; }
+    const res=await renameProjectFolderOnDisk({ dir: state.dir, newName: v, idbSet });
+    if(!res.ok){ setStatus(res.message); return; }
+    if(res.dir) state.dir=res.dir;
+    syncResourceNameFields("project");
+    syncContextBreadcrumb();
+    setStatus(res.message);
+  }
 }
+function syncSaveButtons(){
+  const btnSave=document.getElementById("btnSave"), lbl=document.getElementById("btnSaveLabel");
+  const btnProj=document.getElementById("btnSaveProject");
+  if(!btnSave||!lbl) return;
+  const onLib=state.active===state.lib;
+  const onSheet=state.active&&state.active!==state.lib;
+  lbl.textContent=saveFileLabel({ onLib, onSheet });
+  btnSave.title=saveFileTip({ onLib, onSheet, fileName: state.active?.name });
+  btnSave.disabled=!(state.active?.svg);
+  if(btnProj){
+    btnProj.disabled=!state.dir;
+    btnProj.title=state.dir?W.saveTip.project:W.saveTip.project;
+  }
+}
+function syncToolbarContext(){
+  const onLib=state.active===state.lib;
+  const onSheet=state.active&&state.active!==state.lib;
+  const symSelected=onLib&&state.symbols.some(s=>s.id===state.selId);
+  const groups=resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection: state.selection.length>0, hasDir: !!state.dir });
+  const { resourceNameMode, ...vis }=groups;
+  const toggle=(id,show)=>{ const el=document.getElementById(id); if(el) el.classList.toggle("context-hidden",!show); };
+  Object.entries(vis).forEach(([id,show])=>toggle(id,show));
+  syncResourceNameFields(resourceNameMode);
+  syncSaveButtons();
+  syncContextBreadcrumb();
+}
+function syncSymbolToolbar(){ syncToolbarContext(); }
 function ensureLib(){ if(!state.lib){ const p=parseSvg(baseDocText()); state.lib={handle:null,name:"E-00_symbole.svg",svg:p.svg,doc:p.doc}; } }
 
 async function openProject(){
@@ -493,7 +666,7 @@ async function scanProject(dir){
     showGrantIfNeeded(dir);
     let statusMsg="Otwarto projekt"+(dir.name?(" "+dir.name):"")+": schemat&oacute;w "+sheets.length+(state.lib?(", biblioteka "+(settingsCfg.library||state.lib.name)):" (brak biblioteki \u2014 kliknij Biblioteka\u2026)")+".";
     if(state.projectNetlists.length) statusMsg+=", spisy: "+state.projectNetlists.length;
-    if(await autoLoadNetlistForSheet(targetSheet(),dir,{silent:true})) statusMsg+=", aktywny spis: "+state.netlist.connections.length+" po\u0142\u0105cze\u0144 ("+state.netlist.name+")";
+    if(typeof autoLoadNetlistForSheet==="function" && await autoLoadNetlistForSheet(typeof targetSheet==="function"?targetSheet():null,dir,{silent:true})) statusMsg+=", aktywny spis: "+state.netlist.connections.length+" po\u0142\u0105cze\u0144 ("+state.netlist.name+")";
     setStatus(statusMsg);
     saveProject();
   }catch(e){
@@ -524,8 +697,6 @@ async function pickLibrary(){
     setStatus("Biblioteka: "+f.name+" ("+state.symbols.length+" symboli"+(state.connIssues.length?", problemy przy&#322;&#261;czy: "+state.connIssues.length:"")+").");
   }catch(e){ if(e.name!=="AbortError") console.warn(e); }
 }
-function libSnapshot(){ return state.lib?{name:state.lib.name, text:serializeSvg(state.lib.svg)}:null; }
-function flushLibrary(){ if(state.lib&&state.lib.svg) syncConnStylesInLib(state.lib.svg,SVGNS); const s=libSnapshot(); if(!s) return; writeJsonCache("libDoc","edytor.lib",s); }
 async function restoreLibrary(){ return restoreLibrarySnapshot(); }
 async function saveProjectSettings(){ if(!state.dir) return false; try{ if(!(await ensurePerm(state.dir))) return false; const h=await state.dir.getFileHandle("projekt.json",{create:true}); await writeHandle(h, JSON.stringify(settingsCfg,null,2)); return true; }catch(e){ console.warn(e); return false; } }
 document.getElementById("btnLib").onclick=pickLibrary;
@@ -665,11 +836,14 @@ function symbolListItem(sym){
   const li=document.createElement("li"); li.dataset.id=sym.id; li.title="Kliknij, aby edytowa\u0107 symbol";
   const svg=document.createElementNS(SVGNS,"svg"); svg.setAttribute("class","sym-thumb"); svg.setAttribute("viewBox","-30 -30 60 60"); svg.setAttribute("preserveAspectRatio","xMidYMid meet");
   const use=document.createElementNS(SVGNS,"use"); use.setAttribute("href","#"+sidebarPrefix+sym.id); use.setAttributeNS(XLINK,"xlink:href","#"+sidebarPrefix+sym.id); svg.appendChild(use);
-  const name=document.createElement("span"); name.className="sym-name"; name.textContent=symbolOznaczenieLabel(sym); name.title=sym.id;
-  const add=document.createElement("button"); add.type="button"; add.className="sym-add"; add.textContent="+"; add.title="Wstaw "+sym.id+" do bie\u017c\u0105cego arkusza";
+  const labels=document.createElement("span"); labels.className="sym-labels";
+  const idEl=document.createElement("span"); idEl.className="sym-id"; idEl.textContent=symbolCatalogLabel(sym.node, sym.id);
+  const oznEl=document.createElement("span"); oznEl.className="sym-ozn"; oznEl.textContent=symbolCatalogSubtitle(sym.node, sym.id);
+  labels.append(idEl,oznEl);
+  const add=document.createElement("button"); add.type="button"; add.className="sym-add"; add.textContent="+"; add.title="Wstaw "+symbolDesignation(sym.node, sym.id)+" na schemat (np. "+symbolDesignation(sym.node, sym.id)+"1)";
   add.addEventListener("pointerdown",e=>e.stopPropagation());
   add.addEventListener("click",e=>{ e.stopPropagation(); insertUse(sym.id,true); });
-  li.append(svg,name,add); li.onclick=()=>selectSymbol(sym.id); li.classList.toggle("sel",state.active===state.lib&&state.selId===sym.id);
+  li.append(svg,labels,add); li.onclick=()=>selectSymbol(sym.id); li.classList.toggle("sel",state.active===state.lib&&state.selId===sym.id);
   requestAnimationFrame(()=>{ try{ const b=use.getBBox(), pad=Math.max(2,Math.max(b.width,b.height)*0.08); if(isFinite(b.width)&&isFinite(b.height)&&(b.width||b.height)) svg.setAttribute("viewBox",[b.x-pad,b.y-pad,Math.max(1,b.width+2*pad),Math.max(1,b.height+2*pad)].map(fmt).join(" ")); }catch(e){} });
   return li;
 }
@@ -710,7 +884,7 @@ function buildSymbolList(){
   state.sheets.forEach(sh=>{ const label=linkedSheetBasename(sh); const li=liEl(label,sh.id,()=>selectSheet(sh)); li.title=sh.relPath||sh.name; li._sheet=sh; schlist.appendChild(li); });
   syncListSelection();
   const ins=document.getElementById("insertSym");
-  if(ins){ const prev=ins.value; ins.innerHTML=""; state.symbols.forEach(s=>{ const o=document.createElement("option"); o.value=s.id; const oz=symbolOznaczenieLabel(s); o.textContent=oz===s.id?oz:oz+" ("+s.id+")"; ins.appendChild(o); }); if([...ins.options].some(o=>o.value===prev)) ins.value=prev; }
+  if(ins){ const prev=ins.value; ins.innerHTML=""; state.symbols.forEach(s=>{ const o=document.createElement("option"); o.value=s.id; const label=symbolCatalogLabel(s.node, s.id); const ozn=symbolDesignation(s.node, s.id); o.textContent=symbolDisplayName(s.node)&&ozn!==label?label+" \u00b7 "+ozn:label; ins.appendChild(o); }); if([...ins.options].some(o=>o.value===prev)) ins.value=prev; }
 }
 
 // ---- wyb&oacute;r celu + render ----
@@ -738,20 +912,31 @@ function activateTarget(target,id,keepView){
   if(target!==state.lib) state.lastSheet=target;
   if(state.active!==prevActive){ state.undo=[]; state.redo=[]; }
   state.selId=id; state.selHandle=null; state.activeEl=null; state.selection=[]; clearSelInfo();
-  const idInp=document.getElementById("symId"); if(idInp&&state.active===state.lib) idInp.value=id;
   syncNameFields();
   syncListSelection(); render();
-  syncContextBreadcrumb();
-  if(state.netlist) refreshNetlistUI();
+  syncToolbarContext();
+  if(state.netlist && typeof refreshNetlistUI==="function") refreshNetlistUI();
   if(keepView) applyView(); else fitView();
   savePrefs();
 }
 function selectSheet(sheet,keepView){ if(!sheet||state.sheets.indexOf(sheet)<0) return; activateTarget(sheet,sheet.id,keepView); if(state.dir){ autoLoadNetlistForSheet(sheet,state.dir,{silent:true}).then(ok=>{ if(state.active!==sheet) return; if(ok) setStatus("Arkusz "+linkedSheetBasename(sheet.name)+", spis: "+state.netlist.name+" ("+state.netlist.connections.length+" po\u0142\u0105cze\u0144)."); else setStatus("Arkusz "+linkedSheetBasename(sheet.name)+" \u2014 brak pliku polaczenia_<arkusz>.md."); }); } }
 function selectSymbol(id, keepView){
-  const sheet=state.sheets.find(s=>s.id===id); if(sheet){ selectSheet(sheet,keepView); return; }
-  ensureLib(); activateTarget(state.lib,id,keepView);
+  if(!id) return;
+  if(state.symbols.some(s=>s.id===id)){
+    ensureLib();
+    activateTarget(state.lib,id,keepView);
+    return;
+  }
+  const sheet=state.sheets.find(s=>s.id===id);
+  if(sheet){ selectSheet(sheet,keepView); return; }
+  ensureLib();
+  if(resolveLibSymbol(state.lib?.svg,id)) activateTarget(state.lib,id,keepView);
 }
-function currentSymNode(){ return (state.srcSvg && state.selId) ? qsById(state.srcSvg, state.selId) : null; }
+function currentSymNode(){
+  if(!state.srcSvg||!state.selId) return null;
+  if(state.active===state.lib) return resolveLibSymbol(state.lib?.svg,state.selId);
+  return qsById(state.srcSvg,state.selId);
+}
 
 function render(){
   const missing=rebuildEditDefs(scene.defs).missing;
@@ -836,7 +1021,7 @@ function editElement(el){
     const cur=(el.getAttribute("href")||el.getAttributeNS(XLINK,"href")||"").replace(/^#/,"");
     const ids=state.symbols.map(s=>s.id);
     const v=prompt("Symbol (<use>) \u2014 id z biblioteki:\n"+ids.join(", "), cur); if(v===null) return;
-    if(!state.lib||!state.lib.svg.querySelector('[id="'+v+'"]')){ setStatus("Brak symbolu "+v+" w bibliotece."); return; }
+    if(!state.lib||!resolveLibSymbol(state.lib.svg,v)){ setStatus("Brak symbolu "+v+" w bibliotece."); return; }
     const ref=prompt("Oznaczenie instancji:",el.getAttribute("data-ref")||""); if(ref===null) return;
     pushUndo(); el.setAttribute("href","#"+v); el.setAttributeNS(XLINK,"xlink:href","#"+v); if(ref.trim()) el.setAttribute("data-ref",ref.trim().replace(/^-/,"")); render(); setStatus("Podmieniono symbol na #"+v);
   } else {
@@ -1048,15 +1233,19 @@ function syncContextBreadcrumb(){
   if(!breadcrumbEl) return;
   if(state.drawMode){
     breadcrumbEl.textContent="Rysowanie: "+(DRAW_LABELS[state.drawMode]||state.drawMode);
+    breadcrumbEl.title=breadcrumbEl.textContent;
     return;
   }
+  const parts=[];
+  if(state.dir?.name) parts.push(breadcrumbProject(state.dir.name));
   if(state.active===state.lib){
-    breadcrumbEl.textContent="Biblioteka symboli"+(state.selId?" · "+state.selId:"");
+    const sym=state.symbols.find(s=>s.id===state.selId);
+    parts.push(breadcrumbLibrary(sym?symbolCatalogLabel(sym.node,sym.id):state.selId||""));
   } else if(state.active&&state.sheets.includes(state.active)){
-    breadcrumbEl.textContent="Schemat: "+(state.active.name||state.selId||"—");
-  } else {
-    breadcrumbEl.textContent="—";
+    parts.push(breadcrumbSheet(linkedSheetBasename(state.active)||state.active.name||""));
   }
+  breadcrumbEl.textContent=parts.length?parts.join(" / "):"\u2014";
+  breadcrumbEl.title=breadcrumbEl.textContent;
 }
 function syncDrawBanner(){
   if(!drawBannerEl) return;
@@ -1070,7 +1259,7 @@ function syncDrawBanner(){
     drawBannerEl.textContent="";
     if(toolbarEl) toolbarEl.classList.remove("draw-mode");
   }
-  syncContextBreadcrumb();
+  syncToolbarContext();
 }
 let connMetaResolve=null;
 function openConnMetaModal(node){
@@ -1378,6 +1567,20 @@ document.getElementById("showHandles").onchange=e=>{ state.showHandles=e.target.
 document.getElementById("rotateOwnedLabels").onchange=e=>{ state.rotateOwnedLabels=e.target.checked; savePrefs(); };
 document.getElementById("rotAng").onchange=savePrefs;
 document.getElementById("insertSym").onchange=savePrefs;
+function styleTargetCtx(){
+  return {
+    isConnLabelMode,
+    isConnGroup,
+    isConnPoint,
+    connParts,
+    connStrokeTargets,
+    connFillTarget,
+    sheetNode: currentSymNode(),
+  };
+}
+function mergedStyleTargets(records){
+  return resolveStyleTargetsForRecords(records, styleTargetCtx());
+}
 function rgbToHex(c){ if(!c) return null; c=c.trim(); if(c[0]==="#") return c; const m=c.match(/rgba?\(([^)]+)\)/); if(!m) return null; const p=m[1].split(",").map(s=>parseFloat(s)); if(p.length<3) return null; const h=n=>("0"+Math.round(n).toString(16)).slice(-2); return "#"+h(p[0])+h(p[1])+h(p[2]); }
 function setGroupVisible(id,on){ document.getElementById(id).classList.toggle("context-hidden",!on); }
 function setMixedColor(inputId,markId,mixed,value){
@@ -1395,16 +1598,7 @@ function setSelectState(sel,value,mixed){
   const o=document.createElement("option"); o.value=v; o.textContent=v; o.dataset.custom="1"; sel.appendChild(o); sel.value=v;
 }
 function primaryColorOf(r){
-  if(r.tag==="use"){
-    const own=r.el.style.getPropertyValue("--object-stroke").trim(); if(own) return rgbToHex(own)||own;
-    const href=(r.el.getAttribute("href")||r.el.getAttributeNS(XLINK,"href")||"").replace(/^#/,"");
-    const def=[...scene.defs.querySelectorAll("[id]")].find(n=>n.id===href);
-    if(def){ for(const n of [def,...def.querySelectorAll("*")]){ const cs=getComputedStyle(n), stroke=cs.stroke; if(paintVisible(stroke)){ const hex=rgbToHex(stroke); if(hex) return hex; } if(n.classList&&n.classList.contains("node")&&paintVisible(cs.fill)){ const hex=rgbToHex(cs.fill); if(hex) return hex; } } }
-    return null;
-  }
-  if(r.tag==="text") return paintVisible(r.cs.fill)?rgbToHex(r.cs.fill):null;
-  if(paintVisible(r.cs.stroke)) return rgbToHex(r.cs.stroke);
-  return paintVisible(r.cs.fill)?rgbToHex(r.cs.fill):null;
+  return primaryColorFromRecord(r, styleTargetCtx(), { rgbToHex, sceneDefs: scene?.defs });
 }
 function selectionTypeLabel(records){
   if(isConnLabelMode()) return "napis przy\u0142\u0105cza";
@@ -1416,8 +1610,12 @@ function selectionTypeLabel(records){
 function syncSelectionToolbar(){
   const records=selectedRecords(), has=records.length>0;
   const info=document.getElementById("selectionInfo");
-  info.innerHTML=has?selectionTypeLabel(records):"Styl nowych obiekt&oacute;w";
-  info.title=has?records.map(r=>r.tag).join(", "):"Ustawienia używane przy rysowaniu nowych elementów";
+  if(state.active===state.lib){
+    syncLibrarySelectionInfo();
+  } else {
+    info.innerHTML=has?selectionTypeLabel(records):"Styl nowych obiekt&oacute;w";
+    info.title=has?records.map(r=>r.tag).join(", "):"Ustawienia używane przy rysowaniu nowych elementów";
+  }
 
   ["btnFlipH","btnFlipV","btnRotL","btnRotR","btnClone","btnDelShape"].forEach(id=>document.getElementById(id).disabled=!has);
   document.getElementById("rotAng").disabled=!has;
@@ -1437,6 +1635,7 @@ function syncSelectionToolbar(){
     setSelectState(sw,state.strokeW,false); dash.indeterminate=false; dash.checked=state.dashOn;
     fillOn.indeterminate=false; fillOn.checked=state.fillOn;
     fs.value=state.fontSize; setSelectState(fw,String(state.fontWeight),false);
+    syncToolbarContext();
     return;
   }
 
@@ -1461,22 +1660,37 @@ function syncSelectionToolbar(){
     const weights=commonValue(tr.map(r=>{ let w=r.cs.fontWeight; if(w==="normal")w="400"; if(w==="bold")w="700"; return w; }));
     setSelectState(fw,weights.value,weights.mixed);
   }
+  syncToolbarContext();
 }
 document.getElementById("strokeColor").onchange=e=>{
   const color=e.target.value; state.strokeColor=color; savePrefs();
   const records=selectedRecords();
-  if(records.length){ pushUndo(); records.forEach(r=>{ if(r.tag==="use") r.el.style.setProperty("--object-stroke",color); else if(isConnLabelMode()) r.el.style.fill=color; else if(isConnGroup(r.el)){ connStrokeTargets(r).forEach(n=>n.style.stroke=color); const lbl=connParts(r.el).label; if(lbl&&paintVisible(getComputedStyle(lbl).fill)) lbl.style.fill=color; } else if(r.tag==="text") r.el.style.fill=color; else if(!paintVisible(r.cs.stroke)&&paintVisible(r.cs.fill)) r.el.style.fill=color; else r.el.style.stroke=color; }); render(); setStatus("Kolor g&#322;&oacute;wny = "+color+" ("+records.length+" elem.)"); }
+  if(records.length){ pushUndo(); applyPrimaryColor(mergedStyleTargets(records), color); render(); setStatus("Kolor g&#322;&oacute;wny = "+color+" ("+records.length+" elem.)"); }
   else syncSelectionToolbar();
 };
-document.getElementById("fillColor").onchange=e=>{ const color=e.target.value; state.fillColor=color; savePrefs(); const t=fillRecords(); if(t.length){ pushUndo(); t.forEach(r=>fillTarget(r).style.fill=color); render(); setStatus("Wype&#322;nienie = "+color+" ("+t.length+" elem.)"); } else syncSelectionToolbar(); };
-document.getElementById("fillOn").onchange=e=>{ const c=e.target; c.indeterminate=false; state.fillOn=c.checked; savePrefs(); const t=fillRecords(); if(t.length){ const on=c.checked, color=document.getElementById("fillColor").value; pushUndo(); t.forEach(r=>fillTarget(r).style.fill=on?color:"none"); render(); setStatus((on?("Wype&#322;nienie = "+color):"Bez wype&#322;nienia")+" ("+t.length+" elem.)"); } else syncSelectionToolbar(); };
-document.getElementById("dashOn").onchange=e=>{ const c=e.target; c.indeterminate=false; state.dashOn=c.checked; savePrefs(); const t=strokeRecords(); if(t.length){ const on=c.checked; pushUndo(); t.forEach(r=>connStrokeTargets(r).forEach(n=>n.style.strokeDasharray=on?"4 3":"none")); render(); setStatus((on?"Linia przerywana":"Linia ci&#261;g&#322;a")+" ("+t.length+" elem.)"); } };
+document.getElementById("fillColor").onchange=e=>{
+  const color=e.target.value; state.fillColor=color; savePrefs();
+  const t=mergedStyleTargets(fillRecords());
+  if(t.fills.length){ pushUndo(); applyFill(t, color, true); render(); setStatus("Wype&#322;nienie = "+color+" ("+t.fills.length+" elem.)"); }
+  else syncSelectionToolbar();
+};
+document.getElementById("fillOn").onchange=e=>{
+  const c=e.target; c.indeterminate=false; state.fillOn=c.checked; savePrefs();
+  const t=mergedStyleTargets(fillRecords());
+  if(t.fills.length){ const on=c.checked, color=document.getElementById("fillColor").value; pushUndo(); applyFill(t, color, on); render(); setStatus((on?("Wype&#322;nienie = "+color):"Bez wype&#322;nienia")+" ("+t.fills.length+" elem.)"); }
+  else syncSelectionToolbar();
+};
+document.getElementById("dashOn").onchange=e=>{
+  const c=e.target; c.indeterminate=false; state.dashOn=c.checked; savePrefs();
+  const t=mergedStyleTargets(strokeRecords());
+  if(t.strokes.length){ const on=c.checked; pushUndo(); applyStrokeDash(t, on); render(); setStatus((on?"Linia przerywana":"Linia ci&#261;g&#322;a")+" ("+t.strokes.length+" elem.)"); }
+};
 document.getElementById("fontSize").onchange=e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) return;
   state.fontSize=v; savePrefs();
-  const t=textRecords().map(r=>r.el); if(t.length){ pushUndo(); t.forEach(el=>el.style.fontSize=v+"px"); render(); setStatus("Czcionka = "+v+" px ("+t.length+" elem.)"); } };
+  const t=mergedStyleTargets(textRecords()); if(t.texts.length){ pushUndo(); applyFont(t,{ fontSize:v }); render(); setStatus("Czcionka = "+v+" px ("+t.texts.length+" elem.)"); } };
 document.getElementById("fontWeight").onchange=e=>{ const w=e.target.value; if(!w) return;
   state.fontWeight=parseInt(w,10)||400; savePrefs();
-  const t=textRecords().map(r=>r.el); if(t.length){ pushUndo(); t.forEach(el=>el.style.fontWeight=w); render(); setStatus("Waga czcionki = "+w+" ("+t.length+" elem.)"); } };
+  const t=mergedStyleTargets(textRecords()); if(t.texts.length){ pushUndo(); applyFont(t,{ fontWeight:w }); render(); setStatus("Waga czcionki = "+w+" ("+t.texts.length+" elem.)"); } };
 function cloneSelection(){ const node=currentSymNode(); if(!node) return; const els=selEls().filter(el=>el.parentNode===node); if(!els.length){ setStatus("Nic nie zaznaczono do klonowania."); return; } pushUndo(); const clones=[]; els.forEach(el=>{ const c=el.cloneNode(true); node.appendChild(c); moveElement(c,state.step,state.step);
     if(c.tagName.toLowerCase()==="use"){
       const sym=c.getAttribute("data-sym")||((c.getAttribute("href")||c.getAttributeNS(XLINK,"href")||"").replace(/^#/,""));
@@ -1588,8 +1802,8 @@ document.getElementById("btnFlipH").onclick=()=>flipSelection("h");
 document.getElementById("btnFlipV").onclick=()=>flipSelection("v");
 document.getElementById("strokeW").onchange=e=>{ const v=parseFloat(e.target.value); if(isNaN(v)||v<=0) return;
   state.strokeW=v; savePrefs();
-  const targets=strokeRecords();
-  if(targets.length){ pushUndo(); targets.forEach(r=>{ if(isConnGroup(r.el)){ connStrokeTargets(r).forEach(n=>n.style.strokeWidth=fmt(v)); applyConnStyle(r.el); } else connStrokeTargets(r).forEach(n=>n.style.strokeWidth=fmt(v)); }); render(); setStatus("Grubo&#347;&#263; = "+v+" ("+targets.length+" elem.)"); }
+  const records=strokeRecords();
+  if(records.length){ pushUndo(); applyStrokeWidth(mergedStyleTargets(records), v, fmt); records.forEach(r=>{ if(isConnGroup(r.el)) applyConnStyle(r.el); }); render(); setStatus("Grubo&#347;&#263; = "+v+" ("+records.length+" elem.)"); }
 };
 document.getElementById("btnZoomIn").onclick=()=>{ state.zoom=Math.min(40,state.zoom*1.2); applyView(); drawHandles(); };
 document.getElementById("btnZoomOut").onclick=()=>{ state.zoom=Math.max(0.5,state.zoom/1.2); applyView(); drawHandles(); };
@@ -1651,35 +1865,11 @@ function deleteActiveEl(){
   if(!targets.length){ setStatus("Zaznacz kszta&#322;t (kliknij body lub uchwyt)."); return; }
   pushUndo(); targets.forEach(el=>el.remove()); state.selection=[]; state.activeEl=null; state.selHandle=null; clearSelInfo(); render(); setStatus("Usuni&#281;to: "+targets.length);
 }
-function renameSymbol(){
-  const conn=selectedConnOnSheet();
-  if(conn){
-    const v=(document.getElementById("symId").value||"").trim();
-    if(!v){ setStatus("Nazwa pinu nie mo\u017ce by\u0107 pusta."); return; }
-    pushUndo(); conn.setAttribute("data-pin",v); updateConnLabel(conn); render(); syncNameFields(); setStatus("Pin przy\u0142\u0105cza: "+v); saveProject(); return;
-  }
-  const sym=state.symbols.find(s=>s.id===state.selId);
-  if(!sym||state.active!==state.lib){ setStatus("Wybierz typ symbolu w bibliotece (lewy panel), nie schemat."); return; }
-  const node=sym.node;
-  const v=(document.getElementById("symId").value||"").trim();
-  if(!v){ setStatus("Typ symbolu nie mo&#380;e by&#263; pusty."); return; }
-  if(!isValidSymbolId(v)){ setStatus("Typ symbolu: litery (w tym polskie), cyfry, _, -."); return; }
-  if(v!==node.id && svgIdExists(state.lib.svg,v)){ setStatus("Taki typ symbolu ju&#380; istnieje: "+v); return; }
-  const oldId=node.id;
-  pushUndo();
-  rewriteSymbolIdRefs(state.lib.svg,oldId,v,XLINK);
-  state.sheets.forEach(sh=>rewriteSymbolIdRefs(sh.svg,oldId,v,XLINK));
-  node.id=v; state.selId=v;
-  buildSymbolList();
-  syncListSelection();
-  syncNameFields();
-  setStatus("Typ symbolu: "+oldId+" \u2192 "+v); saveProject();
-}
 function addSymbol(){
   ensureLib();
   let defs=state.lib.svg.querySelector("defs");
   if(!defs){ defs=state.lib.svg.ownerDocument.createElementNS(SVGNS,"defs"); state.lib.svg.insertBefore(defs, state.lib.svg.firstChild); }
-  let n=1,id; do{ id="nowy-"+n; n++; }while(state.lib.svg.querySelector('[id="'+id+'"]'));
+  let n=1,id; do{ id="nowy-"+n; n++; }while(resolveLibSymbol(state.lib.svg,id));
   const g=state.lib.svg.ownerDocument.createElementNS(SVGNS,"g"); g.setAttribute("id",id); defs.appendChild(g);
   state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; state.fileName=state.lib.name;
   buildSymbolList(); selectSymbol(id); setStatus("Dodano symbol "+id+" (pusty) do biblioteki."); saveProject();
@@ -1696,18 +1886,16 @@ function deleteSymbol(){
 }
 function symbolDependsOn(id,target,seen=new Set()){
   if(id===target) return true; if(seen.has(id)) return false; seen.add(id);
-  const sym=state.lib&&state.lib.svg&&state.lib.svg.querySelector('[id="'+id+'"]'); if(!sym) return false;
+  const sym=state.lib&&resolveLibSymbol(state.lib.svg,id); if(!sym) return false;
   return [...sym.querySelectorAll("use")].some(u=>{ const child=(u.getAttribute("href")||u.getAttributeNS(XLINK,"href")||"").replace(/^#/,""); return child&&symbolDependsOn(child,target,seen); });
 }
-function refBaseForSymbol(id){
-  const sym=state.lib&&state.lib.svg&&state.lib.svg.querySelector('[id="'+id+'"]');
+function refBaseForSymbol(id, symNode){
+  const sym=symNode||resolveLibSymbol(state.lib?.svg,id);
   return refBaseForSymbolCore(id, sym);
 }
 function symbolOznaczenieLabel(sym){
   if(!sym) return "";
-  const prefix=(sym.node&&sym.node.getAttribute("data-inst-prefix")||"").trim();
-  if(prefix) return prefix;
-  return refBaseForSymbol(sym.id).base;
+  return symbolDesignation(sym.node, sym.id);
 }
 function nextInstanceRef(node,symbolId){
   const used=new Set([...node.querySelectorAll("use[data-ref]")].map(u=>u.getAttribute("data-ref")).filter(Boolean));
@@ -1744,7 +1932,7 @@ function insertUse(idOverride,fromSidebar){
 function duplicateSymbol(){
   const sym=state.symbols.find(s=>s.id===state.selId); if(!sym){ setStatus("Zaznacz symbol w bibliotece (nie schemat)."); return; }
   let defs=state.lib.svg.querySelector("defs")||state.lib.svg;
-  const base=sym.id.replace(/-kopia\d*$/,""); let n=1,id; do{ id=base+"-kopia"+(n>1?n:""); n++; }while(state.lib.svg.querySelector('[id="'+id+'"]'));
+  const base=sym.id.replace(/-kopia\d*$/,""); let n=1,id; do{ id=base+"-kopia"+(n>1?n:""); n++; }while(resolveLibSymbol(state.lib.svg,id));
   const c=sym.node.cloneNode(true); c.id=id; defs.appendChild(c);
   buildSymbolList(); selectSymbol(id); setStatus("Zduplikowano symbol jako "+id); saveProject();
 }
@@ -1771,12 +1959,11 @@ document.getElementById("btnAddText").onclick=()=>startDraw("text");
 document.getElementById("btnAddArc").onclick=()=>startDraw("arc");
 document.getElementById("btnClone").onclick=cloneSelection;
 document.getElementById("btnDelShape").onclick=deleteActiveEl;
-document.getElementById("btnRename").onclick=renameSymbol;
-document.getElementById("symId").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); renameSymbol(); } });
-["instPrefix","instNumbered","instStart"].forEach(id=>{
+document.getElementById("btnSaveSymbol").onclick=saveSymbol;
+document.getElementById("btnSaveResource").onclick=()=>{ saveResourceName(); };
+["symName","instPrefix","instNumbered","instStart"].forEach(id=>{
   const el=document.getElementById(id); if(!el) return;
-  el.addEventListener("change",()=>{ if(state.active===state.lib) saveInstPrefixSettings(); });
-  if(id==="instPrefix") el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveInstPrefixSettings(); } });
+  if(id==="symName"||id==="instPrefix") el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveSymbol(); } });
 });
 document.getElementById("btnAddSym").onclick=addSymbol;
 document.getElementById("btnDelSym").onclick=deleteSymbol;
@@ -1801,8 +1988,8 @@ const DEFAULT_STYLE = "\n"+
   connAllCss()+
   ".dash{stroke-dasharray:4 3;}\n"+
   ".node{fill:#0f172a;}\n"+
-  ".pin{font:400 9px Arial,sans-serif;fill:#334155;}\n"+
-  ".did{font:700 12px Arial,sans-serif;fill:#0f172a;}\n"+
+  ".pin{font:400 9px Arial,sans-serif;fill:var(--object-stroke,#334155);}\n"+
+  ".did{font:700 12px Arial,sans-serif;fill:var(--object-stroke,#0f172a);}\n"+
   wireCssRules()+"\n";
 function baseDocText(){
   return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1485 1050" width="1485" height="1050"><defs><style>'+DEFAULT_STYLE+'</style></defs></svg>';
@@ -1902,16 +2089,62 @@ settingsBg.addEventListener("pointerdown",e=>{ if(e.target===settingsBg) closeSe
 
 // ---- autozapis projektu (biblioteka + schematy) + pami&#281;&#263; ustawie&#324; ----
 let _noSave=true, _docT=null, _prefsT=null;
-function markDirty(){ if(_noSave) return; clearTimeout(_docT); _docT=setTimeout(()=>{ flushDoc(); flushLibrary(); },700); }
+let _cacheScoreFloor=0, _libCacheScoreFloor=0;
+function markDirty(){ if(_noSave) return; clearTimeout(_docT); _docT=setTimeout(persistNow,700); }
 function projectSnapshot(){
-  return { sheets: state.sheets.map(s=>({name:s.name,relPath:s.relPath||null,id:s.id,text:serializeSvg(s.svg)})),
+  return {
+    savedAt: Date.now(),
+    dirName: state.dir?.name || null,
+    sheets: state.sheets.map(s=>({name:s.name,relPath:s.relPath||null,id:s.id,text:serializeSvg(s.svg)})),
     settings: settingsCfg,
     activeId: state.selId,
-    netlist: state.netlistRaw?{name:state.netlist&&state.netlist.name||"spis.md",text:state.netlistRaw}:null };
+    netlist: state.netlistRaw?{name:state.netlist&&state.netlist.name||"spis.md",text:state.netlistRaw}:null,
+  };
 }
-function flushDoc(){ let snap; try{ snap=projectSnapshot(); }catch(e){ return; }
-  writeJsonCache("project","edytor.project",snap); }
-function saveProject(){ markDirty(); }
+function libSnapshot(){
+  if(!state.lib?.svg) return null;
+  return { name: state.lib.name, text: serializeSvg(state.lib.svg), savedAt: Date.now() };
+}
+function persistNow(){
+  if(_noSave) return;
+  try{
+    const snap=projectSnapshot();
+    let existing=null;
+    try{ const raw=localStorage.getItem("edytor.project"); existing=raw?JSON.parse(raw):null; }catch(e){}
+    const newScore=projectCacheScore(snap);
+    const oldScore=Math.max(projectCacheScore(existing), _cacheScoreFloor);
+    if(newScore>0 && newScore>=oldScore) writeJsonCache("project","edytor.project",snap);
+    else if(newScore===0 && oldScore===0) writeJsonCache("project","edytor.project",snap);
+  }catch(e){}
+  if(state.lib?.svg){
+    syncConnStylesInLib(state.lib.svg,SVGNS);
+    const s=libSnapshot();
+    if(s){
+      let existing=null;
+      try{ const raw=localStorage.getItem("edytor.lib"); existing=raw?JSON.parse(raw):null; }catch(e){}
+      const newScore=libraryCacheScore(s);
+      const oldScore=Math.max(libraryCacheScore(existing), _libCacheScoreFloor);
+      if(newScore>0 && newScore>=oldScore) writeJsonCache("libDoc","edytor.lib",s);
+      else if(newScore===0 && oldScore===0) writeJsonCache("libDoc","edytor.lib",s);
+    }
+  }
+}
+function flushDoc(){ persistNow(); }
+function flushLibrary(){ persistNow(); }
+function saveProject(){ if(_noSave) return; clearTimeout(_docT); persistNow(); }
+function sheetsFromProjectSnapshot(proj){
+  if(!proj?.sheets?.length) return [];
+  return proj.sheets.map(s=>{
+    const p=parseSvg(s.text);
+    if(!p) return null;
+    return {handle:null,name:s.name,relPath:s.relPath||null,svg:p.svg,doc:p.doc,id:s.id||firstSchId(p.svg)};
+  }).filter(Boolean);
+}
+async function applyCachedProjectMeta(proj){
+  if(!proj) return;
+  if(proj.settings) settingsCfg=Object.assign({}, SETTINGS_DEFAULT, proj.settings);
+  if(proj.netlist?.text) await loadNetlistText(proj.netlist.text,proj.netlist.name,null,{silent:true});
+}
 async function restoreProject(){ return restoreProjectSnapshot(); }
 function savePrefs(){ if(_noSave) return; clearTimeout(_prefsT); _prefsT=setTimeout(()=>{
   const rot=parseFloat((document.getElementById("rotAng")||{}).value); const ins=(document.getElementById("insertSym")||{}).value;
@@ -1942,8 +2175,9 @@ async function loadPrefs(){
   if(p.panY!=null) state.panY=p.panY;
   return p;
 }
-window.addEventListener("pagehide",()=>{ flushDoc(); flushLibrary(); });
-window.addEventListener("beforeunload",e=>{ flushDoc(); flushLibrary(); if(countDirtySheets(state.sheets)){ e.preventDefault(); e.returnValue=""; } });
+window.addEventListener("pagehide",persistNow);
+window.addEventListener("beforeunload",e=>{ persistNow(); if(countDirtySheets(state.sheets)){ e.preventDefault(); e.returnValue=""; } });
+document.addEventListener("visibilitychange",()=>{ if(document.visibilityState==="hidden") persistNow(); });
 window.addEventListener("keydown",e=>{
   const tag=(e.target.tagName||"").toLowerCase();
   if(tag==="input"||tag==="textarea"||tag==="select") return;
@@ -1954,6 +2188,8 @@ window.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key==="c"||e.key==="C")){ e.preventDefault(); copySel(); }
   if((e.ctrlKey||e.metaKey)&&(e.key==="x"||e.key==="X")){ e.preventDefault(); cutSel(); }
   if((e.ctrlKey||e.metaKey)&&(e.key==="v"||e.key==="V")){ e.preventDefault(); pasteClip(e.shiftKey); }
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==="s"||e.key==="S")){ e.preventDefault(); void saveFile(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="s"||e.key==="S")){ e.preventDefault(); void saveProjectToDisk(); return; }
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==="z"||e.key==="Z")){ e.preventDefault(); doUndo(); }
   if((e.ctrlKey||e.metaKey)&&((e.shiftKey&&(e.key==="z"||e.key==="Z"))||e.key==="y"||e.key==="Y")){ e.preventDefault(); doRedo(); }
   if(!e.ctrlKey&&!e.metaKey&&e.key.indexOf("Arrow")===0){ e.preventDefault(); const d=e.shiftKey?1:state.step;
@@ -1995,10 +2231,19 @@ async function relinkHandles(dir){
 /** Nadpisuje arkusze w pamięci treścią z plików SVG na dysku (pełny skan, nie merge z cache). */
 async function reloadSheetsFromDir(dir, opts={}){
   if(!dir) return 0;
+  const prevSheets=state.sheets.slice();
   let walked;
-  try{ walked=await walkDir(dir); }catch(e){ return 0; }
-  const sheets=await applyWalkedProject(walked, { skipLib: !!opts.skipLib, skipSettings: !!opts.skipSettings });
-  if(!sheets.length) return 0;
+  try{ walked=await walkDir(dir); }catch(e){
+    const outcome=resolveReloadSheetsOutcome({ diskSheets: [], prevSheets, keepExistingOnEmpty: !!opts.keepExistingOnEmpty });
+    state.sheets=outcome.sheets;
+    return outcome.count;
+  }
+  const diskSheets=await applyWalkedProject(walked, { skipLib: !!opts.skipLib, skipSettings: !!opts.skipSettings });
+  const outcome=resolveReloadSheetsOutcome({ diskSheets, prevSheets, keepExistingOnEmpty: !!opts.keepExistingOnEmpty });
+  if(outcome.action!=="use-disk"){
+    state.sheets=outcome.sheets;
+    return outcome.count;
+  }
   if(!opts.skipLib) await reloadLibraryFromHandle();
   migrateProjectSymbolNames();
   buildSymbolList();
@@ -2007,14 +2252,19 @@ async function reloadSheetsFromDir(dir, opts={}){
   else if(state.sheets[0]) selectSheet(state.sheets[0], true);
   else render();
   saveProject();
-  return sheets.length;
+  return diskSheets.length;
 }
 async function needsPerm(h){ if(!h||!h.queryPermission) return false; try{ return (await h.queryPermission({mode:"readwrite"}))!=="granted"; }catch(e){ return false; } }
-async function refreshGrantButton(){ const b=document.getElementById("btnGrant"); if(!b) return; const need=(await needsPerm(state.dir))||(await needsPerm(state.libHandle)); b.style.display=need?"inline-flex":"none"; if(!need && state.dir){ await relinkHandles(state.dir); const dirtyN=countDirtySheets(state.sheets); if(dirtyN){ setStatus("Przywr&oacute;cono dost&#281;p. Niezapisane zmiany ("+dirtyN+" ark.) zachowane — kliknij Zapisz."); return; } const n=await reloadSheetsFromDir(state.dir); await autoLoadNetlistForSheet(targetSheet(),state.dir,{silent:true}); if(n) setStatus("Zsynchronizowano "+n+" schemat(ów) z dysku."); } }
+async function refreshGrantButton(){
+  const b=document.getElementById("btnGrant"); if(!b) return;
+  const need=(await needsPerm(state.dir))||(await needsPerm(state.libHandle));
+  b.style.display=need?"inline-flex":"none";
+  if(!need&&state.dir) await relinkHandles(state.dir);
+}
 function showGrantIfNeeded(){ return refreshGrantButton(); }
 document.getElementById("btnGrant").onclick=async()=>{
   let any=false, reloaded=0;
-  if(state.dir && await ensurePerm(state.dir)){ await relinkHandles(state.dir); reloaded=await reloadSheetsFromDir(state.dir); any=true; await autoLoadNetlistForSheet(targetSheet(),state.dir,{silent:true}); }
+  if(state.dir && await ensurePerm(state.dir)){ await relinkHandles(state.dir); reloaded=await reloadSheetsFromDir(state.dir); any=true; if(typeof autoLoadNetlistForSheet==="function") await autoLoadNetlistForSheet(typeof targetSheet==="function"?targetSheet():null,state.dir,{silent:true}); }
   if(state.libHandle && await ensurePerm(state.libHandle)){ if(state.lib) state.lib.handle=state.libHandle; any=true; }
   await refreshGrantButton();
   const netMsg=state.netlist?" Spis: "+state.netlist.connections.length+" po\u0142\u0105cze\u0144.":"";
@@ -2024,49 +2274,74 @@ document.getElementById("btnGrant").onclick=async()=>{
 
 // init
 scene = createStageLayers(stage, SVGNS);
-bootstrapEditorSync({
-  injectIcons,
-  initConnMetaModal,
-  wireHistory,
-  wireConnModel,
-  wireProjectMigrate,
-  wireRenderPipeline,
-  scene,
-  applyView,
-  drawGrid,
-  wireNetlistRouting,
-  wireSelectionModel,
-  initTextBar,
-  syncSelectionToolbar,
-  syncSymbolToolbar,
-  syncContextBreadcrumb,
-  refreshNetlistUI,
-  routeConnButton: document.getElementById("btnRouteConn"),
-  getRouteSelectedConnection: () => routeSelectedConnection,
-});
+applyStaticWording();
+try{
+  bootstrapEditorSync({
+    injectIcons,
+    initConnMetaModal,
+    wireHistory,
+    wireConnModel,
+    wireProjectMigrate,
+    wireRenderPipeline,
+    scene,
+    applyView,
+    drawGrid,
+    wireNetlistRouting,
+    wireSelectionModel,
+    initTextBar,
+    syncSelectionToolbar,
+    syncToolbarContext,
+    syncContextBreadcrumb,
+    refreshNetlistUI,
+    routeConnButton: document.getElementById("btnRouteConn"),
+    getRouteSelectedConnection: () => routeSelectedConnection,
+  });
+}catch(e){
+  console.error("Błąd inicjalizacji edytora:", e);
+  setStatus("Błąd inicjalizacji: "+(e.message||e));
+}
 (async function boot(){
+  try{
   const prefs = await loadPrefs();
   await loadSettings();
   try{ const d=await idbGet("dir"); if(d) state.dir=d; }catch(e){}
   try{ const lh=await idbGet("libHandle"); if(lh){ state.libHandle=lh; } }catch(e){}
 
+  const cachedProj=await restoreProject();
+  const cachedSheets=sheetsFromProjectSnapshot(cachedProj);
+  _cacheScoreFloor=projectCacheScore(cachedProj);
+
+  if(cachedSheets.length) state.sheets=cachedSheets;
+  if(cachedProj) await applyCachedProjectMeta(cachedProj);
+
+  const cachedLib=await restoreLibrary();
+  _libCacheScoreFloor=libraryCacheScore(cachedLib);
+  if(cachedLib){
+    const p=parseSvg(cachedLib.text);
+    if(p) adoptLibraryFromParsed(p, cachedLib.name||"E-00_symbole.svg", state.libHandle||null);
+  }
+
   let loadedFromDisk=false;
   if(state.dir && await hasPerm(state.dir)){
     await relinkHandles(state.dir);
-    loadedFromDisk=(await reloadSheetsFromDir(state.dir))>0;
-    if(loadedFromDisk) await autoLoadNetlistForSheet(targetSheet(),state.dir,{silent:true});
+    loadedFromDisk=(await reloadSheetsFromDir(state.dir, { keepExistingOnEmpty: true }))>0;
+    if(loadedFromDisk && typeof autoLoadNetlistForSheet==="function"){
+    await autoLoadNetlistForSheet(typeof targetSheet==="function"?targetSheet():null, state.dir, {silent:true});
+  }
   }
 
-  if(!loadedFromDisk){
-    const libS=await restoreLibrary();
-    if(libS){ const p=parseSvg(libS.text); if(p) adoptLibraryFromParsed(p, libS.name||"E-00_symbole.svg", null); }
+  const hasLibrary=!!(state.lib&&state.lib.svg&&hasLibSymbols(state.lib.svg));
+  const needCache=resolveBootCachePlan({ loadedFromDisk, sheetCount: state.sheets.length, hasLibrary });
+  if(needCache.needCacheLib && !hasLibrary){
+    if(!cachedLib){
+      const libS=await restoreLibrary();
+      if(libS){ const p=parseSvg(libS.text); if(p) adoptLibraryFromParsed(p, libS.name||"E-00_symbole.svg", null); }
+    }
     if(state.libHandle && state.lib) state.lib.handle=state.libHandle;
-    const proj=await restoreProject();
-    if(proj){
-      if(proj.settings) settingsCfg=Object.assign({}, SETTINGS_DEFAULT, proj.settings);
-      state.sheets=(proj.sheets||[]).map(s=>{ const p=parseSvg(s.text); return p?{handle:null,name:s.name,relPath:s.relPath||null,svg:p.svg,doc:p.doc,id:s.id||firstSchId(p.svg)}:null; }).filter(Boolean);
-      if(proj.netlist&&proj.netlist.text) await loadNetlistText(proj.netlist.text,proj.netlist.name,null,{silent:true});
-    } else { state.sheets=[]; }
+  }
+  if(needCache.needCacheSheets && !state.sheets.length && cachedSheets.length){
+    state.sheets=cachedSheets;
+    if(cachedProj) await applyCachedProjectMeta(cachedProj);
   }
 
   ensureLib();
@@ -2076,12 +2351,22 @@ bootstrapEditorSync({
   const ok = want && (state.sheets.find(s=>s.id===want)||state.symbols.find(s=>s.id===want));
   const target = ok?want:(state.sheets[0]?state.sheets[0].id:(state.symbols[0]?state.symbols[0].id:null));
   if(target) selectSymbol(target, !!(prefs&&prefs.zoom!=null)); else { state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; render(); }
+  const restoredFromCache=!loadedFromDisk&&state.sheets.length>0;
+  const dirHint=cachedProj?.dirName||state.dir?.name;
   const bootMsg=loadedFromDisk
     ? "Wczytano z dysku: "+state.sheets.length+" schemat(ów), biblioteka "+(settingsCfg.library||state.lib?.name||"?")+"."
-    : "Tryb offline (cache). Otwórz projekt ponownie, aby wczytać pliki z dysku.";
+    : restoredFromCache
+      ? "Przywrócono z cache ("+state.sheets.length+" schemat(ów)"+(dirHint?", projekt: "+dirHint:"")+")."+(state.dir?" Kliknij „Przywróć dostęp”, jeśli zapis na dysk nie działa.":" Zapisz projekt na dysk, aby utrwalić zmiany.")
+      : "Brak projektu — otwórz folder projektu (Plik → Otwórz projekt).";
   setStatus(bootMsg);
   _noSave=false;
+  persistNow();
+  savePrefs();
   await refreshGrantButton();
-  if(state.netlist) refreshNetlistUI();
+  if(state.netlist && typeof refreshNetlistUI==="function") refreshNetlistUI();
   if(prefs && prefs.insertSym){ const ins=document.getElementById("insertSym"); if(ins && [...ins.options].some(o=>o.value===prefs.insertSym)) ins.value=prefs.insertSym; }
+  }catch(e){
+    console.error("Błąd wczytywania projektu:", e);
+    setStatus("Błąd wczytywania: "+(e.message||e));
+  }
 })();

@@ -19,8 +19,8 @@ const styles = `.fr{fill:none;stroke:var(--object-stroke,#0f172a);stroke-width:2
 .tbb{font:700 11px Arial,sans-serif;fill:#0f172a;}
 .sym{fill:none;stroke:var(--object-stroke,#0f172a);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}
 .node{fill:var(--object-stroke,#0f172a);}
-.pin{font:400 9px Arial,sans-serif;fill:#334155;}
-.did{font:700 12px Arial,sans-serif;fill:#0f172a;}
+.pin{font:400 9px Arial,sans-serif;fill:var(--object-stroke,#334155);}
+.did{font:700 12px Arial,sans-serif;fill:var(--object-stroke,#0f172a);}
 .conn-stub{fill:none;stroke:var(--object-stroke,#0f172a);stroke-width:1.5;stroke-linecap:butt;}
 .conn-joint{fill:none;stroke:var(--object-stroke,#0f172a);stroke-width:1.5;pointer-events:none;}
 .conn-contact{fill:#dc2626;stroke:none;pointer-events:none;}`;

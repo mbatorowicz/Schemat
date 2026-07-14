@@ -117,6 +117,11 @@ describe("instance-refs", () => {
   it("rozpoznaje PSU jako G", () => {
     expect(refBaseForSymbol("PSU").base).toBe("G");
   });
+
+  it("używa id symbolu jako base gdy brak atrybutów numeracji", () => {
+    const node = { id: "B", getAttribute: () => null };
+    expect(refBaseForSymbol("B", node)).toEqual({ base: "B", numbered: true, start: 1 });
+  });
 });
 
 describe("conn-contact-pick", () => {
@@ -224,9 +229,11 @@ describe("symbol-service", () => {
       },
     };
     expect(parseUseHref(use)).toBe("SK1");
+    const symEl = { tagName: "g", id: "SK" };
+    const defs = { children: [symEl] };
     const lib = {
       querySelector(sel) {
-        return sel.includes("SK") ? { id: "SK" } : null;
+        return sel === "defs" ? defs : null;
       },
     };
     expect(resolveSymbolDef(lib, null, parseUseHref(use))?.id).toBe("SK");

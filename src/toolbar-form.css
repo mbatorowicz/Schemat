@@ -1,0 +1,61 @@
+/** SSOT — layout formularzy nazw w pasku kontekstowym toolbara. */
+
+#toolbar .toolbar-form {
+  gap: 3px;
+}
+
+#toolbar .toolbar-form__row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  align-items: center;
+  min-height: 28px;
+}
+
+#toolbar .toolbar-form__field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+#toolbar .toolbar-form__label {
+  font: 600 11px Arial, Helvetica, sans-serif;
+  color: #475569;
+  min-width: 0;
+}
+
+#toolbar .toolbar-form__input {
+  font: 12px Arial, Helvetica, sans-serif;
+  padding: 3px 5px;
+  border: 1px solid #94a3b8;
+  background: #fff;
+  border-radius: 4px;
+}
+
+#toolbar .toolbar-form__input--name {
+  width: 120px;
+}
+
+#toolbar .toolbar-form__input--designation {
+  width: 52px;
+}
+
+#toolbar .toolbar-form__input--number {
+  width: 44px;
+}
+
+#toolbar .toolbar-form__input--resource {
+  width: 160px;
+}
+
+#toolbar .toolbar-form__actions {
+  display: inline-flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+#toolbar .toolbar-form__check {
+  font: 11px Arial, Helvetica, sans-serif;
+  color: #475569;
+}

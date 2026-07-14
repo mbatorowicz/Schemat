@@ -23,6 +23,14 @@ export function useColorAwareClone(node) {
       .replace(/(\.node\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
         const value = v.trim();
         return value === "none" || value.indexOf("var(") >= 0 ? all : prefix + "fill:var(--object-stroke," + value + ")";
+      })
+      .replace(/(\.pin\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
+        const value = v.trim();
+        return value === "none" || value.indexOf("var(") >= 0 ? all : prefix + "fill:var(--object-stroke," + value + ")";
+      })
+      .replace(/(\.did\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
+        const value = v.trim();
+        return value === "none" || value.indexOf("var(") >= 0 ? all : prefix + "fill:var(--object-stroke," + value + ")";
       });
     return clone;
   }
@@ -31,7 +39,7 @@ export function useColorAwareClone(node) {
     if (attr && attr !== "none" && attr.indexOf("var(") < 0) n.setAttribute("stroke", "var(--object-stroke," + attr + ")");
     if (n.style && n.style.stroke && n.style.stroke !== "none" && n.style.stroke.indexOf("var(") < 0)
       n.style.stroke = "var(--object-stroke," + n.style.stroke + ")";
-    if (n.classList && n.classList.contains("node")) {
+    if (n.classList && (n.classList.contains("node") || n.classList.contains("pin") || n.classList.contains("did"))) {
       const fill = n.getAttribute("fill");
       if (fill && fill !== "none" && fill.indexOf("var(") < 0) n.setAttribute("fill", "var(--object-stroke," + fill + ")");
       if (n.style && n.style.fill && n.style.fill !== "none" && n.style.fill.indexOf("var(") < 0)

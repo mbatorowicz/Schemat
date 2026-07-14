@@ -4,9 +4,7 @@
 
 import { childPair } from "./dom-pairing.js";
 import { hostRootFrom } from "./stage-layers.js";
-
-const STROKE_TAGS = new Set(["line", "rect", "circle", "polyline", "polygon", "path"]);
-const FILL_TAGS = new Set(["rect", "circle", "polygon", "path"]);
+import { STROKE_TAGS, FILL_TAGS } from "./style-targets.js";
 
 export function paintVisible(v) {
   return !!v && v !== "none" && v !== "transparent" && !/rgba\([^)]*,\s*0\)$/.test(v);

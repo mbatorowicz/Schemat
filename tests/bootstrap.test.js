@@ -21,7 +21,7 @@ describe("app-bootstrap", () => {
       wireSelectionModel: () => {},
       initTextBar: () => {},
       syncSelectionToolbar: () => {},
-      syncSymbolToolbar: () => {},
+      syncToolbarContext: () => {},
       syncContextBreadcrumb: () => {},
       refreshNetlistUI: () => {},
       routeConnButton: btn,

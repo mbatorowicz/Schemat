@@ -2,7 +2,7 @@
  * Migracje projektu — jedna kolejność, idempotentne, bez rozproszonej logiki w main.js.
  */
 import { symbolAliasMigrations, SYMBOL_ID_ALIASES } from "./symbol-aliases.js";
-import { stripSheetEmbeddedSymbols } from "./symbol-resolver.js";
+import { stripSheetEmbeddedSymbols, resolveLibSymbol, libSymbolGroups } from "./symbol-resolver.js";
 import { migrateInstanceRefsOnRoot } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
 export function createProjectMigrator(deps) {
@@ -23,9 +23,10 @@ export function createProjectMigrator(deps) {
     if (!state.lib?.svg) return false;
     let changed = false;
     symbolAliasMigrations().forEach(([oldId, newId]) => {
-      const oldNode = qsById(state.lib.svg, oldId);
+      const oldNode = resolveLibSymbol(state.lib.svg, oldId);
       if (!oldNode) return;
-      const existing = qsById(state.lib.svg, newId);
+      if (oldNode.getAttribute("data-alias-lock") === "1") return;
+      const existing = resolveLibSymbol(state.lib.svg, newId);
       if (existing && existing !== oldNode) {
         rewriteSymbolIdRefs(state.lib.svg, oldId, newId, XLINK);
         oldNode.remove();
@@ -77,12 +78,48 @@ export function createProjectMigrator(deps) {
     return changed;
   }
 
+  function migrateLibraryDesignationIds() {
+    if (!state.lib?.svg) return false;
+    let changed = false;
+    libSymbolGroups(state.lib.svg).forEach((g) => {
+      if (g.getAttribute("data-alias-lock") === "1") return;
+      const prefix = (g.getAttribute("data-inst-prefix") || "").trim();
+      const target = prefix && prefix !== g.id ? prefix : null;
+      if (!target) {
+        const m = g.id.match(/^([A-Z])(\d+)$/i);
+        if (!m || resolveLibSymbol(state.lib.svg, m[1])) return;
+        renameLibSymbolId(g, m[1], parseInt(m[2], 10) || 1);
+        changed = true;
+        return;
+      }
+      if (resolveLibSymbol(state.lib.svg, target)) return;
+      renameLibSymbolId(g, target, parseInt(g.getAttribute("data-inst-start") || "1", 10) || 1);
+      changed = true;
+    });
+    return changed;
+  }
+
+  function renameLibSymbolId(node, newId, startNum) {
+    const oldId = node.id;
+    rewriteSymbolIdRefs(state.lib.svg, oldId, newId, XLINK);
+    state.sheets.forEach((sh) => {
+      if (sh.svg) rewriteSymbolIdRefs(sh.svg, oldId, newId, XLINK);
+    });
+    node.id = newId;
+    if (!node.getAttribute("data-inst-prefix")) node.setAttribute("data-inst-prefix", newId);
+    if (node.getAttribute("data-inst-numbered") == null || node.getAttribute("data-inst-numbered") === "") {
+      node.setAttribute("data-inst-numbered", "1");
+    }
+    if (!node.getAttribute("data-inst-start")) node.setAttribute("data-inst-start", String(startNum || 1));
+  }
+
   function migrateProject() {
     let changed = false;
     if (state.lib && state.lib.svg) {
       normalizeLibLayout(state.lib.svg, SVGNS);
       if (stripSymPrefixInSvg(state.lib.svg, XLINK)) changed = true;
       if (migrateLibrarySymbolNames()) changed = true;
+      if (migrateLibraryDesignationIds()) changed = true;
     }
     state.sheets.forEach((sh) => {
       if (sh.svg && stripSymPrefixInSvg(sh.svg, XLINK)) changed = true;

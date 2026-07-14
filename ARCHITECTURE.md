@@ -16,7 +16,8 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Typografia | `element-styles.js` | `applyTextStyle` — bez nadpisywania bez `force` |
 | Złącza | `conn-model.js` + `conn-theme.js` | geometria vs etykieta (`touchLabel`) |
 | Zapis arkusza | `sheet-persistence.js` | `dirty`, `inlineSheetDefsSafe` |
-| Rozwiązywanie symboli (niskopoziomowe) | `symbol-resolver.js` | querySelector w lib/sheet defs |
+| Formularze toolbara | `toolbar-form.css` + `toolbar-context.js` | layout pól nazw, widoczność grup |
+| Wording UI | `ui-wording.js` | etykiety, tooltips, statusy, breadcrumb |
 
 ## Przepływ symboli (nie psuj tego łańcucha)
 

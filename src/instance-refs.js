@@ -47,6 +47,12 @@ export function refBaseForSymbol(id, symNode = null) {
   if (fromSym) return fromSym;
   if (INSTANCE_REF_RULES[id]) return { ...INSTANCE_REF_RULES[id] };
   const s = String(id || "").trim();
+  // Id symbolu = oznaczenie techniczne (B, SK) — numer instancji na schemacie
+  if (symNode && symNode.id === id && isValidInstanceRef(s)) {
+    const numbered = symNode.getAttribute("data-inst-numbered") !== "0";
+    const start = parseInt(symNode.getAttribute("data-inst-start") || "1", 10) || 1;
+    return { base: s, numbered, start };
+  }
   const lower = s.toLowerCase();
   if (/^q$/i.test(s)) return { base: "Q", numbered: false };
   if (/^f1$/i.test(s) || /^f$/i.test(s)) return { base: "F", numbered: true, start: 1 };

@@ -15,7 +15,7 @@ export const SYMBOL_ID_ALIASES = {
   motor: "MOTOR",
   a1: "A1",
   r1: "R1",
-  b1: "B1",
+  b1: "B",
   y1: "Y1",
   cyl: "CYL",
 };

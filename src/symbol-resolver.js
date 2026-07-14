@@ -16,7 +16,9 @@ export function libSymbolGroups(svg) {
 export function resolveLibSymbol(libSvg, id) {
   if (!libSvg || !id) return null;
   const canon = canonicalSymbolId(id);
-  return qsById(libSvg, canon) || qsById(libSvg, id);
+  return (
+    libSymbolGroups(libSvg).find((g) => g.id === canon || g.id === id) || null
+  );
 }
 
 export function resolveSheetSymbol(sheetSvg, id) {
@@ -24,7 +26,14 @@ export function resolveSheetSymbol(sheetSvg, id) {
   const defs = sheetSvg.querySelector("defs");
   if (!defs) return null;
   const canon = canonicalSymbolId(id);
-  return qsById(defs, canon) || qsById(defs, id);
+  return (
+    [...defs.children].find(
+      (n) =>
+        n.tagName?.toLowerCase() === "g" &&
+        n.id &&
+        (n.id === canon || n.id === id)
+    ) || null
+  );
 }
 
 export function resolveSymbol(libSvg, sheetSvg, id) {

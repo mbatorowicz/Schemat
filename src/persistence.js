@@ -1,5 +1,10 @@
 /** Trwałość projektu — IndexedDB + localStorage. Dysk ma pierwszeństwo przed cache. */
 
+import {
+  projectCacheScore,
+  libraryCacheScore,
+} from "./boot-cache.js";
+
 const DB_NAME = "edytor";
 const STORE = "kv";
 
@@ -31,32 +36,46 @@ export function idbGet(key) {
   });
 }
 
-export async function readJsonCache(idbKey, lsKey) {
+export async function readJsonCache(idbKey, lsKey, scoreFn = projectCacheScore) {
+  let fromLs = null;
+  let fromIdb = null;
   try {
-    const fromIdb = await idbGet(idbKey);
-    if (fromIdb) return fromIdb;
+    const raw = localStorage.getItem(lsKey);
+    fromLs = raw ? JSON.parse(raw) : null;
+  } catch {
+    /* quota / parse */
+  }
+  try {
+    fromIdb = await idbGet(idbKey);
   } catch {
     /* offline fallback */
   }
-  try {
-    const raw = localStorage.getItem(lsKey);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return pickJsonCache(fromLs, fromIdb, scoreFn);
+}
+
+/** Preferuje pełniejszy snapshot (więcej arkuszy / treści), nie ślepo localStorage. */
+export function pickJsonCache(fromLs, fromIdb, scoreFn = projectCacheScore) {
+  if (!fromLs) return fromIdb;
+  if (!fromIdb) return fromLs;
+  return scoreFn(fromIdb) > scoreFn(fromLs) ? fromIdb : fromLs;
 }
 
 export function writeJsonCache(idbKey, lsKey, value) {
+  const json = JSON.stringify(value);
   try {
-    localStorage.setItem(lsKey, JSON.stringify(value));
+    localStorage.setItem(lsKey, json);
   } catch {
-    /* quota */
+    try {
+      localStorage.removeItem(lsKey);
+    } catch {
+      /* ignore */
+    }
   }
-  idbSet(idbKey, value).catch(() => {});
+  return idbSet(idbKey, value).catch(() => {});
 }
 
 export async function restoreLibrarySnapshot() {
-  return readJsonCache("libDoc", "edytor.lib");
+  return readJsonCache("libDoc", "edytor.lib", libraryCacheScore);
 }
 
 export async function restoreProjectSnapshot() {

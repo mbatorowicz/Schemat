@@ -17,6 +17,8 @@ export function createFileIo(deps) {
     syncListSelection,
     idbSet,
     XLINK,
+    saveProjectSettings,
+    getFileHandleByPath,
   } = deps;
 
   async function hasPerm(handle) {
@@ -122,12 +124,87 @@ export function createFileIo(deps) {
     setStatus("Pobrano " + (act.name || "plik.svg") + ".");
   }
 
+  async function saveProjectToDisk() {
+    const state = getState();
+    if (!state.dir) {
+      setStatus("Otwórz projekt (folder), aby zapisać całość.");
+      return false;
+    }
+    if (!(await ensurePerm(state.dir))) {
+      setStatus("Brak uprawnień zapisu do folderu projektu.");
+      return false;
+    }
+
+    let savedSheets = 0;
+    let savedLib = false;
+
+    if (state.lib?.svg) {
+      try {
+        let h = state.lib.handle || state.libHandle;
+        if (!h) {
+          const libName = state.lib.name || "E-00_symbole.svg";
+          h = await state.dir.getFileHandle(libName, { create: true });
+          state.lib.handle = h;
+          state.libHandle = h;
+          idbSet("libHandle", h).catch(() => {});
+        }
+        if (await ensurePerm(h)) {
+          await writeHandle(h, serializeSvg(state.lib.svg));
+          flushLibrary();
+          savedLib = true;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    for (const sheet of state.sheets || []) {
+      if (!sheet.dirty || !sheet.svg) continue;
+      try {
+        const r = inlineSheetDefs(sheet);
+        if (r?.missing?.length) console.warn("Zapis projektu: brak symboli:", r.missing.join(", "));
+        let h = sheet.handle;
+        if (!h) {
+          if (sheet.relPath && getFileHandleByPath) {
+            h = await getFileHandleByPath(state.dir, sheet.relPath, true);
+          } else if (sheet.name) {
+            h = await state.dir.getFileHandle(sheet.name, { create: true });
+          }
+          if (h) sheet.handle = h;
+        }
+        if (h && (await ensurePerm(h))) {
+          await writeHandle(h, serializeSvg(sheet.svg));
+          clearSheetDirty(sheet);
+          savedSheets++;
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+
+    const settingsOk = saveProjectSettings ? await saveProjectSettings() : false;
+    flushDoc();
+    if (buildSymbolList) buildSymbolList();
+    if (syncListSelection) syncListSelection();
+
+    let msg = "Zapisano projekt";
+    const bits = [];
+    if (savedLib) bits.push("biblioteka");
+    if (savedSheets) bits.push(savedSheets + " schemat" + (savedSheets === 1 ? "" : "ów"));
+    if (settingsOk) bits.push("projekt.json");
+    if (bits.length) msg += " (" + bits.join(", ") + ")";
+    else msg += " (brak zmian do zapisu)";
+    setStatus(msg);
+    return true;
+  }
+
   return {
     hasPerm,
     ensurePerm,
     writeHandle,
     saveFile,
     saveAs,
+    saveProjectToDisk,
     downloadSvg,
   };
 }

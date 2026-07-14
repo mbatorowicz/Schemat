@@ -45,12 +45,12 @@ export function styleConnContact(circle, connG, state, fmt) {
 
 export function connStubCss() {
   const t = CONN_THEME;
-  return `.conn-stub{fill:none;stroke:${t.stroke};stroke-width:${t.strokeWidth};stroke-linecap:${t.stubLinecap};}`;
+  return `.conn-stub{fill:none;stroke:var(--object-stroke,${t.stroke});stroke-width:${t.strokeWidth};stroke-linecap:${t.stubLinecap};}`;
 }
 
 export function connJointCss() {
   const t = CONN_THEME;
-  return `.conn-joint{fill:none;stroke:${t.stroke};stroke-width:${t.strokeWidth};pointer-events:none;}`;
+  return `.conn-joint{fill:none;stroke:var(--object-stroke,${t.stroke});stroke-width:${t.strokeWidth};pointer-events:none;}`;
 }
 
 export function connContactCss() {
