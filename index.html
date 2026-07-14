@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Edytor schemat&oacute;w i symboli</title>
+<style>
+  :root { --bg:#0f172a; --panel:#f1f5f9; --line:#cbd5e1; --accent:#2563eb; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; font-family:Arial,Helvetica,sans-serif; color:#0f172a; }
+  #app { display:grid; grid-template-rows:auto 1fr; height:100vh; }
+  #toolbar { display:flex; flex-direction:column; background:#e2e8f0; border-bottom:1px solid var(--line); }
+  #toolbar .toolbar-line { display:flex; flex-wrap:wrap; gap:2px 4px; align-items:stretch; align-content:flex-start; padding:4px 6px; min-width:0; width:100%; }
+  #toolbarMain { border-bottom:1px solid var(--line); }
+  #toolbarContext { background:#f8fafc; border-top:1px solid var(--line); }
+  #toolbar .grp { display:flex; flex:0 0 auto; flex-direction:column; gap:2px; padding:0 6px; border-right:1px solid var(--line); }
+  #toolbar .grp:last-child { border-right:none; }
+  #toolbar .grp-row { display:flex; gap:3px; align-items:center; min-height:28px; }
+  #toolbar .grp-lbl { font:600 9px Arial; letter-spacing:.04em; text-transform:uppercase; color:#64748b; text-align:center; user-select:none; }
+  #toolbar .context-hidden { display:none; }
+  #toolbar .grp-row.context-hidden { display:none; }
+  #toolbar .selection-info { min-width:128px; max-width:210px; font:600 12px Arial; color:#1e3a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #toolbar .mixed-mark { display:none; font:600 9px Arial; color:#b45309; text-transform:uppercase; }
+  #toolbar .mixed-mark.show { display:inline; }
+  #toolbar input[type=color].mixed { outline:2px dashed #f59e0b; outline-offset:1px; }
+  select, input[type=number], input[type=text] { font:12px Arial; padding:3px 5px; border:1px solid #94a3b8; background:#fff; border-radius:4px; cursor:pointer; }
+  button { font:13px Arial; padding:4px 8px; border:1px solid #94a3b8; background:#fff; border-radius:4px; cursor:pointer; }
+  button:hover { background:#f8fafc; }
+  button:disabled, select:disabled, input:disabled { opacity:.42; cursor:not-allowed; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .tbtn { display:inline-flex; align-items:center; justify-content:center; width:30px; height:28px; padding:0; color:#1e293b; }
+  .tbtn svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+  .tbtn:hover { background:#f8fafc; border-color:#64748b; }
+  .tbtn:active { background:#dbeafe; }
+  .tbtn.primary { color:#fff; }
+  .tbtn.primary svg { stroke:#fff; }
+  .tbtn.danger:hover { background:#fee2e2; border-color:#ef4444; color:#b91c1c; }
+  .tbtn .fillnode { fill:currentColor; stroke:none; }
+  .sep { width:1px; align-self:center; height:22px; background:var(--line); margin:0 2px; }
+  label { font:12px Arial; color:#334155; }
+  #toolbar .mini { font:11px Arial; color:#475569; }
+  #main { display:grid; grid-template-columns:220px 1fr; min-height:0; }
+  #left { background:var(--panel); border-right:1px solid var(--line); overflow:auto; padding:8px; }
+  #symlist, #schlist, #elemList { list-style:none; margin:0 0 6px; padding:0; }
+  #schlist li, #elemList li { padding:6px 8px; border-radius:4px; cursor:pointer; font:13px Arial; color:#0f172a; }
+  #symlist li { display:flex; align-items:center; gap:6px; min-width:0; padding:3px 4px; border-radius:4px; cursor:pointer; font:13px Arial; color:#0f172a; }
+  #symlist li:hover, #schlist li:hover, #elemList li:hover { background:#e2e8f0; }
+  #symlist li.sel, #schlist li.sel, #elemList li.sel { background:var(--accent); color:#fff; }
+  #elemList li .elem-kind { display:block; font:10px Arial; color:#64748b; margin-top:1px; }
+  #symlist li.sel .elem-kind, #elemList li.sel .elem-kind { color:#dbeafe; }
+  #elemSec.context-hidden, #elemProps.context-hidden { display:none; }
+  #elemProps { margin:4px 0 10px; padding:8px; background:#fff; border:1px solid #cbd5e1; border-radius:6px; max-height:42vh; overflow:auto; }
+  #elemProps .elem-props-title { font:700 12px Arial; margin:0 0 6px; color:#0f172a; }
+  #elemProps .elem-props-empty { font:12px Arial; color:#64748b; margin:0; }
+  #elemProps section { margin:0 0 8px; }
+  #elemProps section h4 { font:700 10px Arial; text-transform:uppercase; letter-spacing:.04em; color:#64748b; margin:0 0 4px; }
+  #elemProps dl { margin:0; display:grid; grid-template-columns:minmax(88px,38%) 1fr; gap:2px 6px; font:11px Arial; }
+  #elemProps dt { color:#475569; margin:0; word-break:break-word; }
+  #elemProps dd { margin:0; color:#0f172a; word-break:break-word; }
+  .sym-thumb { flex:0 0 46px; width:46px; height:34px; background:#fff; border:1px solid #cbd5e1; border-radius:3px; pointer-events:none; }
+  .sym-name { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .sym-add { flex:0 0 25px; width:25px; height:25px; padding:0; font:bold 18px Arial; line-height:1; }
+  #symlist li.sel .sym-add { border-color:#bfdbfe; color:#1e3a8a; }
+  #sidebarSymbolDefs { position:absolute; width:0; height:0; overflow:hidden; pointer-events:none; }
+  #stagewrap { position:relative; min-width:0; background:#fff; overflow:hidden; user-select:none; -webkit-user-select:none; }
+  #stage { width:100%; height:100%; display:block; background:#fff; touch-action:none; user-select:none; -webkit-user-select:none; -moz-user-select:none; }
+  #stage text { user-select:none; -webkit-user-select:none; }
+  .sec { font:700 12px Arial; margin:6px 0 4px; color:#0f172a; }
+  #status { font:12px Arial; color:#475569; margin-left:auto; align-self:center; padding:0 4px; }
+  #contextBreadcrumb .breadcrumb-text { font:600 12px Arial; color:#1e3a8a; white-space:nowrap; max-width:280px; overflow:hidden; text-overflow:ellipsis; }
+  #netlistConn option[data-ok="1"] { color:#15803d; }
+  #netlistConn option[data-ok="0"] { color:#b91c1c; }
+  #drawBanner { position:absolute; left:50%; top:44px; transform:translateX(-50%); display:none; align-items:center; gap:10px; background:#eff6ff; border:1px solid #93c5fd; border-radius:6px; padding:6px 12px; font:600 12px Arial; color:#1e40af; box-shadow:0 4px 16px rgba(37,99,235,.12); z-index:19; pointer-events:none; }
+  #drawBanner.open { display:flex; }
+  #toolbar.draw-mode #arrangeGroup { display:none; }
+  .modal-bg { position:fixed; inset:0; background:rgba(15,23,42,.45); display:none; align-items:center; justify-content:center; z-index:50; }
+  .modal-bg.open { display:flex; }
+  .modal { background:#fff; border-radius:8px; padding:18px 20px; width:440px; max-width:92vw; box-shadow:0 10px 40px rgba(0,0,0,.35); }
+  .modal h2 { font:700 15px Arial; margin:0 0 12px; }
+  .modal .frow { display:flex; align-items:center; gap:8px; margin:7px 0; }
+  .modal .frow label { width:120px; font:12px Arial; color:#334155; }
+  .modal .frow input, .modal .frow select { flex:1; }
+  .modal .actions { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .modal .actions button { padding:6px 14px; }
+  #netlistReviewText { width:100%; min-height:280px; resize:vertical; font:12px Consolas,monospace; border:1px solid #94a3b8; border-radius:4px; padding:8px; }
+  #hud { position:absolute; left:8px; bottom:8px; font:12px monospace; color:#334155; background:rgba(255,255,255,.85); padding:3px 6px; border:1px solid var(--line); border-radius:4px; pointer-events:none; }
+  .hint { font:11px Arial; color:#64748b; line-height:1.5; }
+  .hnd { fill:#fff; stroke:#2563eb; stroke-width:1.5; cursor:grab; }
+  .hnd.sel { fill:#2563eb; }
+  .hnd.ctrl { fill:#fde047; stroke:#a16207; }
+  .ctrlline { stroke:#a16207; stroke-width:0.6; stroke-dasharray:2 2; }
+  .marq { pointer-events:none; }
+  #textbar { position:absolute; left:50%; top:8px; transform:translateX(-50%); display:none; align-items:center; gap:8px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:5px 9px; box-shadow:0 4px 16px rgba(0,0,0,.14); z-index:20; }
+  #textbar .tbl { font:600 11px Arial; color:#475569; }
+  #textbar input[type=text] { width:220px; }
+  #textbar .tbhint { font:11px Arial; color:#94a3b8; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="toolbar">
+    <div id="toolbarMain" class="toolbar-line">
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnOpen" class="tbtn primary" title="Otw&oacute;rz projekt (folder)"></button>
+          <button id="btnGrant" class="tbtn" style="display:none" title="Przywr&oacute;&#263; dost&#281;p do folderu (zapis na dysk)"></button>
+          <button id="btnSave" class="tbtn" title="Zapisz (nadpisz)"></button>
+          <button id="btnSaveAs" class="tbtn" title="Zapisz jako&hellip;"></button>
+          <span class="sep"></span>
+          <button id="btnNewSheet" class="tbtn" title="Nowy schemat (arkusz A4 z ramk&#261; i tabelk&#261;)"></button>
+          <button id="btnLib" class="tbtn" title="Biblioteka symboli (wsp&oacute;lny plik) &mdash; wska&#380;/otw&oacute;rz"></button>
+        </div>
+        <div class="grp-lbl">Plik</div>
+      </div>
+
+      <div class="grp" id="contextBreadcrumb">
+        <div class="grp-row"><span id="breadcrumbText" class="breadcrumb-text">—</span></div>
+        <div class="grp-lbl">Kontekst</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnUndo" class="tbtn" title="Cofnij (Ctrl+Z)"></button>
+          <button id="btnRedo" class="tbtn" title="Pon&oacute;w (Ctrl+Y)"></button>
+        </div>
+        <div class="grp-lbl">Historia</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnCopy" class="tbtn" title="Kopiuj (Ctrl+C)"></button>
+          <button id="btnCut" class="tbtn" title="Wytnij (Ctrl+X)"></button>
+          <button id="btnPaste" class="tbtn" title="Wklej (Ctrl+V), w miejscu: Ctrl+Shift+V"></button>
+        </div>
+        <div class="grp-lbl">Schowek</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnAddLine" class="tbtn" title="Dodaj lini&#281;"></button>
+          <button id="btnAddRect" class="tbtn" title="Dodaj prostok&#261;t"></button>
+          <button id="btnAddCircle" class="tbtn" title="Dodaj ko&#322;o"></button>
+          <button id="btnAddArc" class="tbtn" title="Dodaj &#322;uk"></button>
+          <button id="btnAddText" class="tbtn" title="Dodaj tekst"></button>
+        </div>
+        <div class="grp-lbl">Rysuj</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnAddLead" class="tbtn" title="Kreska"></button>
+          <button id="btnAddPoint" class="tbtn" title="Punkt"></button>
+        </div>
+        <div class="grp-lbl">Z&#322;&#261;cza</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnAddNode" class="tbtn" title="W&#281;ze&#322;"></button>
+          <button id="btnAddPin" class="tbtn" title="Pin"></button>
+        </div>
+        <div class="grp-lbl">Oznaczenia</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnNetlistOpen" class="tbtn" title="Wczytaj spis po&#322;&#261;cze&#324;">&#8801;</button>
+          <select id="netlistConn" title="Wybierz po&#322;&#261;czenie" style="width:150px"><option value="">spis po&#322;&#261;cze&#324;</option></select>
+          <button id="btnRouteConn" class="tbtn" title="Trasuj wybrane po&#322;&#261;czenie">&#8618;</button>
+          <button id="btnExportNetlist" class="tbtn" title="Poka&#380; propozycje zmian spisu">&#8644;</button>
+        </div>
+        <div class="grp-lbl">Po&#322;&#261;czenia</div>
+      </div>
+
+      <div class="grp" id="symbolGroup">
+        <div class="grp-row" id="symbolLibRow">
+          <label class="mini">Id</label>
+          <input type="text" id="symId" size="10" placeholder="id" style="width:72px" title="Identyfikator techniczny w bibliotece (href)"/>
+          <button id="btnRename" class="tbtn" title="Zmie&#324; id symbolu"></button>
+          <label class="mini">Ozn.</label>
+          <input type="text" id="instPrefix" size="6" placeholder="Q" style="width:44px" title="Oznaczenie instancji: Q, WD, F, G, X (spis po&#322;&#261;cze&#324;)"/>
+          <label class="mini" title="Numeracja F1, F2…"><input type="checkbox" id="instNumbered" checked/> nr</label>
+          <label class="mini">Od</label>
+          <input type="number" id="instStart" value="1" min="1" step="1" style="width:40px" title="Pierwszy numer instancji"/>
+          <span class="sep"></span>
+          <button id="btnAddSym" class="tbtn" title="Nowy symbol"></button>
+          <button id="btnDupSym" class="tbtn" title="Duplikuj"></button>
+          <button id="btnExportSym" class="tbtn" title="Eksportuj SVG"></button>
+          <button id="btnDelSym" class="tbtn danger" title="Usu&#324;"></button>
+        </div>
+        <div class="grp-row" id="symbolSheetRow">
+          <label class="mini">Wstaw</label>
+          <select id="insertSym" title="Symbol do wstawienia" style="max-width:120px"></select>
+          <button id="btnInsertUse" class="tbtn" title="Wstaw instancj&#281; na schemat"></button>
+        </div>
+        <div class="grp-lbl">Symbol</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnZoomOut" class="tbtn" title="Oddal"></button>
+          <button id="btnZoomIn" class="tbtn" title="Przybli&#380;"></button>
+          <button id="btnFit" class="tbtn" title="Dopasuj do widoku"></button>
+          <span class="sep"></span>
+          <label class="mini">Siatka</label>
+          <select id="grid">
+            <option value="1">1</option>
+            <option value="2.5">2.5</option>
+            <option value="5" selected>5</option>
+          </select>
+          <label class="mini"><input type="checkbox" id="snap" checked/> snap</label>
+          <label class="mini"><input type="checkbox" id="showHandles" checked/> uchwyty</label>
+          <label class="mini"><input type="checkbox" id="rotateOwnedLabels" checked/> obracaj napisy</label>
+          <span class="sep"></span>
+          <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
+        </div>
+        <div class="grp-lbl">Widok</div>
+      </div>
+    </div>
+
+    <div id="toolbarContext" class="toolbar-line">
+      <div class="grp">
+        <div class="grp-row"><span id="selectionInfo" class="selection-info">Styl nowych obiekt&oacute;w</span></div>
+        <div class="grp-lbl">Zaznaczenie</div>
+      </div>
+
+      <div class="grp" id="arrangeGroup">
+        <div class="grp-row">
+          <button id="btnFlipH" class="tbtn" title="Odbij w poziomie"></button>
+          <button id="btnFlipV" class="tbtn" title="Odbij w pionie"></button>
+          <button id="btnRotL" class="tbtn" title="Obr&oacute;t w lewo"></button>
+          <button id="btnRotR" class="tbtn" title="Obr&oacute;t w prawo"></button>
+          <input type="number" id="rotAng" value="90" step="15" style="width:44px" title="k&#261;t obrotu w stopniach"/>
+          <span class="sep"></span>
+          <button id="btnClone" class="tbtn" title="Klonuj zaznaczenie (Ctrl+D)"></button>
+          <button id="btnDelShape" class="tbtn danger" title="Usu&#324; zaznaczenie (Delete)"></button>
+        </div>
+        <div class="grp-lbl">U&#322;&oacute;&#380;</div>
+      </div>
+
+      <div class="grp" id="primaryStyleGroup">
+        <div class="grp-row">
+          <label class="mini">G&#322;&oacute;wny</label>
+          <input type="color" id="strokeColor" value="#0f172a" title="Kolor g&#322;&oacute;wny: tekst / obrys"/>
+          <span id="primaryColorMixed" class="mixed-mark">r&oacute;&#380;ne</span>
+        </div>
+        <div class="grp-lbl">Kolor</div>
+      </div>
+
+      <div class="grp" id="strokeStyleGroup">
+        <div class="grp-row">
+          <label class="mini">Grub.</label>
+          <select id="strokeW" title="Grubo&#347;&#263; linii">
+            <option value="">&mdash;</option>
+            <option value="0.6">0.6</option>
+            <option value="1">1</option>
+            <option value="1.3">1.3</option>
+            <option value="1.5">1.5</option>
+            <option value="2" selected>2</option>
+            <option value="2.5">2.5</option>
+            <option value="3">3</option>
+          </select>
+          <label class="mini"><input type="checkbox" id="dashOn"/> przerywana</label>
+        </div>
+        <div class="grp-lbl">Obrys</div>
+      </div>
+
+      <div class="grp" id="fillStyleGroup">
+        <div class="grp-row">
+          <input type="color" id="fillColor" value="#ffd21a" title="Kolor wype&#322;nienia"/>
+          <span id="fillColorMixed" class="mixed-mark">r&oacute;&#380;ne</span>
+          <label class="mini"><input type="checkbox" id="fillOn"/> wype&#322;nienie</label>
+        </div>
+        <div class="grp-lbl">Wype&#322;nienie</div>
+      </div>
+
+      <div class="grp" id="textStyleGroup">
+        <div class="grp-row">
+          <label class="mini">Rozm.</label><input type="number" id="fontSize" value="9" min="1" step="1" placeholder="&mdash;" style="width:48px"/>
+          <label class="mini">Waga</label>
+          <select id="fontWeight" title="Grubo&#347;&#263; czcionki">
+            <option value="">&mdash;</option>
+            <option value="400">normalna</option>
+            <option value="500">&#347;rednia</option>
+            <option value="700">pogrubiona</option>
+          </select>
+        </div>
+        <div class="grp-lbl">Tekst</div>
+      </div>
+
+      <div id="status">&nbsp;</div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="left">
+      <div class="sec">Schematy</div>
+      <ul id="schlist"></ul>
+      <div class="sec">Symbole</div>
+      <svg id="sidebarSymbolDefs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs></defs></svg>
+      <ul id="symlist"></ul>
+      <div class="sec context-hidden" id="elemSec">Elementy schematu</div>
+      <ul id="elemList"></ul>
+      <div id="elemProps" class="context-hidden">
+        <div class="elem-props-title" id="elemPropsTitle">Właściwości</div>
+        <div id="elemPropsBody"></div>
+      </div>
+    </div>
+
+    <div id="stagewrap">
+      <svg id="stage" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div id="drawBanner" role="status" aria-live="polite"></div>
+      <div id="hud">&mdash;</div>
+      <div id="textbar">
+        <span class="tbl">Tekst</span>
+        <input type="text" id="textEdit" placeholder="tre&#347;&#263; napisu"/>
+        <label class="tbl">Czc.</label><input type="number" id="textSize" min="1" step="1" style="width:48px"/>
+        <select id="textWeight" title="Grubo&#347;&#263;"><option value="400">normalna</option><option value="500">&#347;rednia</option><option value="700">pogrubiona</option></select>
+        <span class="tbhint">Enter zatwierdza &bull; Esc cofa</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="connMeta" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="connMetaTitle">
+  <div class="modal">
+    <h2 id="connMetaTitle">Metadane złącza</h2>
+    <div class="frow" id="connMetaRefRow"><label for="connMetaRef">Oznaczenie</label><input type="text" id="connMetaRef" placeholder="np. WD1"/></div>
+    <div class="frow"><label for="connMetaPin">Pin</label><input type="text" id="connMetaPin" placeholder="1"/></div>
+    <div class="actions">
+      <button type="button" id="connMetaCancel">Anuluj</button>
+      <button type="button" id="connMetaOk" class="primary">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="settings" class="modal-bg">
+  <div class="modal">
+    <h2>Ustawienia</h2>
+    <div class="frow"><label>Orientacja A4</label>
+      <select id="setOrient">
+        <option value="landscape">Poziom</option>
+        <option value="portrait">Pion</option>
+      </select>
+    </div>
+    <div class="frow"><label>Dokument</label><input type="text" id="setDoc"/></div>
+    <div class="frow"><label>Nr seryjny</label><input type="text" id="setSerial"/></div>
+    <div class="frow"><label>Wytw&oacute;rca</label><input type="text" id="setMaker"/></div>
+    <div class="frow"><label>Wersja</label><input type="text" id="setVersion"/></div>
+    <div class="frow"><label>Arkusz</label><input type="text" id="setSheet"/></div>
+    <div class="frow"><label>Norma</label><input type="text" id="setNorm"/></div>
+    <div class="frow"><label>Data</label><input type="text" id="setDate" placeholder="RRRR-MM-DD"/></div>
+    <div class="actions">
+      <button id="setCancel">Anuluj</button>
+      <button id="setSave" class="primary">Zapisz</button>
+    </div>
+  </div>
+</div>
+
+<div id="netlistReview" class="modal-bg">
+  <div class="modal" style="width:720px">
+    <h2>Propozycje zmian spisu po&#322;&#261;cze&#324;</h2>
+    <textarea id="netlistReviewText" readonly></textarea>
+    <div class="actions">
+      <button id="netlistReviewClose">Zamknij</button>
+      <button id="netlistReviewDownload" class="primary">Pobierz propozycje .md</button>
+    </div>
+  </div>
+</div>
+
+<input type="file" id="fileInput" accept=".svg,image/svg+xml" style="display:none"/>
+<input type="file" id="netlistInput" accept=".md,text/markdown,text/plain" style="display:none"/>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>
