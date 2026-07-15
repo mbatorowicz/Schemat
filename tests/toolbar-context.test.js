@@ -19,8 +19,12 @@ describe("resolveToolbarGroups", () => {
     expect(g.resourceNameMode).toBe("library");
   });
 
-  it("na schemacie pokazuje rename schematu", () => {
+  it("na schemacie pokazuje rysowanie i wstawianie", () => {
     const g = resolveToolbarGroups({ onLib: false, onSheet: true, symSelected: false, hasSelection: true, hasDir: true });
+    expect(g.drawGroup).toBe(true);
+    expect(g.leadGroup).toBe(true);
+    expect(g.markGroup).toBe(true);
+    expect(g.sheetInsertGroup).toBe(true);
     expect(g.resourceNameMode).toBe("sheet");
     expect(g.arrangeGroup).toBe(true);
     expect(g.libSymbolMetaGroup).toBe(false);

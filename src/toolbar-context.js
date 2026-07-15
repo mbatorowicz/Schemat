@@ -9,9 +9,9 @@ export function resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection
   else if (hasDir) resourceNameMode = "project";
 
   return {
-    drawGroup: onLib,
-    leadGroup: onLib,
-    markGroup: onLib,
+    drawGroup: onLib || onSheet,
+    leadGroup: onLib || onSheet,
+    markGroup: onLib || onSheet,
     libActionsGroup: onLib,
     libSymbolMetaGroup: onLib && symSelected,
     resourceNameGroup: !!resourceNameMode,
