@@ -1,9 +1,8 @@
-/** Pola nazwy symbolu w toolbarze — ID techniczne vs oznaczenie instancji. */
+/** Pola nazwy symbolu w toolbarze — bez sugestii w placeholderze. */
 
-/** Oznaczenie (prefiks) nie jest auto-wypełniane sugestią — tylko placeholder. */
-export function resolveInstPrefixFields(explicitPrefix, suggestedBase) {
+export function resolveInstPrefixFields(explicitPrefix) {
   return {
     value: (explicitPrefix || "").trim(),
-    placeholder: (suggestedBase || "").trim(),
+    placeholder: "",
   };
 }

@@ -34,7 +34,7 @@ describe("resolveToolbarGroups", () => {
 
 describe("formatLibrarySelectionInfo", () => {
   it("deleguje do wording SSOT", () => {
-    expect(formatLibrarySelectionInfo("E-STOP", "SB")).toBe("Symbol: E-STOP · ozn. SB");
+    expect(formatLibrarySelectionInfo("E-STOP", "SB")).toBe("Symbol: E-STOP · oznaczenie: SB");
     expect(formatLibrarySelectionInfo("", "SB")).toBe(W.selection.pickSymbol);
   });
 });

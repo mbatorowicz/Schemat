@@ -1,10 +1,18 @@
-/** SSOT — etykiety, tooltips, statusy i breadcrumb (nazwy, zapis, zasoby). */
+/** SSOT — etykiety, tooltips, statusy i breadcrumb (bez przykładowych nazw projektu). */
 
 export const BANNED_UI_TERMS = [
   "ID typu",
   "Zastosuj ID",
   "Ozn.",
   "typ symbolu",
+  "Czujnik fotooptyczny",
+  "Transporter boczny",
+  "CS-TB",
+  "Zasilanie",
+  "E-01",
+  "E-00_symbole",
+  "np. B",
+  "np. WD",
 ];
 
 export const W = {
@@ -14,16 +22,16 @@ export const W = {
     numberFrom: "Od",
     numberToggle: "Numeruj",
     sheetName: "Nazwa schematu",
-    libraryName: "Nazwa biblioteki",
-    projectName: "Nazwa projektu",
+    libraryName: "Nazwa pliku biblioteki",
+    projectName: "Nazwa folderu projektu",
   },
   fieldTip: {
     symbolName:
-      "Nazwa czytelna w listach i nag\u0142\u00f3wku (np. Czujnik fotooptyczny). Nie trafia na schemat jako oznaczenie elementu.",
+      "Nazwa czytelna w listach i nag\u0142\u00f3wku. Nie jest oznaczeniem instancji na rysunku.",
     symbolDesignation:
-      "Typ elementu na schemacie (np. B, SK, SB). Wiele symboli w bibliotece mo\u017ce mie\u0107 to samo oznaczenie \u2014 numeracja SB1, SB2\u2026 jest wsp\u00f3lna.",
+      "Typ elementu na schemacie. Wiele symboli w bibliotece mo\u017ce mie\u0107 to samo oznaczenie; numeracja instancji jest wsp\u00f3lna.",
     numberToggle:
-      "Domy\u015blna numeracja instancji przy wstawianiu na schemat (B1, B2\u2026). Numer na schemacie to osobne pole data-ref.",
+      "Domy\u015blna numeracja przy wstawianiu instancji. Numer na schemacie to osobne pole.",
   },
   group: {
     symbol: "Symbol",
@@ -41,24 +49,45 @@ export const W = {
   },
   saveTip: {
     file: "Zapisz zawarto\u015b\u0107 pliku na dysk",
-    project: "Zapisz bibliotek\u0119, zmienione schematy i projekt.json",
-    symbol: "Zapisz nazw\u0119, oznaczenie (id techniczne) i domy\u015bln\u0105 numeracj\u0119 na schemacie",
-    sheet: "Zapisz nazw\u0119 wy\u015bwietlan\u0105 schematu (lista, breadcrumb, tytu\u0142 w ramce)",
+    project: "Zapisz bibliotek\u0119, zmienione schematy i ustawienia projektu",
+    symbol: "Zapisz nazw\u0119, oznaczenie i domy\u015bln\u0105 numeracj\u0119",
+    sheet: "Zapisz nazw\u0119 wy\u015bwietlan\u0105 schematu",
     library: "Zmie\u0144 nazw\u0119 pliku biblioteki",
     projectRename: "Zmie\u0144 nazw\u0119 folderu projektu",
   },
+  /** Pola formularza — puste; bez przyk\u0142ad\u00f3w ani domy\u015blnych nazw. */
   placeholder: {
-    symbolName: "Czujnik fotooptyczny",
-    designation: "B",
-    sheet: "1. Zasilanie",
-    library: "E-00_symbole.svg",
-    project: "CS-TB-48",
+    symbolName: "",
+    designation: "",
+    sheet: "",
+    library: "",
+    project: "",
+    connRef: "",
+    connPin: "",
+    text: "",
+    dateFormat: "RRRR-MM-DD",
   },
   selection: {
     pickSymbol: "Wybierz symbol",
     newObjectStyle: "Styl nowych obiekt\u00f3w",
     pickSymbolTitle: "Wybierz symbol na li\u015bcie po lewej",
-    symbolTitle: (name) => `Symbol w bibliotece: ${name}`,
+    symbolTitle: (name) => (name ? `Symbol: ${name}` : "Symbol"),
+  },
+  create: {
+    noFsApi: "Tworzenie projektu wymaga przegl\u0105darki z dost\u0119pem do folder\u00f3w (Chrome lub Edge).",
+    noProjectWrite: "Brak uprawnie\u0144 zapisu \u2014 u\u017cyj \u201ePrzywr\u00f3\u0107 dost\u0119p\u201d.",
+    projectFailed: "Nie uda\u0142o si\u0119 utworzy\u0107 projektu",
+    libraryFailed: "Nie uda\u0142o si\u0119 utworzy\u0107 biblioteki",
+    sheetFailed: "Nie uda\u0142o si\u0119 utworzy\u0107 schematu",
+    libraryInProject: (rel) => `Utworzono bibliotek\u0119: ${rel}`,
+    libraryLinked: (rel) => `Powi\u0105zano bibliotek\u0119: ${rel}`,
+    libraryStandalone: (name) => `Utworzono bibliotek\u0119: ${name}`,
+    sheetCreated: (title, file) => `Utworzono schemat: ${title} (${file})`,
+  },
+  list: {
+    sheetFileHint: (file) => `Plik: ${file}`,
+    insertSymbol: (ozn) => `Wstaw na schemat (${ozn})`,
+    editSymbol: "Edytuj symbol",
   },
 };
 
@@ -80,10 +109,7 @@ export function resourceNameLabel(mode) {
   return "";
 }
 
-export function resourceNamePlaceholder(mode) {
-  if (mode === "sheet") return W.placeholder.sheet;
-  if (mode === "library") return W.placeholder.library;
-  if (mode === "project") return W.placeholder.project;
+export function resourceNamePlaceholder(_mode) {
   return "";
 }
 
@@ -97,16 +123,16 @@ export function paramsSaveTip(mode) {
 export function symbolSelectionSummary(name, oznLabel) {
   if (!name) return W.selection.pickSymbol;
   const ozn = (oznLabel || "").trim();
-  const oznPart = ozn && ozn !== name ? ` \u00b7 ozn. ${ozn}` : "";
+  const oznPart = ozn && ozn !== name ? ` \u00b7 ${W.field.designation.toLowerCase()}: ${ozn}` : "";
   return `${W.group.symbol}: ${name}${oznPart}`;
 }
 
 export function breadcrumbProject(name) {
-  return name ? `Projekt: ${name}` : "";
+  return name ? `Projekt: ${name}` : "Projekt";
 }
 
 export function breadcrumbLibrary(selName) {
-  return selName ? `Biblioteka \u00b7 ${selName}` : "Biblioteka";
+  return selName ? `Biblioteka: ${selName}` : "Biblioteka";
 }
 
 export function breadcrumbSheet(name) {
@@ -115,19 +141,19 @@ export function breadcrumbSheet(name) {
 
 export const status = {
   symbolSaved(name, ozn) {
-    const oznPart = ozn && ozn !== name ? ` \u00b7 ozn. ${ozn}` : "";
+    const oznPart = ozn && ozn !== name ? ` \u00b7 ${W.field.designation.toLowerCase()}: ${ozn}` : "";
     return `Zapisano symbol: ${name}${oznPart}`;
   },
   symbolRenamed(from, to) {
     return `Nazwa symbolu: ${from} \u2192 ${to}`;
   },
   symbolEmptyName: "Nazwa symbolu nie mo\u017ce by\u0107 pusta.",
-  symbolInvalidName: "Nazwa symbolu nie mo\u017ce by\u0107 pusta (max. 120 znak\u00f3w).",
+  symbolInvalidName: "Nazwa symbolu nie mo\u017ce by\u0107 pusta (maks. 120 znak\u00f3w).",
   symbolEmptyDesignation: "Oznaczenie nie mo\u017ce by\u0107 puste.",
-  symbolInvalidDesignation: "Oznaczenie: litery (w tym polskie), cyfry, _, - (np. B, SK, SB).",
+  symbolInvalidDesignation: "Oznaczenie: litery, cyfry, _, - (bez spacji).",
   symbolDuplicateDesignation: (ozn) => `Symbol o oznaczeniu ${ozn} ju\u017c istnieje.`,
   symbolDuplicate: (name) => `Symbol o nazwie ${name} ju\u017c istnieje.`,
-  symbolPickLibrary: "Wybierz symbol w bibliotece (lewy panel).",
+  symbolPickLibrary: "Wybierz symbol w bibliotece.",
   sheetRenamed(from, to) {
     return `Schemat: ${from} \u2192 ${to}`;
   },
@@ -137,26 +163,30 @@ export const status = {
   projectRenamed(from, to) {
     return `Projekt: ${from} \u2192 ${to}`;
   },
-  projectRenameFailed: "Nie uda\u0142o si\u0119 zmieni\u0107 nazwy folderu \u2014 zmie\u0144 r\u0119cznie w eksploratorze i otw\u00f3rz projekt ponownie.",
-  resourceEmpty: "Nazwa nie mo\u017ce by\u0107 pusta.",
-  resourceInvalidSheet: "Nazwa schematu: litery, cyfry, _, - (bez .svg).",
-  sheetTitleInvalid: "Nazwa schematu nie mo\u017ce by\u0107 pusta (max. 120 znak\u00f3w).",
+  projectRenameFailed:
+    "Nie uda\u0142o si\u0119 zmieni\u0107 nazwy folderu \u2014 zmie\u0144 r\u0119cznie i otw\u00f3rz projekt ponownie.",
+  resourceEmpty: "Pole nie mo\u017ce by\u0107 puste.",
+  resourceInvalidSheet: "Nieprawid\u0142owa nazwa pliku schematu.",
+  sheetTitleInvalid: "Nazwa schematu nie mo\u017ce by\u0107 pusta (maks. 120 znak\u00f3w).",
   sheetTitleMissingNode: "Brak grupy schematu w pliku SVG.",
   sheetTitleSaved(title) {
     return `Zapisano nazw\u0119 schematu: ${title}`;
   },
   resourceInvalidLibrary: "Nazwa biblioteki musi ko\u0144czy\u0107 si\u0119 na .svg.",
   resourceInvalidProject: "Nazwa projektu nie mo\u017ce zawiera\u0107 \\ ani /.",
+  pickSheet: "Wybierz schemat na li\u015bcie po lewej.",
 };
 
-/** Zbierz wszystkie statyczne stringi do testu regresji wordingu. */
+/** Zbierz wszystkie statyczne stringi UI do testu regresji wordingu. */
 export function collectWordingStrings() {
   const out = [
     ...Object.values(W.field),
     ...Object.values(W.group),
     ...Object.values(W.save),
     ...Object.values(W.saveTip),
-    ...Object.values(W.placeholder),
+    ...Object.values(W.fieldTip),
+    ...Object.values(W.placeholder).filter((s) => s !== "RRRR-MM-DD"),
+    ...Object.values(W.list),
     W.selection.pickSymbol,
     W.selection.newObjectStyle,
     status.symbolEmptyName,
@@ -171,6 +201,10 @@ export function collectWordingStrings() {
     status.sheetTitleMissingNode,
     status.resourceInvalidLibrary,
     status.resourceInvalidProject,
+    status.pickSheet,
+    breadcrumbProject(""),
+    breadcrumbLibrary(""),
+    breadcrumbSheet(""),
   ];
   return out;
 }

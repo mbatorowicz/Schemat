@@ -71,10 +71,26 @@ import {
   restorePrefsSnapshot
 } from './persistence.js';
 import { qsById } from './dom-selectors.js';
-import { mkChromeEl, mkChromeText, mkHandle, mkPrev } from './element-factory.js';
+import { mkHandle, mkPrev } from './element-factory.js';
 import { createNetlistUi } from './netlist-ui.js';
 import { createFileIo } from './file-io.js';
 import { resolveBootCachePlan, resolveReloadSheetsOutcome, projectCacheScore, libraryCacheScore } from './boot-cache.js';
+import { emptySvgMarkup, uniqueLibraryFileName } from './document-scaffold.js';
+import {
+  createSheetDocument,
+  createLibraryInProject,
+  createLibraryStandalone,
+  initializeNewProjectOnDisk,
+  isDirectoryEmpty,
+  writeSheetToProject,
+  parseEmptyLibrary,
+} from './project-create.js';
+import {
+  existingLibrarySvgNames,
+  sheetRelPathSet,
+  librarySettingPathForHandle,
+  DEFAULT_WALK_DEPTH,
+} from './project-paths.js';
 import { resolveToolbarGroups } from './toolbar-context.js';
 import {
   W,
@@ -95,9 +111,7 @@ import {
   sheetCatalogLabel,
   sheetCatalogSubtitle,
   applySheetDisplayTitle,
-  SHEET_TITLE_ATTR,
 } from './sheet-catalog.js';
-import { inferSymbolDisplayName } from './symbol-display.js';
 import {
   renameLibraryOnDisk,
   renameProjectFolderOnDisk,
@@ -110,11 +124,13 @@ import './toolbar-form.css';
 // ---- ikony belki narz&#281;dzi (inline SVG, viewBox 0 0 24 24) ----
 const ICONS = {
   btnOpen:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  btnNewProject:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/>',
   btnGrant:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="15" cy="14" r="2.2"/><path d="M15 16v3M15 19h2"/>',
   btnSave:'<path d="M4 4h11l5 5v11H4z"/><path d="M8 4v5h7"/><rect x="8" y="13" width="8" height="7"/>',
   btnSaveProject:'<path d="M4 4h8l2 2h8v12H4z"/><path d="M8 4v5h6"/><rect x="7" y="14" width="6" height="5"/><path d="M14 4v3h4"/>',
   btnSaveAs:'<path d="M4 4h10l4 4v5"/><path d="M8 4v5h7"/><path d="M13.5 20.5l6-6 2 2-6 6h-2z"/>',
   btnNewSheet:'<rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="15" width="10" height="4"/><path d="M7 7h10"/>',
+  btnNewLibrary:'<path d="M4 5a2 2 0 0 1 2-2h4v16H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-4v16h4a2 2 0 0 1 2 2z"/><path d="M12 8v8M9 11h6"/>',
   btnLib:'<path d="M4 5a2 2 0 0 1 2-2h4v16H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-4v16h4a2 2 0 0 1 2 2z"/>',
   btnSettings:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5 5l2.1 2.1M16.9 16.9L19 19M19 5l-2.1 2.1M7.1 16.9L5 19"/>',
   btnUndo:'<path d="M9 8L4 12l5 4"/><path d="M4 12h10a6 6 0 0 1 0 8"/>',
@@ -382,6 +398,8 @@ function line(parent,x1,y1,x2,y2,stroke,w){
 
 // ---- projekt: biblioteka + pliki schemat&oacute;w ----
 document.getElementById("btnOpen").onclick = openProject;
+document.getElementById("btnNewProject").onclick = () => { newProject(); };
+document.getElementById("btnNewLibrary").onclick = () => { newLibrary(); };
 document.getElementById("fileInput").onchange = e=>{ const f=e.target.files[0]; if(!f) return; f.text().then(t=>importLoose(t, f.name)); };
 
 function resolveLibSymbolNode(id){ return resolveLibSymbol(state.lib?.svg, id); }
@@ -435,6 +453,14 @@ function applyStaticWording(){
   const instPrefix=document.getElementById("instPrefix");
   if(symName) symName.placeholder=W.placeholder.symbolName;
   if(instPrefix) instPrefix.placeholder=W.placeholder.designation;
+  const connRef=document.getElementById("connMetaRef");
+  const connPin=document.getElementById("connMetaPin");
+  const textEdit=document.getElementById("textEdit");
+  const setDate=document.getElementById("setDate");
+  if(connRef) connRef.placeholder=W.placeholder.connRef;
+  if(connPin) connPin.placeholder=W.placeholder.connPin;
+  if(textEdit) textEdit.placeholder=W.placeholder.text;
+  if(setDate) setDate.placeholder=W.placeholder.dateFormat;
   const btnSaveSymbol=document.getElementById("btnSaveSymbol");
   if(btnSaveSymbol) btnSaveSymbol.title=W.saveTip.symbol;
   const btnProj=document.getElementById("btnSaveProject");
@@ -491,14 +517,13 @@ function syncNameFields(){
     const sym=state.symbols.find(s=>s.id===state.selId);
     if(sym){
       symInp.value=symbolDisplayName(sym.node);
-      symInp.placeholder=symInp.value?W.placeholder.symbolName:(inferSymbolDisplayName(sym.node,sym.id)||W.placeholder.symbolName);
+      symInp.placeholder=W.placeholder.symbolName;
       symInp.disabled=false; if(btnSym) btnSym.disabled=false;
       const rule=refBaseForSymbol(state.selId);
       if(prefixInp){
         prefixInp.disabled=false;
         prefixInp.value=symbolDesignation(sym.node, sym.id);
-        const suggested=refBaseForSymbol(sym.id, sym.node).base;
-        prefixInp.placeholder=suggested||W.placeholder.designation;
+        prefixInp.placeholder=W.placeholder.designation;
       }
       if(numChk){
         numChk.disabled=false;
@@ -550,7 +575,7 @@ async function saveResourceName(){
   const v=(inp?.value||"").trim();
   const rw={ writeHandle, getFileHandleByPath };
   if(mode==="sheet"){
-    if(!state.active||state.active===state.lib){ setStatus("Wybierz schemat na liście po lewej."); return; }
+    if(!state.active||state.active===state.lib){ setStatus(status.pickSheet); return; }
     pushUndo();
     const res=applySheetDisplayTitle(state.active, v);
     if(!res.ok){ setStatus(res.message); return; }
@@ -612,6 +637,117 @@ function syncToolbarContext(){
 }
 function syncSymbolToolbar(){ syncToolbarContext(); }
 function ensureLib(){ if(!state.lib){ const p=parseSvg(baseDocText()); state.lib={handle:null,name:"E-00_symbole.svg",svg:p.svg,doc:p.doc}; } }
+
+async function newProject(){
+  if(!window.showDirectoryPicker){ setStatus(W.create.noFsApi); return; }
+  const dirtyN=countDirtySheets(state.sheets);
+  if(dirtyN && !confirm("Masz "+dirtyN+" niezapisany(ych) schemat(ów). Utworzenie nowego projektu wyczyści bieżącą sesję. Kontynuować?")) return;
+  let dir;
+  try{ dir=await window.showDirectoryPicker({mode:"readwrite"}); }catch(e){ if(e.name!=="AbortError") console.warn(e); return; }
+  const empty=await isDirectoryEmpty(dir);
+  if(!empty && !confirm("Folder nie jest pusty. Utworzyć projekt w tym folderze? (istniejące pliki pozostaną)")) return;
+  const res=await initializeNewProjectOnDisk({
+    dir, writeHandle, styleContent: DEFAULT_STYLE, svgNs: SVGNS, todayStr,
+  });
+  if(!res.ok){ setStatus(res.message||W.create.projectFailed); return; }
+  state.dir=dir;
+  idbSet("dir",dir).catch(()=>{});
+  settingsCfg=res.settings;
+  state.sheets=res.firstSheet?[res.firstSheet]:[];
+  state.projectNetlists=[];
+  state.netlist=null;
+  adoptLibraryFromParsed(res.library.parsed, res.library.name, res.library.handle);
+  state.libHandle=res.library.handle;
+  settingsCfg.library=res.library.relPath;
+  idbSet("libHandle", res.library.handle).catch(()=>{});
+  try{
+    migrateProjectSymbolNames();
+    buildSymbolList();
+    if(res.firstSheet) selectSheet(res.firstSheet);
+    else{
+      const s0=state.symbols[0];
+      if(s0) selectSymbol(s0.id);
+      else{ state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; state.selId=null; render(); }
+    }
+    showGrantIfNeeded(dir);
+    setStatus(res.message);
+    saveProject();
+  }catch(e){
+    console.error(e);
+    setStatus(W.create.projectFailed+": "+(e.message||e));
+  }
+}
+
+async function linkLibraryHandleToProject(handle, walkedFiles){
+  if(!state.dir||!handle) return;
+  const rel=await librarySettingPathForHandle(state.dir, handle, walkedFiles);
+  settingsCfg.library=normalizeRelPath(rel);
+  await saveProjectSettings();
+}
+
+async function pickSaveLocationInProject(suggestedName, description){
+  if(!state.dir||!window.showSaveFilePicker) return null;
+  try{
+    return await window.showSaveFilePicker({
+      startIn: state.dir,
+      suggestedName,
+      types:[{description, accept:{"image/svg+xml":[".svg"]}}],
+    });
+  }catch(e){
+    if(e?.name!=="AbortError") console.warn(e);
+    return null;
+  }
+}
+
+async function newLibrary(){
+  if(state.lib?.dirty && !confirm("Bieżąca biblioteka ma niezapisane zmiany. Utworzyć nową bibliotekę mimo to?")) return;
+  const styleContent=DEFAULT_STYLE;
+  if(state.dir){
+    if(!(await ensurePerm(state.dir))){ setStatus(W.create.noProjectWrite); return; }
+    let walked=await walkDir(state.dir,{maxDepth:DEFAULT_WALK_DEPTH}).catch(()=>({files:[]}));
+    const sheetPaths=sheetRelPathSet(state.sheets);
+    const existingNames=existingLibrarySvgNames(walked.files, sheetPaths);
+    const suggested=uniqueLibraryFileName(existingNames);
+    const saveHandle=await pickSaveLocationInProject(suggested, "Biblioteka symboli SVG");
+    let res;
+    if(saveHandle){
+      const rel=await librarySettingPathForHandle(state.dir, saveHandle, walked.files);
+      const parsed=parseEmptyLibrary({styleContent, svgNs:SVGNS});
+      if(!parsed){ setStatus(W.create.libraryFailed); return; }
+      await writeHandle(saveHandle, serializeSvg(parsed.svg));
+      res={ok:true, handle:saveHandle, name:saveHandle.name, relPath:normalizeRelPath(rel||saveHandle.name), parsed};
+    }else{
+      res=await createLibraryInProject({dir:state.dir, writeHandle, styleContent, svgNs:SVGNS, existingNames});
+    }
+    if(!res.ok){ setStatus(res.message||W.create.libraryFailed); return; }
+    adoptLibraryFromParsed(res.parsed, res.name, res.handle);
+    state.libHandle=res.handle;
+    settingsCfg.library=res.relPath;
+    idbSet("libHandle", res.handle).catch(()=>{});
+    buildSymbolList();
+    const s0=state.symbols[0];
+    if(s0) selectSymbol(s0.id);
+    else{ state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; state.selId=null; render(); }
+    await saveProjectSettings();
+    setStatus(W.create.libraryInProject(res.relPath));
+    saveProject();
+    return;
+  }
+  const res=await createLibraryStandalone({
+    styleContent, svgNs:SVGNS, writeHandle,
+    showSaveFilePicker: window.showSaveFilePicker?.bind(window),
+  });
+  if(!res.ok){ if(!res.aborted && res.message) setStatus(res.message); return; }
+  adoptLibraryFromParsed(res.parsed, res.name, res.handle);
+  state.libHandle=res.handle;
+  idbSet("libHandle", res.handle).catch(()=>{});
+  buildSymbolList();
+  const s0=state.symbols[0];
+  if(s0) selectSymbol(s0.id);
+  else{ state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; state.selId=null; render(); }
+  setStatus(W.create.libraryStandalone(res.name));
+  saveProject();
+}
 
 async function openProject(){
   if(!window.showDirectoryPicker){ document.getElementById("fileInput").click(); return; }
@@ -696,15 +832,21 @@ async function pickLibrary(){
   if(!window.showOpenFilePicker){ document.getElementById("fileInput").click(); return; }
   try{
     const wasLibrary=!state.active||state.active===state.lib;
-    const [h]=await window.showOpenFilePicker({types:[{description:"SVG biblioteka symboli",accept:{"image/svg+xml":[".svg"]}}]});
+    const pickerOpts={types:[{description:"SVG biblioteka symboli",accept:{"image/svg+xml":[".svg"]}}]};
+    if(state.dir) pickerOpts.startIn=state.dir;
+    const [h]=await window.showOpenFilePicker(pickerOpts);
     const f=await h.getFile(); const p=parseSvg(await f.text());
     if(!p){ setStatus("Niepoprawny plik SVG."); return; }
     state.libHandle=h; adoptLibraryFromParsed(p,f.name,h);
     idbSet("libHandle",h).catch(()=>{}); flushLibrary();
+    if(state.dir){
+      const walked=await walkDir(state.dir,{maxDepth:DEFAULT_WALK_DEPTH}).catch(()=>({files:[]}));
+      await linkLibraryHandleToProject(h, walked.files);
+    }
     buildSymbolList();
     if(wasLibrary || !currentSymNode()){ const s0=state.symbols[0]; if(s0) selectSymbol(s0.id); else { state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; state.selId=null; render(); } }
     else render();
-    setStatus("Biblioteka: "+f.name+" ("+state.symbols.length+" symboli"+(state.connIssues.length?", problemy przy&#322;&#261;czy: "+state.connIssues.length:"")+").");
+    setStatus("Biblioteka: "+f.name+" ("+state.symbols.length+" symboli"+(state.connIssues.length?", problemy przy&#322;&#261;czy: "+state.connIssues.length:"")+(settingsCfg.library?"; "+settingsCfg.library:"")+").");
   }catch(e){ if(e.name!=="AbortError") console.warn(e); }
 }
 async function restoreLibrary(){ return restoreLibrarySnapshot(); }
@@ -823,7 +965,7 @@ function sheetListItem(sh){
   const subEl=document.createElement("span"); subEl.className="sch-file"; subEl.textContent=sheetCatalogSubtitle(sh);
   labels.append(titleEl,subEl);
   li.appendChild(labels);
-  li.title=[sh.relPath||sh.name, subEl.textContent?"(plik: "+linkedSheetBasename(sh.name)+")":""].filter(Boolean).join(" ");
+  li.title=[sh.relPath||sh.name, subEl.textContent?W.list.sheetFileHint(linkedSheetBasename(sh.name)):""].filter(Boolean).join(" ");
   li.onclick=()=>selectSheet(sh); li._sheet=sh;
   li.classList.toggle("sel",state.active===sh);
   return li;
@@ -855,14 +997,14 @@ function buildSidebarSymbolDefs(){
   });
 }
 function symbolListItem(sym){
-  const li=document.createElement("li"); li.dataset.id=sym.id; li.title="Kliknij, aby edytowa\u0107 symbol";
+  const li=document.createElement("li"); li.dataset.id=sym.id; li.title=W.list.editSymbol;
   const svg=document.createElementNS(SVGNS,"svg"); svg.setAttribute("class","sym-thumb"); svg.setAttribute("viewBox","-30 -30 60 60"); svg.setAttribute("preserveAspectRatio","xMidYMid meet");
   const use=document.createElementNS(SVGNS,"use"); use.setAttribute("href","#"+sidebarPrefix+sym.id); use.setAttributeNS(XLINK,"xlink:href","#"+sidebarPrefix+sym.id); svg.appendChild(use);
   const labels=document.createElement("span"); labels.className="sym-labels";
   const idEl=document.createElement("span"); idEl.className="sym-id"; idEl.textContent=symbolCatalogLabel(sym.node, sym.id);
   const oznEl=document.createElement("span"); oznEl.className="sym-ozn"; oznEl.textContent=symbolCatalogSubtitle(sym.node, sym.id);
   labels.append(idEl,oznEl);
-  const add=document.createElement("button"); add.type="button"; add.className="sym-add"; add.textContent="+"; add.title="Wstaw "+symbolDesignation(sym.node, sym.id)+" na schemat (np. "+symbolDesignation(sym.node, sym.id)+"1)";
+  const add=document.createElement("button"); add.type="button"; add.className="sym-add"; add.textContent="+"; add.title=W.list.insertSymbol(symbolDesignation(sym.node, sym.id));
   add.addEventListener("pointerdown",e=>e.stopPropagation());
   add.addEventListener("click",e=>{ e.stopPropagation(); insertUse(sym.id,true); });
   li.append(svg,labels,add); li.onclick=()=>selectSymbol(sym.id); li.classList.toggle("sel",state.active===state.lib&&state.selId===sym.id);
@@ -2014,7 +2156,7 @@ const DEFAULT_STYLE = "\n"+
   ".did{font:700 12px Arial,sans-serif;fill:var(--object-stroke,#0f172a);}\n"+
   wireCssRules()+"\n";
 function baseDocText(){
-  return '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1485 1050" width="1485" height="1050"><defs><style>'+DEFAULT_STYLE+'</style></defs></svg>';
+  return emptySvgMarkup(DEFAULT_STYLE);
 }
 function ensureStyle(){
   if(!state.srcSvg) return;
@@ -2024,54 +2166,56 @@ function ensureStyle(){
 }
 
 // ---- nowy schemat (arkusz A4) ----
-function buildSheetGroup(id,cfg){
-  const land = cfg.orient!=="portrait";
-  const W = land?1485:1050, H = land?1050:1485;
-  const g=document.createElementNS(SVGNS,"g"); g.setAttribute("id",id);
-  const docTitle=cfg.doc||"Schemat elektryczny";
-  g.setAttribute(SHEET_TITLE_ATTR, docTitle);
-  g.appendChild(mkChromeEl("rect",{x:12,y:12,width:W-24,height:H-24,class:"fr"}));
-  g.appendChild(mkChromeEl("rect",{x:20,y:20,width:W-40,height:H-40,class:"fr2"}));
-  g.appendChild(mkChromeText(34,52,"ttl",docTitle));
-  g.appendChild(mkChromeText(34,72,"sub",(cfg.maker||"")+((cfg.norm)?("  \u00b7  "+cfg.norm):"")));
-  // tabelka opisowa (d&oacute;&#322;)
-  const tH=120, tX=34, tW=W-68, tY=H-34-tH;
-  g.appendChild(mkChromeEl("rect",{x:tX,y:tY,width:tW,height:tH,class:"fr"}));
-  const splitX = tX + Math.round(tW*0.6);
-  g.appendChild(mkChromeEl("line",{x1:splitX,y1:tY,x2:splitX,y2:tY+tH,class:"fr2"}));
-  g.appendChild(mkChromeEl("line",{x1:tX,y1:tY+28,x2:splitX,y2:tY+28,class:"fr2"}));
-  g.appendChild(mkChromeText(tX+12,tY+19,"tbb","Dokument"));
-  g.appendChild(mkChromeText(tX+12,tY+52,"tb",cfg.doc||""));
-  // prawa cz&#281;&#347;&#263;: siatka 2x3 p&oacute;l
-  const x0=splitX, x1=tX+tW, midX=Math.round((x0+x1)/2), colW=(x1-x0)/2, rowH=tH/3;
-  g.appendChild(mkChromeEl("line",{x1:midX,y1:tY,x2:midX,y2:tY+tH,class:"fr2"}));
-  for(let r=1;r<3;r++) g.appendChild(mkChromeEl("line",{x1:x0,y1:tY+r*rowH,x2:x1,y2:tY+r*rowH,class:"fr2"}));
-  const fields=[["Nr seryjny",cfg.serial],["Wytw\u00f3rca",cfg.maker],["Wersja",cfg.version],["Arkusz",cfg.sheet],["Norma",cfg.norm],["Data",cfg.date]];
-  fields.forEach((f,i)=>{ const r=Math.floor(i/2), c=i%2; const cx=x0+c*colW, cy=tY+r*rowH;
-    g.appendChild(mkChromeText(cx+8,cy+15,"tbb",f[0]));
-    g.appendChild(mkChromeText(cx+8,cy+rowH-8,"tb",f[1]||"")); });
-  return g;
-}
 function newSheet(){
   ensureLib();
-  const p=parseSvg(baseDocText()); const svg=p.svg, doc=p.doc;
-  const usedId=x=>state.sheets.some(s=>s.id===x)||svg.querySelector('[id="'+x+'"]');
-  let n=1,id; do{ id="sch-"+n; n++; }while(usedId(id));
-  const g=buildSheetGroup(id, settingsCfg); svg.appendChild(g);
-  let base=(settingsCfg.sheet||"schemat").replace(/[^\w\-]+/g,"_"); let fn=base+".svg", k=1;
-  while(state.sheets.some(s=>s.name===fn)){ fn=base+"-"+(++k)+".svg"; }
-  const sheet={handle:null, name:fn, svg, doc, id};
-  state.sheets.push(sheet);
-  buildSymbolList(); selectSymbol(id);
-  if(state.dir){ (async()=>{ try{ if(await ensurePerm(state.dir)){ sheet.handle=await state.dir.getFileHandle(fn,{create:true}); inlineSheetDefs(sheet); await writeHandle(sheet.handle, serializeSvg(svg)); await saveProjectSettings(); } }catch(e){ console.warn(e); } })(); }
-  setStatus("Utworzono schemat "+fn+" ("+id+", A4 "+(settingsCfg.orient==="portrait"?"pion":"poziom")+").");
-  saveProject();
+  if(!state.dir && !confirm("Brak otwartego projektu — schemat zostanie utworzony tylko w pamięci. Kontynuować?")) return;
+  (async()=>{
+    let relPath=null;
+    let saveHandle=null;
+    if(state.dir && window.showSaveFilePicker){
+      saveHandle=await pickSaveLocationInProject(
+        uniqueFileName(state.sheets.map(s=>s.relPath||s.name).map(n=>n.split("/").pop()), settingsCfg.sheet||"Schemat"),
+        "Schemat SVG"
+      );
+      if(saveHandle){
+        const walked=await walkDir(state.dir,{maxDepth:DEFAULT_WALK_DEPTH}).catch(()=>({files:[]}));
+        relPath=await librarySettingPathForHandle(state.dir, saveHandle, walked.files);
+      }
+    }
+    const doc=createSheetDocument({
+      styleContent: DEFAULT_STYLE,
+      settingsCfg,
+      existingSheetIds: state.sheets.map(s=>s.id),
+      existingFileNames: state.sheets.map(s=>s.relPath||s.name),
+      relPath: relPath||undefined,
+    });
+    if(!doc.ok){ setStatus(doc.message||W.create.sheetFailed); return; }
+    const sheet=doc.sheet;
+    state.sheets.push(sheet);
+    buildSymbolList();
+    selectSheet(sheet);
+    if(state.dir){
+      try{
+        if(await ensurePerm(state.dir)){
+          if(saveHandle){
+            sheet.handle=saveHandle;
+            sheet.relPath=normalizeRelPath(relPath||saveHandle.name);
+            await writeHandle(saveHandle, serializeSvg(sheet.svg));
+          }else await writeSheetToProject(state.dir, sheet, writeHandle, serializeSvg);
+          inlineSheetDefs(sheet);
+          await saveProjectSettings();
+        }
+      }catch(e){ console.warn(e); }
+    }
+    setStatus(W.create.sheetCreated(sheetCatalogLabel(sheet), sheet.relPath||sheet.name));
+    saveProject();
+  })();
 }
 document.getElementById("btnNewSheet").onclick=newSheet;
 
 // ---- ustawienia (formularz + trwa&#322;o&#347;&#263;) ----
 function todayStr(){ const d=new Date(); const p=n=>("0"+n).slice(-2); return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()); }
-const SETTINGS_DEFAULT = { orient:"landscape", doc:"Transporter boczny do drukarki", serial:"CS-TB-2026-001", maker:"CNC Solutions", version:"1.0", sheet:"E-01", norm:"EN 60204-1", date:"", library:"../../lib/E-00_symbole.svg" };
+const SETTINGS_DEFAULT = { orient:"landscape", doc:"", serial:"", maker:"", version:"1.0", sheet:"", norm:"", date:"", library:"" };
 let settingsCfg = Object.assign({}, SETTINGS_DEFAULT);
 async function loadSettings(){
   let s=null; try{ s=await idbGet("settings"); }catch(e){}

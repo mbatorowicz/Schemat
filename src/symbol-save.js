@@ -8,7 +8,7 @@ import { status as Wstatus } from "./ui-wording.js";
 
 
 
-/** Nazwa widoczna w UI (np. „Czujnik fotooptyczny”). */
+/** Nazwa widoczna w UI (listy, breadcrumb). Osobno od oznaczenia technicznego. */
 
 export const SYMBOL_NAME_ATTR = "data-symbol-name";
 

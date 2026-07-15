@@ -60,7 +60,7 @@ export function parentRelPath(relPath) {
 }
 
 export async function walkDir(dir, opts = {}) {
-  const maxDepth = opts.maxDepth ?? 6;
+  const maxDepth = opts.maxDepth ?? 12;
   const files = [];
   const dirs = [];
 

@@ -21,12 +21,12 @@ function mockNode(id, attrs = {}) {
 
 describe("symbol-display", () => {
   it("inferSymbolDisplayName preferuje data-symbol-name", () => {
-    const n = mockNode("B", { [SYMBOL_NAME_ATTR]: "Czujnik fotooptyczny", "data-inst-prefix": "B" });
-    expect(inferSymbolDisplayName(n, "B")).toBe("Czujnik fotooptyczny");
+    const n = mockNode("B", { [SYMBOL_NAME_ATTR]: "Czujnik", "data-inst-prefix": "B" });
+    expect(inferSymbolDisplayName(n, "B")).toBe("Czujnik");
   });
 
-  it("inferSymbolDisplayName używa katalogu dla krótkich id", () => {
-    expect(inferSymbolDisplayName(mockNode("B"), "B")).toBe("Mostek / prostownik");
+  it("inferSymbolDisplayName nie używa katalogu domyślnych nazw", () => {
+    expect(inferSymbolDisplayName(mockNode("B"), "B")).toBe("");
   });
 
   it("inferSymbolDisplayName humanizuje czytelne id", () => {

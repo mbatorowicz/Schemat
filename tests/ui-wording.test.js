@@ -18,8 +18,8 @@ describe("ui-wording SSOT", () => {
   });
 
   it("symbolSelectionSummary formatuje nazwę i oznaczenie", () => {
-    expect(symbolSelectionSummary("SK", "SB")).toBe("Symbol: SK · ozn. SB");
-    expect(symbolSelectionSummary("", "SB")).toBe(W.selection.pickSymbol);
+    expect(symbolSelectionSummary("Stycznik", "SK")).toBe("Symbol: Stycznik · oznaczenie: SK");
+    expect(symbolSelectionSummary("", "SK")).toBe(W.selection.pickSymbol);
   });
 
   it("resourceNameLabel zwraca etykiety pól zasobów", () => {
