@@ -96,6 +96,7 @@ import {
   W,
   saveFileLabel,
   saveFileTip,
+  saveActionTip,
   resourceNameLabel,
   resourceNamePlaceholder,
   paramsSaveTip,
@@ -127,7 +128,6 @@ const ICONS = {
   btnNewProject:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/>',
   btnGrant:'<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="15" cy="14" r="2.2"/><path d="M15 16v3M15 19h2"/>',
   btnSave:'<path d="M4 4h11l5 5v11H4z"/><path d="M8 4v5h7"/><rect x="8" y="13" width="8" height="7"/>',
-  btnSaveProject:'<path d="M4 4h8l2 2h8v12H4z"/><path d="M8 4v5h6"/><rect x="7" y="14" width="6" height="5"/><path d="M14 4v3h4"/>',
   btnSaveAs:'<path d="M4 4h10l4 4v5"/><path d="M8 4v5h7"/><path d="M13.5 20.5l6-6 2 2-6 6h-2z"/>',
   btnNewSheet:'<rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="15" width="10" height="4"/><path d="M7 7h10"/>',
   btnNewLibrary:'<path d="M4 5a2 2 0 0 1 2-2h4v16H6a2 2 0 0 0-2 2z"/><path d="M20 5a2 2 0 0 0-2-2h-4v16h4a2 2 0 0 1 2 2z"/><path d="M12 8v8M9 11h6"/>',
@@ -226,7 +226,7 @@ function selEls(){ return state.selection.length ? state.selection : (state.acti
 let childPair, bboxInRoot, rebuildEditDefs, rebuildHost;
 let targetSheet=()=>null, connectionDiagnostics=()=>({ok:true,reason:""}), routeSelectedConnection=()=>{}, collectNetlistProposals=()=>[], nextProposalId=()=>"NEW1";
 let refreshNetlistUI=()=>{}, loadNetlistText=async()=>false, autoLoadNetlistForSheet=async()=>false;
-let ensurePerm, writeHandle, saveFile, saveAs, saveProjectToDisk, hasPerm;
+let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm;
 let selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue;
 
 function wireRenderPipeline(){
@@ -271,11 +271,9 @@ function wireFileIo(){
     saveProjectSettings,
     getFileHandleByPath,
   });
-  ({ ensurePerm, writeHandle, saveFile, saveAs, saveProjectToDisk, hasPerm }=f);
-  document.getElementById("btnSave").onclick=saveFile;
+  ({ ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm }=f);
+  document.getElementById("btnSave").onclick=()=>{ void save(); };
   document.getElementById("btnSaveAs").onclick=saveAs;
-  const btnProj=document.getElementById("btnSaveProject");
-  if(btnProj) btnProj.onclick=()=>{ void saveProjectToDisk(); };
 }
 
 function wireSelectionModel(){
@@ -463,12 +461,8 @@ function applyStaticWording(){
   if(setDate) setDate.placeholder=W.placeholder.dateFormat;
   const btnSaveSymbol=document.getElementById("btnSaveSymbol");
   if(btnSaveSymbol) btnSaveSymbol.title=W.saveTip.symbol;
-  const btnProj=document.getElementById("btnSaveProject");
-  if(btnProj){
-    const lbl=btnProj.querySelector(".btn-text");
-    if(lbl) lbl.textContent=W.save.project;
-    btnProj.title=W.saveTip.project;
-  }
+  const btnSave=document.getElementById("btnSave");
+  if(btnSave) btnSave.title=W.saveTip.unified;
 }
 function syncResourceNameFields(mode){
   const lbl=document.getElementById("lblResourceName");
@@ -610,18 +604,10 @@ async function saveResourceName(){
   }
 }
 function syncSaveButtons(){
-  const btnSave=document.getElementById("btnSave"), lbl=document.getElementById("btnSaveLabel");
-  const btnProj=document.getElementById("btnSaveProject");
-  if(!btnSave||!lbl) return;
-  const onLib=state.active===state.lib;
-  const onSheet=state.active&&state.active!==state.lib;
-  lbl.textContent=saveFileLabel({ onLib, onSheet });
-  btnSave.title=saveFileTip({ onLib, onSheet, fileName: state.active?.name });
+  const btnSave=document.getElementById("btnSave");
+  if(!btnSave) return;
+  btnSave.title=saveActionTip({ hasDir: !!state.dir, fileName: state.active?.name });
   btnSave.disabled=!(state.active?.svg);
-  if(btnProj){
-    btnProj.disabled=!state.dir;
-    btnProj.title=state.dir?W.saveTip.project:W.saveTip.project;
-  }
 }
 function syncToolbarContext(){
   const onLib=state.active===state.lib;
@@ -2356,8 +2342,8 @@ window.addEventListener("keydown",e=>{
   if((e.ctrlKey||e.metaKey)&&(e.key==="c"||e.key==="C")){ e.preventDefault(); copySel(); }
   if((e.ctrlKey||e.metaKey)&&(e.key==="x"||e.key==="X")){ e.preventDefault(); cutSel(); }
   if((e.ctrlKey||e.metaKey)&&(e.key==="v"||e.key==="V")){ e.preventDefault(); pasteClip(e.shiftKey); }
-  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==="s"||e.key==="S")){ e.preventDefault(); void saveFile(); return; }
-  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="s"||e.key==="S")){ e.preventDefault(); void saveProjectToDisk(); return; }
+  if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==="s"||e.key==="S")){ e.preventDefault(); void save(); return; }
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&(e.key==="s"||e.key==="S")){ e.preventDefault(); void saveAs(); return; }
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&(e.key==="z"||e.key==="Z")){ e.preventDefault(); doUndo(); }
   if((e.ctrlKey||e.metaKey)&&((e.shiftKey&&(e.key==="z"||e.key==="Z"))||e.key==="y"||e.key==="Y")){ e.preventDefault(); doRedo(); }
   if(!e.ctrlKey&&!e.metaKey&&e.key.indexOf("Arrow")===0){ e.preventDefault(); const d=e.shiftKey?1:state.step;

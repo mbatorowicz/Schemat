@@ -48,6 +48,8 @@ export const W = {
     fileGeneric: "Zapisz",
   },
   saveTip: {
+    unified: "Zapisz zmiany na dysk",
+    unifiedProject: "Zapisz aktywny plik i ca\u0142y projekt (biblioteka, schematy, ustawienia)",
     file: "Zapisz zawarto\u015b\u0107 pliku na dysk",
     project: "Zapisz bibliotek\u0119, zmienione schematy i ustawienia projektu",
     symbol: "Zapisz nazw\u0119, oznaczenie i domy\u015bln\u0105 numeracj\u0119",
@@ -90,6 +92,12 @@ export const W = {
     editSymbol: "Edytuj symbol",
   },
 };
+
+export function saveActionTip({ hasDir, fileName }) {
+  if (hasDir) return W.saveTip.unifiedProject;
+  const base = W.saveTip.unified;
+  return fileName ? `${base} (${fileName})` : base;
+}
 
 export function saveFileLabel({ onLib, onSheet }) {
   if (onLib) return W.save.fileLib;

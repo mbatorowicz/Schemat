@@ -6,6 +6,7 @@ import {
   symbolSelectionSummary,
   resourceNameLabel,
   saveFileLabel,
+  saveActionTip,
   paramsSaveTip,
 } from "../src/ui-wording.js";
 
@@ -26,6 +27,11 @@ describe("ui-wording SSOT", () => {
     expect(resourceNameLabel("sheet")).toBe(W.field.sheetName);
     expect(resourceNameLabel("library")).toBe(W.field.libraryName);
     expect(resourceNameLabel("project")).toBe(W.field.projectName);
+  });
+
+  it("saveActionTip zależy od kontekstu projektu", () => {
+    expect(saveActionTip({ hasDir: true })).toBe(W.saveTip.unifiedProject);
+    expect(saveActionTip({ hasDir: false, fileName: "a.svg" })).toContain("a.svg");
   });
 
   it("rozróżnia zapis pliku od zapisu parametrów", () => {

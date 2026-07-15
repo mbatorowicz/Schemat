@@ -198,11 +198,19 @@ export function createFileIo(deps) {
     return true;
   }
 
+  async function save() {
+    const state = getState();
+    if (!state.dir) return saveFile();
+    await saveFile();
+    return saveProjectToDisk();
+  }
+
   return {
     hasPerm,
     ensurePerm,
     writeHandle,
     saveFile,
+    save,
     saveAs,
     saveProjectToDisk,
     downloadSvg,
