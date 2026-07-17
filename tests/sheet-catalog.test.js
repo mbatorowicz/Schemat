@@ -3,8 +3,10 @@ import {
   sheetDisplayTitle,
   sheetCatalogLabel,
   sheetCatalogSubtitle,
+  sheetTitleFromChrome,
   applySheetDisplayTitle,
   migrateSheetDisplayTitle,
+  isSheetTitlePollutedByDoc,
   SHEET_TITLE_ATTR,
 } from "../src/sheet-catalog.js";
 
@@ -34,8 +36,7 @@ function mockSheet({ name = "Zasilanie.svg", id = "sch-1", titleAttr = "", ttl =
       if (sel.includes("ttl")) return ttlNode;
       return null;
     },
-    querySelectorAll(sel) {
-      if (sel.includes("tb")) return [];
+    querySelectorAll() {
       return [];
     },
     children: [],
@@ -52,35 +53,53 @@ function mockSheet({ name = "Zasilanie.svg", id = "sch-1", titleAttr = "", ttl =
         return sel === `[id="${id}"]` ? g : null;
       },
     },
-    _g: g,
     _attrs: attrs,
   };
 }
 
 describe("sheet-catalog", () => {
-  it("sheetDisplayTitle: atrybut > ttl > plik", () => {
-    expect(sheetDisplayTitle(mockSheet({ titleAttr: "1. Zasilanie", ttl: "Stare" }))).toBe("1. Zasilanie");
-    expect(sheetDisplayTitle(mockSheet({ ttl: "Zasilanie główne" }))).toBe("Zasilanie główne");
-    expect(sheetDisplayTitle(mockSheet({ name: "Zasilanie.svg" }))).toBe("Zasilanie");
+  it("sheetDisplayTitle: atrybut arkusza > plik; ignoruje .ttl (tytuł projektu)", () => {
+    expect(sheetDisplayTitle(mockSheet({ titleAttr: "Zasilanie", ttl: "Transporter" }))).toBe("Zasilanie");
+    expect(sheetDisplayTitle(mockSheet({ ttl: "Transporter boczny", name: "Zasilanie.svg" }))).toBe("Zasilanie");
+    expect(sheetDisplayTitle(mockSheet({ name: "Bezpieczenstwo.svg" }))).toBe("Bezpieczenstwo");
   });
 
-  it("sheetCatalogSubtitle pokazuje plik gdy tytuł się różni", () => {
-    const sh = mockSheet({ titleAttr: "1. Zasilanie", name: "Zasilanie.svg" });
-    expect(sheetCatalogSubtitle(sh)).toBe("Zasilanie");
-    expect(sheetCatalogLabel(sh)).toBe("1. Zasilanie");
+  it("odrzuca data-sheet-title skopiowany z tytułu projektu", () => {
+    const sh = mockSheet({
+      titleAttr: "Transporter boczny do drukarki",
+      ttl: "Transporter boczny do drukarki",
+      name: "Bezpieczenstwo.svg",
+    });
+    expect(isSheetTitlePollutedByDoc(sh)).toBe(true);
+    expect(sheetDisplayTitle(sh)).toBe("Bezpieczenstwo");
+    expect(sheetCatalogLabel(sh)).toBe("Bezpieczenstwo");
   });
 
-  it("applySheetDisplayTitle akceptuje spacje i kropki", () => {
-    const sh = mockSheet({ name: "Zasilanie.svg" });
+  it("sheetCatalogSubtitle puste gdy etykieta = plik", () => {
+    const sh = mockSheet({ name: "Zasilanie.svg", titleAttr: "Zasilanie" });
+    expect(sheetCatalogSubtitle(sh)).toBe("");
+  });
+
+  it("applySheetDisplayTitle zapisuje atrybut i nie rusza .ttl", () => {
+    const sh = mockSheet({ name: "Zasilanie.svg", ttl: "Transporter" });
     const res = applySheetDisplayTitle(sh, "1. Zasilanie");
     expect(res.ok).toBe(true);
     expect(sh._attrs[SHEET_TITLE_ATTR]).toBe("1. Zasilanie");
     expect(sh.dirty).toBe(true);
+    expect(sheetTitleFromChrome(sh)).toBe("Transporter");
   });
 
-  it("migrateSheetDisplayTitle kopiuje ttl do atrybutu", () => {
-    const sh = mockSheet({ ttl: "Enable", name: "Enable.svg" });
-    expect(migrateSheetDisplayTitle(sh)).toBe(true);
-    expect(sh._attrs[SHEET_TITLE_ATTR]).toBe("Enable");
+  it("migrateSheetDisplayTitle naprawia zanieczyszczenie i ustawia nazwę z pliku", () => {
+    const polluted = mockSheet({
+      ttl: "Transporter",
+      titleAttr: "Transporter",
+      name: "Enable.svg",
+    });
+    expect(migrateSheetDisplayTitle(polluted)).toBe(true);
+    expect(polluted._attrs[SHEET_TITLE_ATTR]).toBe("Enable");
+
+    const bare = mockSheet({ name: "Naped.svg", ttl: "Transporter", titleAttr: "" });
+    expect(migrateSheetDisplayTitle(bare)).toBe(true);
+    expect(bare._attrs[SHEET_TITLE_ATTR]).toBe("Naped");
   });
 });

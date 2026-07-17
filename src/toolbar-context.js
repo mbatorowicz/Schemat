@@ -17,7 +17,8 @@ export function resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection
     libSymbolMetaGroup: onLib && symSelected,
     resourceNameGroup: !!resourceNameMode,
     resourceNameMode,
-    sheetInsertGroup: onSheet,
+    /** Wstawianie symboli tylko z listy po lewej (+), bez selecta na belce. */
+    sheetInsertGroup: false,
     netlistGroup: onSheet,
     arrangeGroup: onSheet && hasSelection,
     moreGroup: true,

@@ -11,7 +11,6 @@ import {
   schematicSheetChildren,
 } from "./sheet-elements.js";
 import {
-  symbolDisplayName,
   symbolCatalogLabel,
   symbolCatalogSubtitle,
   symbolDesignation,
@@ -385,20 +384,6 @@ export function createSidebarLists(deps) {
       elementCount: isSheetActive() && currentSymNode() ? schematicSheetChildren(currentSymNode()).length : 0,
       sheetActive: isSheetActive(),
     });
-    const ins = document.getElementById("insertSym");
-    if (ins) {
-      const prev = ins.value;
-      ins.innerHTML = "";
-      state.symbols.forEach((s) => {
-        const o = document.createElement("option");
-        o.value = s.id;
-        const label = symbolCatalogLabel(s.node, s.id);
-        const ozn = symbolDesignation(s.node, s.id);
-        o.textContent = symbolDisplayName(s.node) && ozn !== label ? label + " · " + ozn : label;
-        ins.appendChild(o);
-      });
-      if ([...ins.options].some((o) => o.value === prev)) ins.value = prev;
-    }
   }
 
   return {

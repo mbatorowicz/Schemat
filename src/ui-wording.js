@@ -70,9 +70,9 @@ export const W = {
     dateFormat: "RRRR-MM-DD",
   },
   selection: {
-    pickSymbol: "Wybierz symbol",
-    newObjectStyle: "Styl nowych obiekt\u00f3w",
-    pickSymbolTitle: "Wybierz symbol na li\u015bcie po lewej",
+    pickSymbol: "Symbol",
+    newObjectStyle: "Styl",
+    pickSymbolTitle: "Wybierz symbol na liście po lewej",
     symbolTitle: (name) => (name ? `Symbol: ${name}` : "Symbol"),
   },
   create: {
@@ -160,20 +160,36 @@ export function paramsSaveTip(mode) {
 export function symbolSelectionSummary(name, oznLabel) {
   if (!name) return W.selection.pickSymbol;
   const ozn = (oznLabel || "").trim();
-  const oznPart = ozn && ozn !== name ? ` \u00b7 ${W.field.designation.toLowerCase()}: ${ozn}` : "";
-  return `${W.group.symbol}: ${name}${oznPart}`;
+  if (ozn && ozn !== name) return `${name} · ${ozn}`;
+  return name;
+}
+
+/** Krótka etykieta na belce; pełna ścieżka w title. */
+export function formatContextBreadcrumb({ projectName, leafKind, leafName, drawingLabel }) {
+  if (drawingLabel) {
+    return { label: drawingLabel, title: drawingLabel };
+  }
+  const leaf = (leafName || "").trim();
+  const kind =
+    leafKind === "library" ? "Bibl." : leafKind === "sheet" ? "Schemat" : "";
+  const label = leaf ? (kind ? `${kind} · ${leaf}` : leaf) : kind || "—";
+  const titleParts = [];
+  if (projectName) titleParts.push(`Projekt: ${projectName}`);
+  if (leafKind === "library") titleParts.push(leaf ? `Biblioteka: ${leaf}` : "Biblioteka");
+  else if (leafKind === "sheet") titleParts.push(leaf ? `Schemat: ${leaf}` : "Schemat");
+  return { label, title: titleParts.length ? titleParts.join(" › ") : label };
 }
 
 export function breadcrumbProject(name) {
-  return name ? `Projekt: ${name}` : "Projekt";
+  return name || "Projekt";
 }
 
 export function breadcrumbLibrary(selName) {
-  return selName ? `Biblioteka: ${selName}` : "Biblioteka";
+  return selName || "Biblioteka";
 }
 
 export function breadcrumbSheet(name) {
-  return name ? `Schemat: ${name}` : "Schemat";
+  return name || "Schemat";
 }
 
 export const status = {
@@ -255,6 +271,7 @@ export function collectWordingStrings() {
     breadcrumbProject(""),
     breadcrumbLibrary(""),
     breadcrumbSheet(""),
+    formatContextBreadcrumb({ leafKind: "sheet", leafName: "" }).label,
   ];
   return out;
 }

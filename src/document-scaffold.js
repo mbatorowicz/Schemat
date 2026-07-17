@@ -58,7 +58,9 @@ export function buildSheetGroup(id, cfg, svgNs = SVGNS) {
   const g = document.createElementNS(svgNs, "g");
   g.setAttribute("id", id);
   const docTitle = cfg.doc || "Schemat";
-  g.setAttribute(SHEET_TITLE_ATTR, docTitle);
+  /** Nazwa arkusza (lista) — osobno od tytułu dokumentu w .ttl */
+  const sheetTitle = (cfg.sheet || "Schemat").trim() || "Schemat";
+  g.setAttribute(SHEET_TITLE_ATTR, sheetTitle);
   g.appendChild(mkChromeEl("rect", { x: 12, y: 12, width: W - 24, height: H - 24, class: "fr" }));
   g.appendChild(mkChromeEl("rect", { x: 20, y: 20, width: W - 40, height: H - 40, class: "fr2" }));
   g.appendChild(mkChromeText(34, 52, "ttl", docTitle));

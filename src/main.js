@@ -92,9 +92,7 @@ import {
   resourceNamePlaceholder,
   paramsSaveTip,
   symbolSelectionSummary,
-  breadcrumbProject,
-  breadcrumbLibrary,
-  breadcrumbSheet,
+  formatContextBreadcrumb,
   status,
 } from './ui-wording.js';
 import { applySymbolForm, readSymbolFormFromDom, symbolDisplayName, symbolCatalogLabel, symbolDesignation } from './symbol-save.js';
@@ -157,7 +155,6 @@ const ICONS = {
   btnDupSym:'<path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5"/>',
   btnExportSym:'<path d="M12 4v11M8 11l4 4 4-4"/><path d="M4 19h16"/>',
   btnDelSym:'<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/><path d="M10 11v6M14 11v6"/>',
-  btnInsertUse:'<rect x="12" y="4" width="8" height="16" rx="1.5"/><path d="M3 12h9M9 9l3 3-3 3"/>',
   btnZoomOut:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5M8 11h6"/>',
   btnZoomIn:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.5-4.5M8 11h6M11 8v6"/>',
   btnFit:'<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'
@@ -1273,21 +1270,28 @@ stage.addEventListener("dblclick",ev=>{ if(state.drawMode){ ev.preventDefault();
 // ---- interaktywne rysowanie (createDrawMode / wireDrawMode) ----
 function syncContextBreadcrumb(){
   if(!breadcrumbEl) return;
+  let leafKind=null, leafName="";
   if(state.drawMode){
-    breadcrumbEl.textContent="Rysowanie: "+(DRAW_LABELS[state.drawMode]||state.drawMode);
-    breadcrumbEl.title=breadcrumbEl.textContent;
+    const bc=formatContextBreadcrumb({ drawingLabel: DRAW_LABELS[state.drawMode]||state.drawMode });
+    breadcrumbEl.textContent=bc.label;
+    breadcrumbEl.title=bc.title;
     return;
   }
-  const parts=[];
-  if(state.dir?.name) parts.push(breadcrumbProject(state.dir.name));
   if(state.active===state.lib){
+    leafKind="library";
     const sym=state.symbols.find(s=>s.id===state.selId);
-    parts.push(breadcrumbLibrary(sym?symbolCatalogLabel(sym.node,sym.id):state.selId||""));
+    leafName=sym?symbolCatalogLabel(sym.node,sym.id):(state.selId||"");
   } else if(state.active&&state.sheets.includes(state.active)){
-    parts.push(breadcrumbSheet(sheetDisplayTitle(state.active)||state.active.name||""));
+    leafKind="sheet";
+    leafName=sheetDisplayTitle(state.active)||state.active.name||"";
   }
-  breadcrumbEl.textContent=parts.length?parts.join(" / "):"\u2014";
-  breadcrumbEl.title=breadcrumbEl.textContent;
+  const bc=formatContextBreadcrumb({
+    projectName: state.dir?.name||"",
+    leafKind,
+    leafName,
+  });
+  breadcrumbEl.textContent=bc.label;
+  breadcrumbEl.title=bc.title;
 }
 /* syncDrawBanner — tworzony w bootstrap (draw-mode-ui.js) */
 let connMetaResolve=null;
@@ -1490,7 +1494,6 @@ document.getElementById("snap").onchange=e=>{ state.snap=e.target.checked; saveP
 document.getElementById("showHandles").onchange=e=>{ state.showHandles=e.target.checked; if(scene.handles) scene.handles.style.display=state.showHandles?"":"none"; savePrefs(); };
 document.getElementById("rotateOwnedLabels").onchange=e=>{ state.rotateOwnedLabels=e.target.checked; savePrefs(); };
 document.getElementById("rotAng").onchange=savePrefs;
-document.getElementById("insertSym").onchange=savePrefs;
 function styleTargetCtx(){
   return {
     isConnLabelMode,
@@ -1537,8 +1540,8 @@ function syncSelectionToolbar(){
   if(state.active===state.lib){
     syncLibrarySelectionInfo();
   } else {
-    info.innerHTML=has?selectionTypeLabel(records):"Styl nowych obiekt&oacute;w";
-    info.title=has?records.map(r=>r.tag).join(", "):"Ustawienia używane przy rysowaniu nowych elementów";
+    info.textContent=has?selectionTypeLabel(records):W.selection.newObjectStyle;
+    info.title=has?records.map(r=>r.tag).join(", "):"Styl nowych obiektów";
   }
 
   ["btnFlipH","btnFlipV","btnRotL","btnRotR","btnClone","btnDelShape"].forEach(id=>document.getElementById(id).disabled=!has);
@@ -1837,13 +1840,12 @@ function nextInstanceRef(node,symbolId){
 function insertUse(idOverride,fromSidebar){
   if(fromSidebar){
     const target=(state.lastSheet&&state.sheets.includes(state.lastSheet))?state.lastSheet:state.sheets.slice().sort((a,b)=>compareListText(a.name,b.name))[0];
-    if(!target){ setStatus("Najpierw otw&oacute;rz lub utw&oacute;rz schemat."); return; }
+    if(!target){ setStatus("Najpierw otwórz lub utwórz schemat."); return; }
     if(state.active!==target) selectSheet(target);
   }
-  const node=currentSymNode(); if(!node){ setStatus("Najpierw wybierz symbol."); return; }
-  const id=(idOverride||document.getElementById("insertSym").value||"").trim(); if(!id){ setStatus("Wybierz symbol do wstawienia."); return; }
-  if(symbolDependsOn(id,node.id)){ setStatus("Nie mo&#380;na utworzy&#263; cyklicznego zagnie&#380;d&#380;enia symboli."); return; }
-  const picker=document.getElementById("insertSym"); if(picker&&[...picker.options].some(o=>o.value===id)) picker.value=id;
+  const node=currentSymNode(); if(!node){ setStatus("Najpierw wybierz schemat."); return; }
+  const id=(idOverride||"").trim(); if(!id){ setStatus("Wybierz symbol na liście po lewej i kliknij +."); return; }
+  if(symbolDependsOn(id,node.id)){ setStatus("Nie można utworzyć cyklicznego zagnieżdżenia symboli."); return; }
   const c=viewCenterLocal();
   const u=mkEl("use",{x:c.x,y:c.y});
   u.setAttributeNS(XLINK,"xlink:href","#"+id); u.setAttribute("href","#"+id);
@@ -1893,7 +1895,6 @@ document.getElementById("btnSaveResource").onclick=()=>{ saveResourceName(); };
 });
 document.getElementById("btnAddSym").onclick=addSymbol;
 document.getElementById("btnDelSym").onclick=deleteSymbol;
-document.getElementById("btnInsertUse").onclick=()=>insertUse();
 document.getElementById("btnDupSym").onclick=duplicateSymbol;
 document.getElementById("btnExportSym").onclick=exportSymbol;
 
@@ -2078,9 +2079,9 @@ async function applyCachedProjectMeta(proj){
 }
 async function restoreProject(){ return restoreProjectSnapshot(); }
 function savePrefs(){ if(_noSave) return; clearTimeout(_prefsT); _prefsT=setTimeout(()=>{
-  const rot=parseFloat((document.getElementById("rotAng")||{}).value); const ins=(document.getElementById("insertSym")||{}).value;
+  const rot=parseFloat((document.getElementById("rotAng")||{}).value);
   const p={ step:state.step, snap:state.snap, showHandles:state.showHandles, rotateOwnedLabels:state.rotateOwnedLabels, strokeW:state.strokeW, strokeColor:state.strokeColor, fillColor:state.fillColor, fillOn:state.fillOn, dashOn:state.dashOn, fontSize:state.fontSize, fontWeight:state.fontWeight,
-    rotAng:isNaN(rot)?90:rot, insertSym:ins||"", zoom:state.zoom, panX:state.panX, panY:state.panY, selId:state.selId };
+    rotAng:isNaN(rot)?90:rot, zoom:state.zoom, panX:state.panX, panY:state.panY, selId:state.selId };
   try{ localStorage.setItem("edytor.prefs",JSON.stringify(p)); }catch(e){} idbSet("prefs",p).catch(()=>{});
 },400); }
 async function loadPrefs(){
@@ -2100,7 +2101,6 @@ async function loadPrefs(){
   if(p.fontSize!=null){ state.fontSize=p.fontSize; setV("fontSize",p.fontSize); }
   if(p.fontWeight!=null){ state.fontWeight=p.fontWeight; setV("fontWeight",String(p.fontWeight)); }
   if(p.rotAng!=null){ setV("rotAng",p.rotAng); }
-  if(p.insertSym!=null){ state._insertSymPref=p.insertSym; }
   if(p.zoom!=null) state.zoom=p.zoom;
   if(p.panX!=null) state.panX=p.panX;
   if(p.panY!=null) state.panY=p.panY;
@@ -2339,7 +2339,6 @@ try{
   savePrefs();
   await refreshGrantButton();
   if(state.netlist && typeof refreshNetlistUI==="function") refreshNetlistUI();
-  if(prefs && prefs.insertSym){ const ins=document.getElementById("insertSym"); if(ins && [...ins.options].some(o=>o.value===prefs.insertSym)) ins.value=prefs.insertSym; }
   }catch(e){
     console.error("Błąd wczytywania projektu:", e);
     setStatus("Błąd wczytywania: "+(e.message||e), { toast:true, tone:"danger" });

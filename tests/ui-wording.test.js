@@ -4,6 +4,7 @@ import {
   BANNED_UI_TERMS,
   collectWordingStrings,
   symbolSelectionSummary,
+  formatContextBreadcrumb,
   resourceNameLabel,
   saveFileLabel,
   saveActionTip,
@@ -18,9 +19,20 @@ describe("ui-wording SSOT", () => {
     }
   });
 
-  it("symbolSelectionSummary formatuje nazwę i oznaczenie", () => {
-    expect(symbolSelectionSummary("Stycznik", "SK")).toBe("Symbol: Stycznik · oznaczenie: SK");
+  it("symbolSelectionSummary jest zwięzłe", () => {
+    expect(symbolSelectionSummary("Stycznik", "SK")).toBe("Stycznik · SK");
     expect(symbolSelectionSummary("", "SK")).toBe(W.selection.pickSymbol);
+  });
+
+  it("formatContextBreadcrumb pokazuje liść, pełną ścieżkę w title", () => {
+    const bc = formatContextBreadcrumb({
+      projectName: "schematy",
+      leafKind: "sheet",
+      leafName: "Transporter boczny",
+    });
+    expect(bc.label).toBe("Schemat · Transporter boczny");
+    expect(bc.title).toContain("Projekt: schematy");
+    expect(bc.title).toContain("Schemat: Transporter boczny");
   });
 
   it("resourceNameLabel zwraca etykiety pól zasobów", () => {

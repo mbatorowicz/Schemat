@@ -19,7 +19,7 @@
   #toolbar .grp-lbl { display:none; }
   #toolbar .context-hidden { display:none; }
   #toolbar .grp-row.context-hidden { display:none; }
-  #toolbar .selection-info { min-width:128px; max-width:210px; font:600 12px Arial; color:#1e3a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #toolbar .selection-info { min-width:48px; max-width:140px; font:600 12px Arial; color:#1e3a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #toolbar .mixed-mark { display:none; font:600 9px Arial; color:#b45309; text-transform:uppercase; }
   #toolbar .mixed-mark.show { display:inline; }
   #toolbar input[type=color].mixed { outline:2px dashed #f59e0b; outline-offset:1px; }
@@ -89,7 +89,7 @@
   #saveBadge[data-kind="ok"] { border-color:#86efac; background:#f0fdf4; color:#166534; }
   #saveBadge[data-kind="idle"] { opacity:.85; }
   #saveBadge .save-badge-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex:0 0 auto; }
-  #contextBreadcrumb .breadcrumb-text { font:600 12px Arial; color:#1e3a8a; white-space:nowrap; max-width:360px; overflow:hidden; text-overflow:ellipsis; }
+  #contextBreadcrumb .breadcrumb-text { font:600 12px Arial; color:#1e3a8a; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
   #netlistConn option[data-ok="1"] { color:#15803d; }
   #netlistConn option[data-ok="0"] { color:#b91c1c; }
   #drawBanner { position:absolute; left:50%; top:44px; transform:translateX(-50%); display:none; align-items:center; gap:10px; background:#eff6ff; border:1px solid #93c5fd; border-radius:6px; padding:6px 12px; font:600 12px Arial; color:#1e40af; z-index:19; pointer-events:none; }
@@ -191,13 +191,6 @@
         </div>
       </div>
 
-      <div class="grp" id="sheetInsertGroup">
-        <div class="grp-row">
-          <select id="insertSym" title="Symbol do wstawienia" style="max-width:110px"></select>
-          <button id="btnInsertUse" class="tbtn" title="Wstaw"></button>
-        </div>
-      </div>
-
       <div class="grp" id="netlistGroup">
         <div class="grp-row">
           <button id="btnNetlistOpen" class="tbtn" title="Spis">&#8801;</button>
@@ -249,7 +242,7 @@
       </div>
 
       <div class="grp">
-        <div class="grp-row"><span id="selectionInfo" class="selection-info">Styl nowych obiektów</span></div>
+        <div class="grp-row"><span id="selectionInfo" class="selection-info">Styl</span></div>
       </div>
 
       <div class="grp context-hidden toolbar-form" id="libSymbolMetaGroup">

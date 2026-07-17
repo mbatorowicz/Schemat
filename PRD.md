@@ -152,7 +152,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - FR-21: Wstawianie `<use>` z auto-`data-ref`.
 - FR-22: Etykiety instancji (`text[data-owner-ref]`).
 - FR-24: Lista elementów aktywnego arkusza (bez ramki A4 i tabelki dokumentu); etykiety po `data-ref`; kliknięcie → panel właściwości z edytowalnym `data-ref`, oznaczeniem i etykietą schematu (`setInstanceRef`).
-- FR-25: Na arkuszu pasek SYMBOL = tylko **Wstaw**; oznaczenie konfigurowane w bibliotece; instancja na schemacie widoczna w panelu właściwości (spis połączeń).
+- FR-25: Wstawianie instancji z listy symboli (przycisk **+**); oznaczenie konfigurowane w bibliotece; instancja na schemacie widoczna w panelu właściwości (spis połączeń).
 
 ### 6.4 Rysowanie
 

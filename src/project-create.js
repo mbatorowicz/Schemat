@@ -34,9 +34,6 @@ export function createSheetDocument(opts) {
   const cfg = { ...opts.settingsCfg };
   if (opts.title) cfg.doc = opts.title;
 
-  const id = nextSheetGroupId(opts.existingSheetIds, parsed.svg);
-  parsed.svg.appendChild(buildSheetGroup(id, cfg));
-
   const base = (opts.fileBase || cfg.sheet || "schemat").replace(/[^\w\-]+/g, "_") || "schemat";
   const fileName = uniqueFileName(
     (opts.existingFileNames || []).map((n) => n.split("/").pop()),
@@ -44,6 +41,12 @@ export function createSheetDocument(opts) {
     ".svg"
   );
   const name = opts.relPath ? normalizeRelPath(opts.relPath) : fileName;
+  const fileBaseName = (name.split("/").pop() || name).replace(/\.svg$/i, "");
+  /** Nazwa arkusza = plik; tytuł dokumentu (cfg.doc) zostaje w .ttl ramki. */
+  cfg.sheet = opts.fileBase || fileBaseName || cfg.sheet || "Schemat";
+
+  const id = nextSheetGroupId(opts.existingSheetIds, parsed.svg);
+  parsed.svg.appendChild(buildSheetGroup(id, cfg));
 
   return {
     ok: true,

@@ -12,7 +12,7 @@ describe("resolveToolbarGroups", () => {
     expect(g.libSymbolMetaGroup).toBe(false);
     expect(g.resourceNameGroup).toBe(true);
     expect(g.resourceNameMode).toBe("library");
-    expect(g.sheetInsertGroup).toBe(false);
+    expect(g.sheetInsertGroup).toBe(false); // wstawianie tylko z sidebara
   });
 
   it("pokazuje meta symbolu i nazwę biblioteki gdy wybrany symbol", () => {
@@ -26,7 +26,7 @@ describe("resolveToolbarGroups", () => {
     expect(g.drawGroup).toBe(true);
     expect(g.leadGroup).toBe(true);
     expect(g.markGroup).toBe(false);
-    expect(g.sheetInsertGroup).toBe(true);
+    expect(g.sheetInsertGroup).toBe(false);
     expect(g.resourceNameMode).toBe("sheet");
     expect(g.arrangeGroup).toBe(true);
     expect(g.libSymbolMetaGroup).toBe(false);
@@ -46,7 +46,7 @@ describe("resolveToolbarGroups", () => {
 
 describe("formatLibrarySelectionInfo", () => {
   it("deleguje do wording SSOT", () => {
-    expect(formatLibrarySelectionInfo("E-STOP", "SB")).toBe("Symbol: E-STOP · oznaczenie: SB");
+    expect(formatLibrarySelectionInfo("E-STOP", "SB")).toBe("E-STOP · SB");
     expect(formatLibrarySelectionInfo("", "SB")).toBe(W.selection.pickSymbol);
   });
 });
