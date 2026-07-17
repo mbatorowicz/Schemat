@@ -19,6 +19,8 @@ export function resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection
     sheetInsertGroup: onSheet,
     netlistGroup: onSheet,
     arrangeGroup: onSheet && hasSelection,
+    moreGroup: true,
+    createGroup: true,
   };
 }
 

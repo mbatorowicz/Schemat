@@ -91,6 +91,35 @@ export const W = {
     insertSymbol: (ozn) => `Wstaw na schemat (${ozn})`,
     editSymbol: "Edytuj symbol",
   },
+  empty: {
+    sheets: "Brak schematów — otwórz projekt lub utwórz schemat.",
+    symbols: "Brak symboli — otwórz bibliotekę lub dodaj symbol.",
+    elements: "Brak elementów na arkuszu.",
+    openProjectCta: "Otwórz projekt",
+  },
+  confirm: {
+    dirtyNewProject: (n) =>
+      `Masz ${n} niezapisany(ych) schemat(ów). Utworzenie nowego projektu wyczyści bieżącą sesję. Kontynuować?`,
+    folderNotEmpty: "Folder nie jest pusty. Utworzyć projekt w tym folderze? (istniejące pliki pozostaną)",
+    dirtyLibrary: "Bieżąca biblioteka ma niezapisane zmiany. Utworzyć nową bibliotekę mimo to?",
+    dirtyOpenProject: (n) =>
+      `Masz ${n} niezapisany(ych) arkusz(y). Otwarcie projektu nadpisze je wersją z dysku. Kontynuować?`,
+    deleteSymbol: (id) => `Usunąć symbol ${id} z biblioteki?`,
+    sheetNoProject: "Brak otwartego projektu — schemat zostanie utworzony tylko w pamięci. Kontynuować?",
+    replaceManualRoute: "Trasa jest ręczna. Zastąpić ją trasą automatyczną?",
+  },
+  toast: {
+    saved: "Zapisano.",
+    permRestored: "Przywrócono dostęp do dysku.",
+    permDenied: "Brak zgody na dostęp do dysku.",
+  },
+  chrome: {
+    open: "Otwórz",
+    save: "Zapisz",
+    route: "Trasuj",
+    more: "Więcej",
+    shortcuts: "Skróty",
+  },
 };
 
 export function saveActionTip({ hasDir, fileName }) {
@@ -185,6 +214,13 @@ export const status = {
   pickSheet: "Wybierz schemat na li\u015bcie po lewej.",
 };
 
+export function emptyListCopy(kind) {
+  if (kind === "sheets") return W.empty.sheets;
+  if (kind === "symbols") return W.empty.symbols;
+  if (kind === "elements") return W.empty.elements;
+  return "";
+}
+
 /** Zbierz wszystkie statyczne stringi UI do testu regresji wordingu. */
 export function collectWordingStrings() {
   const out = [
@@ -197,6 +233,12 @@ export function collectWordingStrings() {
     ...Object.values(W.list),
     W.selection.pickSymbol,
     W.selection.newObjectStyle,
+    ...Object.values(W.empty),
+    ...Object.values(W.chrome),
+    W.confirm.folderNotEmpty,
+    W.confirm.dirtyLibrary,
+    W.confirm.sheetNoProject,
+    W.confirm.replaceManualRoute,
     status.symbolEmptyName,
     status.symbolInvalidName,
     status.symbolEmptyDesignation,

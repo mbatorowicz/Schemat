@@ -9,6 +9,7 @@ import { fmt } from "./svg-utils.js";
 import { rotatePoint } from "./svg-dom.js";
 import { definitionForUseElement } from "./symbol-service.js";
 import { hostRootFrom } from "./stage-layers.js";
+import { W } from "./ui-wording.js";
 
 function pinKey(v) {
   return String(v || "")
@@ -53,6 +54,7 @@ export function createNetlistRouting(ctx) {
     setStatus,
     selectSheet,
     getHost,
+    askConfirm,
   } = ctx;
 
   function targetSheet() {
@@ -201,7 +203,7 @@ export function createNetlistRouting(ctx) {
     return out;
   }
 
-  function routeSelectedConnection() {
+  async function routeSelectedConnection() {
     if (!state.netlist || !state.selectedConnId) return;
     const sheet = targetSheet();
     if (!sheet) {
@@ -212,12 +214,17 @@ export function createNetlistRouting(ctx) {
     const record = state.netlist.connections.find((r) => r.id === state.selectedConnId);
     const d = resolveConnectionEndpoints(sheet, record);
     if (!record || !d.ok) {
-      setStatus(d.reason || "Nie można rozwiązać końców połączenia.");
+      setStatus(d.reason || "Nie można rozwiązać końców połączenia.", { toast: true, tone: "warning" });
       return;
     }
     const node = currentSymNode();
     const old = qsByData(node, "conn-id", record.id);
-    if (old && old.getAttribute("data-route") === "manual" && !confirm("Trasa jest ręczna. Zastąpić ją trasą automatyczną?")) return;
+    if (old && old.getAttribute("data-route") === "manual") {
+      const ok = askConfirm
+        ? await askConfirm(W.confirm.replaceManualRoute, { title: "Trasowanie", okLabel: "Zastąp" })
+        : window.confirm(W.confirm.replaceManualRoute);
+      if (!ok) return;
+    }
     const points = OrthogonalRouter.route({
       start: d.from,
       end: d.to,
@@ -227,7 +234,7 @@ export function createNetlistRouting(ctx) {
       obstacles: routeObstacles(sheet, [d.from.element, d.to.element], [d.from, d.to]),
     });
     if (!points || points.length < 2) {
-      setStatus("Router nie znalazł trasy.");
+      setStatus("Router nie znalazł trasy.", { toast: true, tone: "warning" });
       return;
     }
     pushUndo();
@@ -245,7 +252,7 @@ export function createNetlistRouting(ctx) {
     state.selection = [poly];
     state.activeEl = poly;
     render();
-    setStatus("Wytrasowano połączenie " + record.id + ".");
+    setStatus("Wytrasowano połączenie " + record.id + ".", { toast: true, tone: "success" });
   }
 
   function collectNetlistProposals() {

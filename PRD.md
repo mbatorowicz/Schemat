@@ -6,7 +6,7 @@
 | **Projekt** | Transporter boczny do drukarki · CS-TB-48 |
 | **Wytwórca** | CNC Solutions |
 | **Norma** | EN 60204-1 (schematy elektryczne maszyn) |
-| **Wersja dokumentu** | 1.4 · 2026-07-12 |
+| **Wersja dokumentu** | 1.5 · 2026-07-17 |
 
 ---
 
@@ -247,6 +247,11 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - Ikony bez narracji w `title`.
 - Grupa Symbol pokazuje tylko relevantne pola (biblioteka vs schemat).
 - Pasek kontekstowy widoczny zawsze; grupy stylów ukrywane gdy nie dotyczą zaznaczenia.
+- Kluczowe akcje z etykietą: **Otwórz**, **Zapisz**, **Trasuj**; rzadkie w menu **Więcej**.
+- Badge zapisu: `Zapisano` / `N niezapisane` / **Przywróć dostęp** (zamiast ukrytego btnGrant).
+- Potwierdzenia w modalu (nie `confirm()`); krótkie toasty przy zapisie i błędach.
+- Empty state sidebara z CTA „Otwórz projekt”; overlay skrótów (`?`).
+- Przy Zapisz / Trasuj: podsumowanie spójności netlista ↔ schemat (`#netlistHealth`).
 
 ---
 
@@ -301,10 +306,12 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 | Priorytet | Element | Status |
 |-----------|---------|--------|
-| Wysoki | Dalszy podział `main.js` na moduły UI (draw, toolbar, file-io) | W toku — wydzielono history, svg-utils, instance-refs, sheet-elements, project-files |
-| Średni | Walidator spójności netlisty vs schemat | Otwarte |
-| Niski | Skróty klawiszowe w overlay pomocy | Otwarte |
+| Wysoki | Dalszy podział `main.js` na moduły UI (draw, toolbar, file-io) | W toku — m.in. `draw-mode-ui`, `project-perm-ui`, `ui-dialog`, `sidebar-empty` |
+| Średni | Walidator spójności netlisty vs schemat | Częściowo — podsumowanie przy Zapisz/Trasuj + `#netlistHealth` |
+| Niski | Skróty klawiszowe w overlay pomocy | Zrobione (`shortcuts-help.js`, `?`) |
 | Niski | E-02 jako arkusz w tym samym edytorze | Otwarte |
+
+**Zrealizowane (1.5):** badge zapisu/uprawnień; menu Więcej; etykiety Otwórz/Zapisz/Trasuj; modale confirm + toasty; empty states; a11y dialogów; overlay skrótów; walidacja netlisty przy zapisie.
 
 **Zrealizowane (1.4):** modal `#connMeta` zamiast `prompt()`; ESM netlista/router; `wire-theme.js`; Vitest; punkt = jeden logiczny styk; breadcrumb i baner rysowania; edycja `data-ref` w panelu.
 

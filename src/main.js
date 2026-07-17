@@ -117,6 +117,13 @@ import {
   renameLibraryOnDisk,
   renameProjectFolderOnDisk,
 } from './resource-rename.js';
+import { createConfirmDialog, createToastHost, bindModalA11y } from './ui-dialog.js';
+import { createSavePermBadge } from './project-perm-ui.js';
+import { syncSidebarEmptyStates } from './sidebar-lists.js';
+import { DRAW_HINT, DRAW_LABELS, createDrawBannerSync } from './draw-mode-ui.js';
+import { bindShortcutsHelp } from './shortcuts-help.js';
+import { summarizeNetlistHealth } from './netlist-validate.js';
+import { resolveBootStatusMessage } from './project-boot.js';
 import './toolbar-form.css';
 
 
@@ -216,6 +223,17 @@ const breadcrumbEl = document.getElementById("breadcrumbText");
 const drawBannerEl = document.getElementById("drawBanner");
 const toolbarEl = document.getElementById("toolbar");
 const hud = document.getElementById("hud");
+const schEmpty = document.getElementById("schEmpty");
+const symEmpty = document.getElementById("symEmpty");
+const elemEmpty = document.getElementById("elemEmpty");
+
+const confirmDialog = createConfirmDialog();
+confirmDialog.init();
+const toastHost = createToastHost();
+const askConfirm = (message, cfg) => confirmDialog.ask(message, cfg);
+let savePermBadge = null;
+let syncDrawBanner = () => {};
+let settingsModal = null;
 
 // warstwy sceny (gettery — bezpieczne dla modułów wire po build)
 let scene;
@@ -242,7 +260,9 @@ function wireRenderPipeline(){
 function wireNetlistRouting(){
   const n=createNetlistRouting({
     state, XLINK, num, fmt, mkEl, currentSymNode, childPair, bboxInRoot,
-    isConnPoint, connEndpointCoords, updateConnLabel, pushUndo, render, setStatus, selectSheet, getHost: () => scene.host
+    isConnPoint, connEndpointCoords, updateConnLabel, pushUndo, render, setStatus, selectSheet,
+    getHost: () => scene.host,
+    askConfirm,
   });
   ({ targetSheet, connectionDiagnostics, routeSelectedConnection, collectNetlistProposals, nextProposalId }=n);
   const ui=createNetlistUi({
@@ -270,6 +290,13 @@ function wireFileIo(){
     XLINK,
     saveProjectSettings,
     getFileHandleByPath,
+    onDirtyChange: () => { syncDirtyIndicator(); },
+    validateBeforeSave: (st) => {
+      if (!st.netlist || typeof connectionDiagnostics !== "function") return null;
+      const h = summarizeNetlistHealth(st.netlist, connectionDiagnostics);
+      if (!h.bad) return null;
+      return { bad: true, message: h.summary };
+    },
   });
   ({ ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm }=f);
   document.getElementById("btnSave").onclick=()=>{ void save(); };
@@ -463,6 +490,13 @@ function applyStaticWording(){
   if(btnSaveSymbol) btnSaveSymbol.title=W.saveTip.symbol;
   const btnSave=document.getElementById("btnSave");
   if(btnSave) btnSave.title=W.saveTip.unified;
+  const setBtnText=(id,text)=>{ const el=document.getElementById(id); const t=el&&el.querySelector(".btn-text"); if(t) t.textContent=text; };
+  setBtnText("btnOpen", W.chrome.open);
+  setBtnText("btnSave", W.chrome.save);
+  setBtnText("btnRouteConn", W.chrome.route);
+  setBtnText("btnMore", W.chrome.more);
+  setBtnText("btnShortcuts", W.chrome.shortcuts);
+  setBtnText("btnEmptyOpenProject", W.empty.openProjectCta);
 }
 function syncResourceNameFields(mode){
   const lbl=document.getElementById("lblResourceName");
@@ -625,13 +659,13 @@ function syncSymbolToolbar(){ syncToolbarContext(); }
 function ensureLib(){ if(!state.lib){ const p=parseSvg(baseDocText()); state.lib={handle:null,name:"E-00_symbole.svg",svg:p.svg,doc:p.doc}; } }
 
 async function newProject(){
-  if(!window.showDirectoryPicker){ setStatus(W.create.noFsApi); return; }
+  if(!window.showDirectoryPicker){ setStatus(W.create.noFsApi, { toast:true, tone:"warning" }); return; }
   const dirtyN=countDirtySheets(state.sheets);
-  if(dirtyN && !confirm("Masz "+dirtyN+" niezapisany(ych) schemat(ów). Utworzenie nowego projektu wyczyści bieżącą sesję. Kontynuować?")) return;
+  if(dirtyN && !(await askConfirm(W.confirm.dirtyNewProject(dirtyN), { title:"Nowy projekt", danger:true }))) return;
   let dir;
   try{ dir=await window.showDirectoryPicker({mode:"readwrite"}); }catch(e){ if(e.name!=="AbortError") console.warn(e); return; }
   const empty=await isDirectoryEmpty(dir);
-  if(!empty && !confirm("Folder nie jest pusty. Utworzyć projekt w tym folderze? (istniejące pliki pozostaną)")) return;
+  if(!empty && !(await askConfirm(W.confirm.folderNotEmpty, { title:"Folder niepusty" }))) return;
   const res=await initializeNewProjectOnDisk({
     dir, writeHandle, styleContent: DEFAULT_STYLE, svgNs: SVGNS, todayStr,
   });
@@ -686,7 +720,7 @@ async function pickSaveLocationInProject(suggestedName, description){
 }
 
 async function newLibrary(){
-  if(state.lib?.dirty && !confirm("Bieżąca biblioteka ma niezapisane zmiany. Utworzyć nową bibliotekę mimo to?")) return;
+  if(state.lib?.dirty && !(await askConfirm(W.confirm.dirtyLibrary, { title:"Nowa biblioteka", danger:true }))) return;
   const styleContent=DEFAULT_STYLE;
   if(state.dir){
     if(!(await ensurePerm(state.dir))){ setStatus(W.create.noProjectWrite); return; }
@@ -788,7 +822,7 @@ async function scanProject(dir){
   try{ walked=await walkDir(dir); }
   catch(e){ setStatus("Nie uda&#322;o si&#281; odczyta&#263; folderu."); return; }
   const dirtyN=countDirtySheets(state.sheets);
-  if(dirtyN && !confirm("Masz "+dirtyN+" niezapisany(ych) arkusz(y). Otwarcie projektu nadpisze je wersj&#261; z dysku. Kontynuowa&#263;?")) return;
+  if(dirtyN && !(await askConfirm(W.confirm.dirtyOpenProject(dirtyN), { title:"Otwórz projekt", danger:true }))) return;
   const sheets=await applyWalkedProject(walked);
   try{
     migrateProjectSymbolNames();
@@ -927,11 +961,19 @@ function buildElementList(){
     elemSec.classList.add("context-hidden");
     elemProps.classList.add("context-hidden");
     elemPropsBody.innerHTML="";
+    syncSidebarEmptyStates({
+      schEmpty, symEmpty, elemEmpty,
+      sheetCount: state.sheets.length,
+      symbolCount: state.symbols.length,
+      elementCount: 0,
+      sheetActive: false,
+    });
     return;
   }
   const node=currentSymNode(); if(!node){ elemSec.classList.add("context-hidden"); return; }
   elemSec.classList.remove("context-hidden");
-  schematicSheetChildren(node).forEach((el,i)=>{
+  const children=schematicSheetChildren(node);
+  children.forEach((el,i)=>{
     const li=document.createElement("li");
     const kind=sheetElementKind(el);
     const main=document.createElement("span"); main.textContent=sheetElementListLabel(el,i);
@@ -940,6 +982,13 @@ function buildElementList(){
     li._elem=el; el._elemListItem=li;
     li.onclick=()=>selectSheetElement(el);
     elemList.appendChild(li);
+  });
+  syncSidebarEmptyStates({
+    schEmpty, symEmpty, elemEmpty,
+    sheetCount: state.sheets.length,
+    symbolCount: state.symbols.length,
+    elementCount: children.length,
+    sheetActive: true,
   });
   syncElementListSelection();
 }
@@ -1033,6 +1082,13 @@ function buildSymbolList(){
   state.sheets.sort((a,b)=>compareListText(sheetCatalogLabel(a),sheetCatalogLabel(b)));
   state.sheets.forEach(sh=>schlist.appendChild(sheetListItem(sh)));
   syncListSelection();
+  syncSidebarEmptyStates({
+    schEmpty, symEmpty, elemEmpty,
+    sheetCount: state.sheets.length,
+    symbolCount: state.symbols.length,
+    elementCount: isSheetActive() && currentSymNode() ? schematicSheetChildren(currentSymNode()).length : 0,
+    sheetActive: isSheetActive(),
+  });
   const ins=document.getElementById("insertSym");
   if(ins){ const prev=ins.value; ins.innerHTML=""; state.symbols.forEach(s=>{ const o=document.createElement("option"); o.value=s.id; const label=symbolCatalogLabel(s.node, s.id); const ozn=symbolDesignation(s.node, s.id); o.textContent=symbolDisplayName(s.node)&&ozn!==label?label+" \u00b7 "+ozn:label; ins.appendChild(o); }); if([...ins.options].some(o=>o.value===prev)) ins.value=prev; }
 }
@@ -1376,9 +1432,6 @@ stage.addEventListener("dblclick",ev=>{ if(state.drawMode){ ev.preventDefault();
 // ---- interaktywne rysowanie ksztalt&oacute;w (klik-klik) ----
 const DRAW_NEED={ line:Infinity, rect:2, circle:2, arc:3, text:1, pin:1, point:1, node:1, lead:2 };
 const DRAW_BTN={ line:"btnAddLine", rect:"btnAddRect", circle:"btnAddCircle", arc:"btnAddArc", text:"btnAddText", pin:"btnAddPin", point:"btnAddPoint", node:"btnAddNode", lead:"btnAddLead" };
-const DRAW_LABELS={
-  line:"linia", rect:"prostokąt", circle:"koło", arc:"łuk", text:"tekst", pin:"pin", point:"punkt", node:"węzeł", lead:"kreska"
-};
 function syncContextBreadcrumb(){
   if(!breadcrumbEl) return;
   if(state.drawMode){
@@ -1397,20 +1450,7 @@ function syncContextBreadcrumb(){
   breadcrumbEl.textContent=parts.length?parts.join(" / "):"\u2014";
   breadcrumbEl.title=breadcrumbEl.textContent;
 }
-function syncDrawBanner(){
-  if(!drawBannerEl) return;
-  if(state.drawMode){
-    const hint=DRAW_HINT[state.drawMode]||"Rysowanie aktywne";
-    drawBannerEl.textContent="Rysujesz: "+(DRAW_LABELS[state.drawMode]||state.drawMode)+" — Esc anuluje"+(state.drawMode==="line"?", Enter kończy":"");
-    drawBannerEl.classList.add("open");
-    if(toolbarEl) toolbarEl.classList.add("draw-mode");
-  } else {
-    drawBannerEl.classList.remove("open");
-    drawBannerEl.textContent="";
-    if(toolbarEl) toolbarEl.classList.remove("draw-mode");
-  }
-  syncToolbarContext();
-}
+/* syncDrawBanner — tworzony w bootstrap (draw-mode-ui.js) */
 let connMetaResolve=null;
 function openConnMetaModal(node){
   const bg=document.getElementById("connMeta");
@@ -1449,17 +1489,6 @@ function initConnMetaModal(){
   if(bg) bg.addEventListener("pointerdown",e=>{ if(e.target===bg) closeConnMetaModal(null); });
   [refInp,pinInp].forEach(inp=>{ if(inp) inp.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); submit(); } if(e.key==="Escape"){ e.preventDefault(); closeConnMetaModal(null); } }); });
 }
-const DRAW_HINT={
-  line:"Linia/&#322;amana: klikaj punkty \u2022 Enter/dbl-klik = zako&#324;cz \u2022 Esc = anuluj.",
-  rect:"Prostok&#261;t: klik = 1. naro&#380;nik, klik = 2. naro&#380;nik \u2022 Esc = anuluj.",
-  circle:"Okr&#261;g: klik = &#347;rodek, klik = promie&#324; \u2022 Esc = anuluj.",
-  arc:"&#321;uk: klik = pocz&#261;tek, klik = szczyt, klik = koniec \u2022 Esc = anuluj.",
-  text:"Tekst: kliknij miejsce \u2022 Esc = anuluj.",
-  pin:"Pin: kliknij miejsce \u2022 Esc = anuluj.",
-  point:"Punkt: kliknij miejsce \u2022 Esc = anuluj.",
-  node:"W&#281;ze&#322;: kliknij miejsce \u2022 Esc = anuluj.",
-  lead:"Kreska: klik = pocz&#261;tek, klik = koniec \u2022 Esc = anuluj."
-};
 function captureToolStyleFromToolbar(){
   const sw=document.getElementById("strokeW"), sc=document.getElementById("strokeColor"), dash=document.getElementById("dashOn");
   const fillOn=document.getElementById("fillOn"), fc=document.getElementById("fillColor"), fs=document.getElementById("fontSize"), fw=document.getElementById("fontWeight");
@@ -1993,13 +2022,14 @@ function markActiveDirty(){
 }
 function syncDirtyIndicator(){
   const n=countDirtySheets(state.sheets);
-  if(!statusEl) return;
-  statusEl.dataset.unsaved=n>0?"1":"0";
+  if(statusEl) statusEl.dataset.unsaved=n>0?"1":"0";
+  if(savePermBadge) savePermBadge.syncDirtyOnly();
 }
-function setStatus(msg){
+function setStatus(msg, opts){
   if(!statusEl) return;
   statusEl.textContent=msg==null?"":String(msg);
   syncDirtyIndicator();
+  if(opts&&opts.toast&&msg) toastHost.show(String(msg), opts.tone||"info");
 }
 
 // ---- dodawanie/usuwanie ksztaltow ----
@@ -2024,15 +2054,15 @@ function addSymbol(){
   state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; state.fileName=state.lib.name;
   buildSymbolList(); selectSymbol(id); setStatus("Dodano symbol "+id+" (pusty) do biblioteki."); saveProject();
 }
-function deleteSymbol(){
+async function deleteSymbol(){
   const sym=state.symbols.find(s=>s.id===state.selId);
   if(!sym){ setStatus("Zaznacz symbol w bibliotece (nie schemat)."); return; }
-  if(!confirm("Usun\u0105\u0107 symbol "+sym.id+" z biblioteki?")) return;
+  if(!(await askConfirm(W.confirm.deleteSymbol(sym.id), { title:"Usuń symbol", okLabel:"Usuń", danger:true }))) return;
   const id=sym.id; sym.node.remove(); buildSymbolList();
   const nx=state.symbols[0]?state.symbols[0].id:(state.sheets[0]?state.sheets[0].id:null);
   if(nx) selectSymbol(nx);
   else { state.selId=null; state.selection=[]; state.activeEl=null; state.selHandle=null; scene.host.innerHTML=""; scene.handles.innerHTML=""; clearSelInfo(); clearHighlight(); syncSelectionToolbar(); }
-  setStatus("Usuni&#281;to symbol "+id); saveProject();
+  setStatus("Usunięto symbol "+id, { toast:true, tone:"success" }); saveProject();
 }
 function symbolDependsOn(id,target,seen=new Set()){
   if(id===target) return true; if(seen.has(id)) return false; seen.add(id);
@@ -2152,9 +2182,9 @@ function ensureStyle(){
 }
 
 // ---- nowy schemat (arkusz A4) ----
-function newSheet(){
+async function newSheet(){
   ensureLib();
-  if(!state.dir && !confirm("Brak otwartego projektu — schemat zostanie utworzony tylko w pamięci. Kontynuować?")) return;
+  if(!state.dir && !(await askConfirm(W.confirm.sheetNoProject, { title:"Nowy schemat" }))) return;
   (async()=>{
     let relPath=null;
     let saveHandle=null;
@@ -2212,6 +2242,7 @@ async function loadSettings(){
 }
 function saveSettingsCfg(){ try{ localStorage.setItem("edytor.settings",JSON.stringify(settingsCfg)); }catch(e){} idbSet("settings",settingsCfg).catch(()=>{}); }
 const settingsBg=document.getElementById("settings");
+settingsModal=bindModalA11y({ id:"settings", labelledBy:"settingsTitle", initialFocus:"setOrient" });
 function openSettings(){
   document.getElementById("setOrient").value=settingsCfg.orient;
   document.getElementById("setDoc").value=settingsCfg.doc||"";
@@ -2221,9 +2252,9 @@ function openSettings(){
   document.getElementById("setSheet").value=settingsCfg.sheet||"";
   document.getElementById("setNorm").value=settingsCfg.norm||"";
   document.getElementById("setDate").value=settingsCfg.date||todayStr();
-  settingsBg.classList.add("open");
+  settingsModal.open();
 }
-function closeSettings(){ settingsBg.classList.remove("open"); }
+function closeSettings(){ settingsModal.close(); }
 document.getElementById("btnSettings").onclick=openSettings;
 document.getElementById("setCancel").onclick=closeSettings;
 document.getElementById("setSave").onclick=()=>{
@@ -2409,26 +2440,67 @@ async function reloadSheetsFromDir(dir, opts={}){
   return diskSheets.length;
 }
 async function needsPerm(h){ if(!h||!h.queryPermission) return false; try{ return (await h.queryPermission({mode:"readwrite"}))!=="granted"; }catch(e){ return false; } }
-async function refreshGrantButton(){
-  const b=document.getElementById("btnGrant"); if(!b) return;
-  const need=(await needsPerm(state.dir))||(await needsPerm(state.libHandle));
-  b.style.display=need?"inline-flex":"none";
-  if(!need&&state.dir) await relinkHandles(state.dir);
-}
-function showGrantIfNeeded(){ return refreshGrantButton(); }
-document.getElementById("btnGrant").onclick=async()=>{
+async function restoreFolderAccess(){
   let any=false, reloaded=0;
   if(state.dir && await ensurePerm(state.dir)){ await relinkHandles(state.dir); reloaded=await reloadSheetsFromDir(state.dir); any=true; if(typeof autoLoadNetlistForSheet==="function") await autoLoadNetlistForSheet(typeof targetSheet==="function"?targetSheet():null,state.dir,{silent:true}); }
   if(state.libHandle && await ensurePerm(state.libHandle)){ if(state.lib) state.lib.handle=state.libHandle; any=true; }
   await refreshGrantButton();
-  const netMsg=state.netlist?" Spis: "+state.netlist.connections.length+" po\u0142\u0105cze\u0144.":"";
-  if(reloaded) setStatus("Przywr&oacute;cono dost&#281;p i zsynchronizowano "+reloaded+" schemat(ów) z dysku."+netMsg);
-  else setStatus((any?"Przywr&oacute;cono dost&#281;p do dysku \u2014 zapis dzia&#322;a.":"Brak zgody na dost&#281;p do dysku.")+netMsg);
-};
+  const netMsg=state.netlist?" Spis: "+state.netlist.connections.length+" połączeń.":"";
+  if(reloaded) setStatus("Przywrócono dostęp i zsynchronizowano "+reloaded+" schemat(ów) z dysku."+netMsg, { toast:true, tone:"success" });
+  else setStatus((any?W.toast.permRestored:W.toast.permDenied)+netMsg, { toast:true, tone: any?"success":"warning" });
+}
+async function refreshGrantButton(){
+  const b=document.getElementById("btnGrant");
+  if(b) b.style.display="none";
+  if(!savePermBadge){
+    savePermBadge=createSavePermBadge({
+      getState:()=>state,
+      countDirtySheets,
+      needsPerm,
+      badgeEl: document.getElementById("saveBadge"),
+      labelEl: document.getElementById("saveBadgeLabel"),
+    });
+  }
+  const view=await savePermBadge.sync();
+  if(!view.kind||view.kind!=="perm"){
+    if(state.dir && !(await needsPerm(state.dir))) await relinkHandles(state.dir);
+  }
+}
+function showGrantIfNeeded(){ return refreshGrantButton(); }
+document.getElementById("btnGrant").onclick=()=>{ void restoreFolderAccess(); };
+const saveBadgeEl=document.getElementById("saveBadge");
+if(saveBadgeEl) saveBadgeEl.addEventListener("click",()=>{
+  const kind=saveBadgeEl.dataset.kind;
+  if(kind==="perm") void restoreFolderAccess();
+  else if(kind==="dirty") void save();
+});
 
 // init
 scene = createStageLayers(stage, SVGNS);
 applyStaticWording();
+syncDrawBanner = createDrawBannerSync({
+  drawBannerEl,
+  toolbarEl,
+  getDrawMode: () => state.drawMode,
+  onToolbarSync: () => syncToolbarContext(),
+});
+bindShortcutsHelp();
+(function wireMoreMenu(){
+  const btn=document.getElementById("btnMore");
+  const panel=document.getElementById("morePanel");
+  if(!btn||!panel) return;
+  btn.addEventListener("click",(e)=>{
+    e.stopPropagation();
+    panel.classList.toggle("open");
+  });
+  document.addEventListener("pointerdown",(e)=>{
+    if(!panel.classList.contains("open")) return;
+    if(panel.contains(e.target)||btn.contains(e.target)) return;
+    panel.classList.remove("open");
+  });
+})();
+const emptyOpen=document.getElementById("btnEmptyOpenProject");
+if(emptyOpen) emptyOpen.onclick=()=>{ document.getElementById("btnOpen")?.click(); };
 try{
   bootstrapEditorSync({
     injectIcons,
@@ -2452,7 +2524,7 @@ try{
   });
 }catch(e){
   console.error("Błąd inicjalizacji edytora:", e);
-  setStatus("Błąd inicjalizacji: "+(e.message||e));
+  setStatus("Błąd inicjalizacji: "+(e.message||e), { toast:true, tone:"danger" });
 }
 (async function boot(){
   try{
@@ -2507,12 +2579,15 @@ try{
   if(target) selectSymbol(target, !!(prefs&&prefs.zoom!=null)); else { state.active=state.lib; state.srcSvg=state.lib.svg; state.srcDoc=state.lib.doc; render(); }
   const restoredFromCache=!loadedFromDisk&&state.sheets.length>0;
   const dirHint=cachedProj?.dirName||state.dir?.name;
-  const bootMsg=loadedFromDisk
-    ? "Wczytano z dysku: "+state.sheets.length+" schemat(ów), biblioteka "+(settingsCfg.library||state.lib?.name||"?")+"."
-    : restoredFromCache
-      ? "Przywrócono z cache ("+state.sheets.length+" schemat(ów)"+(dirHint?", projekt: "+dirHint:"")+")."+(state.dir?" Kliknij „Przywróć dostęp”, jeśli zapis na dysk nie działa.":" Zapisz projekt na dysk, aby utrwalić zmiany.")
-      : "Brak projektu — otwórz folder projektu (Plik → Otwórz projekt).";
-  setStatus(bootMsg);
+  const bootUi=resolveBootStatusMessage({
+    loadedFromDisk,
+    sheetCount: state.sheets.length,
+    libraryLabel: settingsCfg.library||state.lib?.name||"?",
+    restoredFromCache,
+    dirHint,
+    hasDir: !!state.dir,
+  });
+  setStatus(bootUi.message, { toast: bootUi.toast, tone: bootUi.tone });
   _noSave=false;
   persistNow();
   savePrefs();
@@ -2521,6 +2596,6 @@ try{
   if(prefs && prefs.insertSym){ const ins=document.getElementById("insertSym"); if(ins && [...ins.options].some(o=>o.value===prefs.insertSym)) ins.value=prefs.insertSym; }
   }catch(e){
     console.error("Błąd wczytywania projektu:", e);
-    setStatus("Błąd wczytywania: "+(e.message||e));
+    setStatus("Błąd wczytywania: "+(e.message||e), { toast:true, tone:"danger" });
   }
 })();

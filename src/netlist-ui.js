@@ -6,6 +6,8 @@ import {
   walkDir,
   sheetBasename as linkedSheetBasename,
 } from "./project-files.js";
+import { summarizeNetlistHealth } from "./netlist-validate.js";
+import { bindModalA11y } from "./ui-dialog.js";
 
 /**
  * UI i ładowanie spisu połączeń — wydzielone z main.js.
@@ -40,6 +42,19 @@ export function createNetlistUi(deps) {
     if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
     else state.selectedConnId = "";
     document.getElementById("btnRouteConn").disabled = !state.netlist || !sel.value;
+    const health = document.getElementById("netlistHealth");
+    if (health) {
+      if (!state.netlist) {
+        health.textContent = "";
+        health.dataset.bad = "0";
+        health.removeAttribute("title");
+      } else {
+        const h = summarizeNetlistHealth(state.netlist, connectionDiagnostics);
+        health.textContent = h.bad ? h.bad + "/" + h.total + " błędów" : h.total ? "OK · " + h.total : "";
+        health.dataset.bad = h.bad ? "1" : "0";
+        health.title = h.summary;
+      }
+    }
   }
 
   function sheetBasename(sheet) {
@@ -135,12 +150,20 @@ export function createNetlistUi(deps) {
     document.getElementById("netlistInput").click();
   }
 
+  let reviewModal = null;
+
   function openNetlistReview() {
     document.getElementById("netlistReviewText").value = NetlistModel.proposalPreview(collectNetlistProposals());
-    document.getElementById("netlistReview").classList.add("open");
+    if (reviewModal) reviewModal.open();
+    else document.getElementById("netlistReview").classList.add("open");
   }
 
   function wireNetlistDom() {
+    reviewModal = bindModalA11y({
+      id: "netlistReview",
+      labelledBy: "netlistReviewTitle",
+      initialFocus: "netlistReviewClose",
+    });
     document.getElementById("btnNetlistOpen").onclick = pickNetlist;
     document.getElementById("netlistInput").onchange = (e) => {
       const f = e.target.files[0];
@@ -153,15 +176,14 @@ export function createNetlistUi(deps) {
       if (state.selectedConnId) {
         const r = state.netlist.connections.find((x) => x.id === state.selectedConnId);
         const d = connectionDiagnostics(r);
-        setStatus(d.ok ? "Połączenie " + r.id + " gotowe do trasowania." : d.reason);
+        setStatus(d.ok ? "Połączenie " + r.id + " gotowe do trasowania." : d.reason, {
+          toast: !d.ok,
+          tone: d.ok ? "info" : "warning",
+        });
       }
     };
     document.getElementById("btnExportNetlist").onclick = openNetlistReview;
-    document.getElementById("netlistReviewClose").onclick = () =>
-      document.getElementById("netlistReview").classList.remove("open");
-    document.getElementById("netlistReview").addEventListener("pointerdown", (e) => {
-      if (e.target.id === "netlistReview") e.currentTarget.classList.remove("open");
-    });
+    document.getElementById("netlistReviewClose").onclick = () => reviewModal.close();
     document.getElementById("netlistReviewDownload").onclick = () => {
       const text = document.getElementById("netlistReviewText").value;
       const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });

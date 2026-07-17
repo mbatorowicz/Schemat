@@ -34,6 +34,12 @@ describe("resolveToolbarGroups", () => {
     const g = resolveToolbarGroups({ onLib: false, onSheet: false, symSelected: false, hasSelection: false, hasDir: true });
     expect(g.resourceNameMode).toBe("project");
   });
+
+  it("zawsze pokazuje menu Więcej", () => {
+    const g = resolveToolbarGroups({ onLib: false, onSheet: false, symSelected: false, hasSelection: false, hasDir: false });
+    expect(g.moreGroup).toBe(true);
+    expect(g.createGroup).toBe(true);
+  });
 });
 
 describe("formatLibrarySelectionInfo", () => {

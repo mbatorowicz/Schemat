@@ -19,6 +19,8 @@ export function createFileIo(deps) {
     XLINK,
     saveProjectSettings,
     getFileHandleByPath,
+    onDirtyChange,
+    validateBeforeSave,
   } = deps;
 
   async function hasPerm(handle) {
@@ -74,8 +76,12 @@ export function createFileIo(deps) {
       try {
         await writeHandle(act.handle, serializeSvg(act.svg));
         if (act !== state.lib) clearSheetDirty(act);
+        if (typeof onDirtyChange === "function") onDirtyChange();
         const warn = r?.missing?.length ? " (ostrzeżenie: brak symboli " + r.missing.join(", ") + ")" : "";
-        setStatus((act === state.lib ? "Zapisano bibliotekę " : "Zapisano schemat ") + act.name + warn);
+        setStatus((act === state.lib ? "Zapisano bibliotekę " : "Zapisano schemat ") + act.name + warn, {
+          toast: true,
+          tone: warn ? "warning" : "success",
+        });
         flushDoc();
         return;
       } catch (e) {
@@ -194,12 +200,17 @@ export function createFileIo(deps) {
     if (settingsOk) bits.push("projekt.json");
     if (bits.length) msg += " (" + bits.join(", ") + ")";
     else msg += " (brak zmian do zapisu)";
-    setStatus(msg);
+    if (typeof onDirtyChange === "function") onDirtyChange();
+    setStatus(msg, { toast: true, tone: "success" });
     return true;
   }
 
   async function save() {
     const state = getState();
+    if (typeof validateBeforeSave === "function") {
+      const v = validateBeforeSave(state);
+      if (v?.message) setStatus(v.message, { toast: !!v.bad, tone: v.bad ? "warning" : "info" });
+    }
     if (!state.dir) return saveFile();
     await saveFile();
     return saveProjectToDisk();
