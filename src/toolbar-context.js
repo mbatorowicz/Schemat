@@ -11,7 +11,8 @@ export function resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection
   return {
     drawGroup: onLib || onSheet,
     leadGroup: onLib || onSheet,
-    markGroup: onLib || onSheet,
+    /** Przyciski węzeł/pin są w leadGroup; markGroup zostaje ukryty (placeholder id). */
+    markGroup: false,
     libActionsGroup: onLib,
     libSymbolMetaGroup: onLib && symSelected,
     resourceNameGroup: !!resourceNameMode,

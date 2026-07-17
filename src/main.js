@@ -1,26 +1,17 @@
 import { connAllCss, syncConnStylesInLib } from './conn-theme.js';
 import { createConnModel } from './conn-model.js';
 import {
-  sheetBasename as linkedSheetBasename,
   walkDir,
   getFileHandleByPath,
   resolveSharedLibrary,
   normalizeRelPath
 } from './project-files.js';
-import {
-  sheetElementKind,
-  kindDisplay,
-  sheetElementListLabel,
-  sheetElementPropertySections,
-  schematicSheetChildren
-} from './sheet-elements.js';
-import { NetlistModel } from './netlist-model.js';
+import { sheetElementListLabel } from './sheet-elements.js';
 import { wireColor, wireCssRules } from './wire-theme.js';
 import { num, fmt, fmtRot, parseSvg, serializeSvg, firstSchId } from './svg-utils.js';
 import { refBaseForSymbol as refBaseForSymbolCore, isValidInstanceRef } from './instance-refs.js';
 import { createHistory } from './history.js';
 import {
-  libSymbolGroups,
   resolveLibSymbol,
   resolveSheetSymbol,
   resolveSymbol,
@@ -72,7 +63,7 @@ import {
 } from './persistence.js';
 import { qsById } from './dom-selectors.js';
 import { mkHandle, mkPrev } from './element-factory.js';
-import { createNetlistUi } from './netlist-ui.js';
+import { createNetlistUi, createNetlistLiveValidator } from './netlist-ui.js';
 import { createFileIo } from './file-io.js';
 import { resolveBootCachePlan, resolveReloadSheetsOutcome, projectCacheScore, libraryCacheScore } from './boot-cache.js';
 import { emptySvgMarkup, uniqueLibraryFileName } from './document-scaffold.js';
@@ -106,11 +97,10 @@ import {
   breadcrumbSheet,
   status,
 } from './ui-wording.js';
-import { applySymbolForm, readSymbolFormFromDom, symbolDisplayName, symbolCatalogLabel, symbolCatalogSubtitle, symbolDesignation } from './symbol-save.js';
+import { applySymbolForm, readSymbolFormFromDom, symbolDisplayName, symbolCatalogLabel, symbolDesignation } from './symbol-save.js';
 import {
   sheetDisplayTitle,
   sheetCatalogLabel,
-  sheetCatalogSubtitle,
   applySheetDisplayTitle,
 } from './sheet-catalog.js';
 import {
@@ -119,8 +109,9 @@ import {
 } from './resource-rename.js';
 import { createConfirmDialog, createToastHost, bindModalA11y } from './ui-dialog.js';
 import { createSavePermBadge } from './project-perm-ui.js';
-import { syncSidebarEmptyStates } from './sidebar-lists.js';
-import { DRAW_HINT, DRAW_LABELS, createDrawBannerSync } from './draw-mode-ui.js';
+import { createSidebarLists } from './sidebar-lists.js';
+import { DRAW_LABELS, createDrawBannerSync } from './draw-mode-ui.js';
+import { createDrawMode } from './draw-mode.js';
 import { bindShortcutsHelp } from './shortcuts-help.js';
 import { summarizeNetlistHealth } from './netlist-validate.js';
 import { resolveBootStatusMessage } from './project-boot.js';
@@ -244,6 +235,11 @@ function selEls(){ return state.selection.length ? state.selection : (state.acti
 let childPair, bboxInRoot, rebuildEditDefs, rebuildHost;
 let targetSheet=()=>null, connectionDiagnostics=()=>({ok:true,reason:""}), routeSelectedConnection=()=>{}, collectNetlistProposals=()=>[], nextProposalId=()=>"NEW1";
 let refreshNetlistUI=()=>{}, loadNetlistText=async()=>false, autoLoadNetlistForSheet=async()=>false;
+let scheduleNetlistRefresh=()=>{};
+let buildSymbolList=()=>{}, buildElementList=()=>{}, syncListSelection=()=>{}, syncElementListSelection=()=>{};
+let validateSymbolConnections=()=>[], renderElementProps=()=>{}, compareListText=(a,b)=>String(a).localeCompare(String(b),"pl");
+let startDraw=()=>{}, startLineDraw=()=>{}, addDrawPoint=()=>{}, drawPreview=()=>{};
+let finishShape=async()=>{}, finishLineDraw=()=>{}, exitDraw=()=>{}, jointCandidates=()=>[], nearestJoint=()=>null;
 let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm;
 let selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue;
 
@@ -274,7 +270,39 @@ function wireNetlistRouting(){
     getSettingsCfg:()=>settingsCfg,
   });
   ({ refreshNetlistUI, loadNetlistText, autoLoadNetlistForSheet }=ui);
+  const live=createNetlistLiveValidator({ refreshNetlistUI, debounceMs:180 });
+  scheduleNetlistRefresh=live.scheduleRefresh;
   ui.wireNetlistDom();
+  wireDrawMode();
+}
+
+function wireDrawMode(){
+  const d=createDrawMode({
+    state, stage, getScene:()=>scene, currentSymNode, setStatus,
+    syncDrawBanner:()=>syncDrawBanner(), syncSelectionToolbar, clearHighlight,
+    captureToolStyleFromToolbar, pushUndo:()=>pushUndo(), render, snap, fmt, mkEl, mkPrev,
+    SVGNS, XLINK, num, rotatePoint, definitionForUseElement,
+    isConnGroup:(...a)=>isConnGroup(...a),
+    pushConnContactCandidates:(...a)=>pushConnContactCandidates(...a),
+    finishConnDraw:(...a)=>finishConnDraw(...a),
+    nextProposalId:()=>nextProposalId(),
+    wireColor, styleShape, styleLine, styleText, styleNode,
+  });
+  ({ startDraw, startLineDraw, addDrawPoint, drawPreview, finishShape, finishLineDraw, exitDraw, jointCandidates, nearestJoint }=d);
+}
+
+function wireSidebarLists(){
+  const s=createSidebarLists({
+    state, symlist, schlist, elemList, elemSec, elemProps, elemPropsTitle, elemPropsBody,
+    schEmpty, symEmpty, elemEmpty,
+    isSheetActive, currentSymNode, selEls,
+    selectSheet:(...a)=>selectSheet(...a),
+    selectSymbol:(...a)=>selectSymbol(...a),
+    selectSheetElement:(...a)=>selectSheetElement(...a),
+    insertUse:(...a)=>insertUse(...a),
+    setInstanceRef, setStatus, render, saveProject,
+  });
+  ({ buildSymbolList, buildElementList, syncListSelection, syncElementListSelection, validateSymbolConnections, renderElementProps, compareListText }=s);
 }
 
 function wireFileIo(){
@@ -884,41 +912,6 @@ function selectSheetElement(el,opts){
   if(scroll && el._elemListItem) el._elemListItem.scrollIntoView({block:"nearest"});
   setStatus("Zaznaczono: "+sheetElementListLabel(el,Array.prototype.indexOf.call(node.children,el)));
 }
-function renderElementProps(el){
-  if(!elemProps||!elemPropsBody) return;
-  if(!el){ elemProps.classList.add("context-hidden"); elemPropsBody.innerHTML=""; return; }
-  const node=currentSymNode(); if(!node||el.parentNode!==node){ renderElementProps(null); return; }
-  const idx=Array.prototype.indexOf.call(node.children,el);
-  const sections=sheetElementPropertySections(el,idx);
-  if(elemPropsTitle) elemPropsTitle.textContent=sheetElementListLabel(el,idx);
-  elemPropsBody.innerHTML="";
-  const kind=sheetElementKind(el);
-  sections.forEach(sec=>{
-    const s=document.createElement("section");
-    const h=document.createElement("h4"); h.textContent=sec.title; s.appendChild(h);
-    const dl=document.createElement("dl");
-    sec.rows.forEach(([k,v])=>{
-      const dt=document.createElement("dt"); dt.textContent=k;
-      const dd=document.createElement("dd");
-      if(sec.title==="Oznaczenia (spis połączeń)" && k==="Oznaczenie" && kind==="use"){
-        const inp=document.createElement("input");
-        inp.type="text"; inp.value=(el.getAttribute("data-ref")||"").trim(); inp.style.width="100%"; inp.style.font="11px Arial";
-        inp.title="Oznaczenie instancji na schemacie (data-ref)";
-        inp.addEventListener("change",()=>{
-          const res=setInstanceRef(el,inp.value);
-          if(!res.ok){ setStatus(res.reason||"Nie udało się zmienić oznaczenia."); inp.value=el.getAttribute("data-ref")||""; return; }
-          if(res.changed){ render(); buildElementList(); syncElementListSelection(); setStatus("Oznaczenie: "+inp.value); saveProject(); }
-        });
-        dd.appendChild(inp);
-      } else {
-        dd.textContent=v==null||v===""?"—":String(v); dd.title=dd.textContent;
-      }
-      dl.appendChild(dt); dl.appendChild(dd);
-    });
-    s.appendChild(dl); elemPropsBody.appendChild(s);
-  });
-  elemProps.classList.remove("context-hidden");
-}
 function setInstanceRef(use,v){
   const node=use&&use.parentNode; if(!node) return {ok:false,reason:"Brak elementu."};
   v=(v||"").trim().replace(/^-/,"");
@@ -938,160 +931,7 @@ function setInstanceRef(use,v){
   [...node.querySelectorAll('[data-role="conn"][data-ref="'+oldRef+'"]')].forEach(c=>c.setAttribute("data-ref",v));
   return {ok:true,changed:true};
 }
-function syncElementListSelection(){
-  if(!elemList) return;
-  const node=currentSymNode(), sel=selEls().filter(el=>node&&el.parentNode===node);
-  [...elemList.children].forEach(li=>{
-    const on=sel.indexOf(li._elem)>=0;
-    li.classList.toggle("sel",on);
-    if(on&&li._elem===state.activeEl) li._elem._elemListItem=li;
-  });
-  if(!isSheetActive()){ renderElementProps(null); return; }
-  if(sel.length===1) renderElementProps(sel[0]);
-  else if(sel.length>1&&elemProps&&elemPropsBody){
-    if(elemPropsTitle) elemPropsTitle.textContent=sel.length+" elementów zaznaczonych";
-    elemPropsBody.innerHTML='<p class="elem-props-empty">Kliknij jeden element na liście, aby zobaczyć pełne właściwości.</p>';
-    elemProps.classList.remove("context-hidden");
-  } else renderElementProps(null);
-}
-function buildElementList(){
-  if(!elemList||!elemSec||!elemProps) return;
-  elemList.innerHTML="";
-  if(!isSheetActive()){
-    elemSec.classList.add("context-hidden");
-    elemProps.classList.add("context-hidden");
-    elemPropsBody.innerHTML="";
-    syncSidebarEmptyStates({
-      schEmpty, symEmpty, elemEmpty,
-      sheetCount: state.sheets.length,
-      symbolCount: state.symbols.length,
-      elementCount: 0,
-      sheetActive: false,
-    });
-    return;
-  }
-  const node=currentSymNode(); if(!node){ elemSec.classList.add("context-hidden"); return; }
-  elemSec.classList.remove("context-hidden");
-  const children=schematicSheetChildren(node);
-  children.forEach((el,i)=>{
-    const li=document.createElement("li");
-    const kind=sheetElementKind(el);
-    const main=document.createElement("span"); main.textContent=sheetElementListLabel(el,i);
-    const sub=document.createElement("span"); sub.className="elem-kind"; sub.textContent=kindDisplay(kind);
-    li.append(main,sub);
-    li._elem=el; el._elemListItem=li;
-    li.onclick=()=>selectSheetElement(el);
-    elemList.appendChild(li);
-  });
-  syncSidebarEmptyStates({
-    schEmpty, symEmpty, elemEmpty,
-    sheetCount: state.sheets.length,
-    symbolCount: state.symbols.length,
-    elementCount: children.length,
-    sheetActive: true,
-  });
-  syncElementListSelection();
-}
-function liEl(label,id,onClick){ const li=document.createElement("li"); li.textContent=label; li.dataset.id=id; li.onclick=onClick; return li; }
-function sheetListItem(sh){
-  const li=document.createElement("li"); li.dataset.id=sh.id;
-  const labels=document.createElement("span"); labels.className="sch-labels";
-  const titleEl=document.createElement("span"); titleEl.className="sch-title"; titleEl.textContent=sheetCatalogLabel(sh);
-  const subEl=document.createElement("span"); subEl.className="sch-file"; subEl.textContent=sheetCatalogSubtitle(sh);
-  labels.append(titleEl,subEl);
-  li.appendChild(labels);
-  li.title=[sh.relPath||sh.name, subEl.textContent?W.list.sheetFileHint(linkedSheetBasename(sh.name)):""].filter(Boolean).join(" ");
-  li.onclick=()=>selectSheet(sh); li._sheet=sh;
-  li.classList.toggle("sel",state.active===sh);
-  return li;
-}
-const listCollator=new Intl.Collator("pl",{numeric:true,sensitivity:"base"});
-const listCollatorStrict=new Intl.Collator("pl",{numeric:true,sensitivity:"variant"});
-let sidebarBuildSeq=0, sidebarPrefix="sidebar-";
-function compareListText(a,b){ return listCollator.compare(a,b)||listCollatorStrict.compare(a,b); }
-function syncListSelection(){
-  [...symlist.children].forEach(li=>li.classList.toggle("sel",state.active===state.lib&&li.dataset.id===state.selId));
-  [...schlist.children].forEach(li=>li.classList.toggle("sel",li._sheet===state.active));
-}
-function buildSidebarSymbolDefs(){
-  const host=document.querySelector("#sidebarSymbolDefs defs"); if(!host) return;
-  host.innerHTML=""; const prefix="sidebar-"+(++sidebarBuildSeq)+"-"; sidebarPrefix=prefix;
-  const ids=state.symbols.flatMap(s=>[s.node,...s.node.querySelectorAll("[id]")].map(n=>n.id).filter(Boolean));
-  const rewrite=v=>{ let out=(v||"").replace(/url\(#([^)]+)\)/g,(all,id)=>"url(#"+prefix+id+")"); ids.forEach(id=>{ out=out.replace(new RegExp("#"+id.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b","g"),"#"+prefix+id); }); return out; };
-  const style=state.lib&&state.lib.svg&&state.lib.svg.querySelector("defs style");
-  if(style){ const st=document.importNode(style,true); st.textContent=rewrite(st.textContent); host.appendChild(st); }
-  state.symbols.forEach(sym=>{
-    const clone=document.importNode(sym.node,true);
-    [clone,...clone.querySelectorAll("[id]")].forEach(n=>{ if(n.id) n.id=prefix+n.id; });
-    [clone,...clone.querySelectorAll("*")].forEach(n=>{
-      const href=n.getAttribute&&n.getAttribute("href"); if(href&&href[0]==="#") n.setAttribute("href","#"+prefix+href.slice(1));
-      const xhref=n.getAttributeNS&&n.getAttributeNS(XLINK,"href"); if(xhref&&xhref[0]==="#") n.setAttributeNS(XLINK,"xlink:href","#"+prefix+xhref.slice(1));
-      if(n.attributes) [...n.attributes].forEach(a=>{ if(a.value&&a.value.indexOf("url(#")>=0) n.setAttributeNS(a.namespaceURI,a.name,rewrite(a.value)); });
-    });
-    host.appendChild(clone);
-  });
-}
-function symbolListItem(sym){
-  const li=document.createElement("li"); li.dataset.id=sym.id; li.title=W.list.editSymbol;
-  const svg=document.createElementNS(SVGNS,"svg"); svg.setAttribute("class","sym-thumb"); svg.setAttribute("viewBox","-30 -30 60 60"); svg.setAttribute("preserveAspectRatio","xMidYMid meet");
-  const use=document.createElementNS(SVGNS,"use"); use.setAttribute("href","#"+sidebarPrefix+sym.id); use.setAttributeNS(XLINK,"xlink:href","#"+sidebarPrefix+sym.id); svg.appendChild(use);
-  const labels=document.createElement("span"); labels.className="sym-labels";
-  const idEl=document.createElement("span"); idEl.className="sym-id"; idEl.textContent=symbolCatalogLabel(sym.node, sym.id);
-  const oznEl=document.createElement("span"); oznEl.className="sym-ozn"; oznEl.textContent=symbolCatalogSubtitle(sym.node, sym.id);
-  labels.append(idEl,oznEl);
-  const add=document.createElement("button"); add.type="button"; add.className="sym-add"; add.textContent="+"; add.title=W.list.insertSymbol(symbolDesignation(sym.node, sym.id));
-  add.addEventListener("pointerdown",e=>e.stopPropagation());
-  add.addEventListener("click",e=>{ e.stopPropagation(); insertUse(sym.id,true); });
-  li.append(svg,labels,add); li.onclick=()=>selectSymbol(sym.id); li.classList.toggle("sel",state.active===state.lib&&state.selId===sym.id);
-  requestAnimationFrame(()=>{ try{ const b=use.getBBox(), pad=Math.max(2,Math.max(b.width,b.height)*0.08); if(isFinite(b.width)&&isFinite(b.height)&&(b.width||b.height)) svg.setAttribute("viewBox",[b.x-pad,b.y-pad,Math.max(1,b.width+2*pad),Math.max(1,b.height+2*pad)].map(fmt).join(" ")); }catch(e){} });
-  return li;
-}
-function validateSymbolConnections(){
-  const issues=[], byId=new Map(state.symbols.map(s=>[s.id,s.node]));
-  state.symbols.forEach(sym=>{
-    const pins=new Set();
-    [...sym.node.querySelectorAll('[data-role="conn"]')].forEach(c=>{
-      const pin=(c.getAttribute("data-pin")||"").trim(), dir=c.getAttribute("data-dir");
-      const kind=(c.getAttribute("data-kind")||"").toLowerCase();
-      if(!pin) issues.push(sym.id+": brak data-pin"); else if(pins.has(pin)) issues.push(sym.id+": duplikat pinu "+pin); else pins.add(pin);
-      if(kind==="lead"&&!["N","E","S","W"].includes(dir)) issues.push(sym.id+":"+pin+" niepoprawny data-dir");
-      ["stub","joint","label"].forEach(part=>{ if(!c.querySelector('[data-part="'+part+'"]')) issues.push(sym.id+":"+pin+" brak "+part); });
-    });
-  });
-  function walk(id,stack){
-    if(stack.has(id)) return true; const node=byId.get(id); if(!node) return false;
-    const next=new Set(stack); next.add(id);
-    return [...node.querySelectorAll("use")].some(u=>{ const child=(u.getAttribute("href")||u.getAttributeNS(XLINK,"href")||"").replace(/^#/,""); return child&&walk(child,next); });
-  }
-  state.symbols.forEach(s=>{ if(walk(s.id,new Set())) issues.push(s.id+": cykliczne zagnie\u017cd\u017cenie"); });
-  state.connIssues=issues; if(issues.length) console.warn("Walidacja przy\u0142\u0105czy:",issues);
-  return issues;
-}
-function buildSymbolList(){
-  state.symbols=[]; symlist.innerHTML=""; schlist.innerHTML="";
-  if(state.lib && state.lib.svg){
-    const seen=new Set();
-    libSymbolGroups(state.lib.svg).forEach(g=>{
-      if(seen.has(g.id)) return; seen.add(g.id);
-      state.symbols.push({id:g.id, node:g});
-    });
-  }
-  state.symbols.sort((a,b)=>compareListText(symbolCatalogLabel(a.node,a.id),symbolCatalogLabel(b.node,b.id))); buildSidebarSymbolDefs();
-  validateSymbolConnections();
-  state.symbols.forEach(sym=>symlist.appendChild(symbolListItem(sym)));
-  state.sheets.sort((a,b)=>compareListText(sheetCatalogLabel(a),sheetCatalogLabel(b)));
-  state.sheets.forEach(sh=>schlist.appendChild(sheetListItem(sh)));
-  syncListSelection();
-  syncSidebarEmptyStates({
-    schEmpty, symEmpty, elemEmpty,
-    sheetCount: state.sheets.length,
-    symbolCount: state.symbols.length,
-    elementCount: isSheetActive() && currentSymNode() ? schematicSheetChildren(currentSymNode()).length : 0,
-    sheetActive: isSheetActive(),
-  });
-  const ins=document.getElementById("insertSym");
-  if(ins){ const prev=ins.value; ins.innerHTML=""; state.symbols.forEach(s=>{ const o=document.createElement("option"); o.value=s.id; const label=symbolCatalogLabel(s.node, s.id); const ozn=symbolDesignation(s.node, s.id); o.textContent=symbolDisplayName(s.node)&&ozn!==label?label+" \u00b7 "+ozn:label; ins.appendChild(o); }); if([...ins.options].some(o=>o.value===prev)) ins.value=prev; }
-}
+/* buildSymbolList / buildElementList / sync* — createSidebarLists (wireSidebarLists) */
 
 // ---- wyb&oacute;r celu + render ----
 function migrateSheetSemantics(sheet){
@@ -1121,7 +961,7 @@ function activateTarget(target,id,keepView){
   syncNameFields();
   syncListSelection(); render();
   syncToolbarContext();
-  if(state.netlist && typeof refreshNetlistUI==="function") refreshNetlistUI();
+  if(state.netlist) scheduleNetlistRefresh();
   if(keepView) applyView(); else fitView();
   savePrefs();
 }
@@ -1148,13 +988,14 @@ function render(){
   const missing=rebuildEditDefs(scene.defs).missing;
   if(missing.length) console.warn("Brak symboli w podglądzie:", missing.join(", "));
   const node=currentSymNode();
-  if(!node){ scene.host.innerHTML=""; buildElementList(); syncSelectionToolbar(); markDirty(); return; }
+  if(!node){ scene.host.innerHTML=""; buildElementList(); syncSelectionToolbar(); markDirty(); scheduleNetlistRefresh(); return; }
   rebuildHost(scene.host);
   buildHandles(node);
   attachBodyHandlers();
   buildElementList();
   highlightActive();
   markDirty();
+  scheduleNetlistRefresh();
 }
 function attachBodyHandlers(){
   const root=scene.hostRoot; if(!root) return;
@@ -1429,9 +1270,7 @@ stage.addEventListener("pointerup",ev=>{
 });
 stage.addEventListener("dblclick",ev=>{ if(state.drawMode){ ev.preventDefault(); void finishShape(); } });
 
-// ---- interaktywne rysowanie ksztalt&oacute;w (klik-klik) ----
-const DRAW_NEED={ line:Infinity, rect:2, circle:2, arc:3, text:1, pin:1, point:1, node:1, lead:2 };
-const DRAW_BTN={ line:"btnAddLine", rect:"btnAddRect", circle:"btnAddCircle", arc:"btnAddArc", text:"btnAddText", pin:"btnAddPin", point:"btnAddPoint", node:"btnAddNode", lead:"btnAddLead" };
+// ---- interaktywne rysowanie (createDrawMode / wireDrawMode) ----
 function syncContextBreadcrumb(){
   if(!breadcrumbEl) return;
   if(state.drawMode){
@@ -1501,52 +1340,6 @@ function captureToolStyleFromToolbar(){
   if(fw&&fw.value) state.fontWeight=parseInt(fw.value,10)||400;
   savePrefs();
 }
-function startDraw(kind){
-  const node=currentSymNode(); if(!node){ setStatus("Najpierw wybierz symbol lub schemat."); return; }
-  if(state.drawMode===kind){ if(kind==="line") finishLineDraw(); else { exitDraw(); setStatus("Anulowano."); } return; } // ten sam przycisk = zako&#324;cz/wyjd&#378;
-  exitDraw();
-  captureToolStyleFromToolbar();
-  state.drawMode=kind; state.drawing={kind, need:DRAW_NEED[kind], pts:[], cursor:null, snaps:[]};
-  state.selection=[]; state.activeEl=null; state.selHandle=null; clearHighlight(); syncSelectionToolbar();
-  const b=document.getElementById(DRAW_BTN[kind]); if(b) b.classList.add("primary");
-  stage.style.cursor="crosshair";
-  setStatus(DRAW_HINT[kind]||"Rysowanie: klikaj punkty.");
-  syncDrawBanner();
-}
-function startLineDraw(){ startDraw("line"); }
-function jointCandidates(){
-  const node=currentSymNode(); if(!node) return []; const out=[];
-  [...node.children].forEach(el=>{
-    if(isConnGroup(el)&&el.getAttribute("data-ref")){ pushConnContactCandidates(out,el,(x,y)=>[x,y],el.getAttribute("data-ref"),el.getAttribute("data-pin"),el); return; }
-    if(el.tagName.toLowerCase()!=="use"||!el.getAttribute("data-ref")) return;
-    const def=definitionForUseElement(el, state.lib?.svg, state.srcSvg, XLINK), ux=num(el,"x"), uy=num(el,"y"), angle=parseFloat(el.getAttribute("data-ang")||"0"), ref=el.getAttribute("data-ref");
-    if(!def) return;
-    [...def.querySelectorAll('[data-role="conn"]')].forEach(c=>{ pushConnContactCandidates(out,c,(x,y)=>rotatePoint(ux+x,uy+y,ux,uy,angle),ref,c.getAttribute("data-pin"),el); });
-  });
-  return out;
-}
-function nearestJoint(x,y){
-  const max=9/state.zoom; let best=null,dist=max;
-  jointCandidates().forEach(j=>{ const d=Math.hypot(j.x-x,j.y-y); if(d<=dist){dist=d;best=j;} }); return best;
-}
-function addDrawPoint(x,y){
-  if(!state.drawing) return; let snapped=null;
-  if(state.drawing.kind==="line") snapped=nearestJoint(x,y);
-  if(snapped){ x=snapped.x; y=snapped.y; } else if(state.snap){ x=snap(x); y=snap(y); }
-  state.drawing.pts.push([x,y]); state.drawing.snaps.push(snapped); drawPreview(); if(state.drawing.need!==Infinity && state.drawing.pts.length>=state.drawing.need) finishShape();
-}
-function arcPath(p0,p1,p2){ const cx=2*p1[0]-(p0[0]+p2[0])/2, cy=2*p1[1]-(p0[1]+p2[1])/2; return "M "+fmt(p0[0])+" "+fmt(p0[1])+" Q "+fmt(cx)+" "+fmt(cy)+" "+fmt(p2[0])+" "+fmt(p2[1]); }
-function drawPreview(){
-  clearHighlight(); if(!state.drawing) return;
-  const d=state.drawing, k=d.kind, pts=d.pts, cur=d.cursor;
-  if(k==="line"){ const a=pts.slice(); if(cur) a.push(cur); if(a.length>=2) scene.sel.appendChild(mkPrev("polyline",{points:a.map(p=>p.join(",")).join(" ")})); }
-  else if(k==="rect" && pts.length>=1 && cur){ scene.sel.appendChild(mkPrev("rect",{x:Math.min(pts[0][0],cur[0]),y:Math.min(pts[0][1],cur[1]),width:Math.abs(cur[0]-pts[0][0]),height:Math.abs(cur[1]-pts[0][1])})); }
-  else if(k==="circle" && pts.length>=1 && cur){ scene.sel.appendChild(mkPrev("circle",{cx:pts[0][0],cy:pts[0][1],r:Math.hypot(cur[0]-pts[0][0],cur[1]-pts[0][1])})); }
-  else if(k==="arc"){ if(pts.length===1 && cur){ scene.sel.appendChild(mkPrev("line",{x1:pts[0][0],y1:pts[0][1],x2:cur[0],y2:cur[1]})); } else if(pts.length===2){ scene.sel.appendChild(mkPrev("path",{d:arcPath(pts[0],pts[1],cur||pts[1])})); } }
-  else if(k==="lead" && pts.length>=1 && cur){ scene.sel.appendChild(mkPrev("line",{x1:pts[0][0],y1:pts[0][1],x2:cur[0],y2:cur[1]})); }
-  const rr=(k==="lead"||k==="point")?2/state.zoom:3/state.zoom;
-  pts.forEach(p=>{ const c=document.createElementNS(SVGNS,"circle"); c.setAttribute("cx",p[0]); c.setAttribute("cy",p[1]); c.setAttribute("r",rr); c.setAttribute("fill","#2563eb"); c.style.pointerEvents="none"; scene.sel.appendChild(c); });
-}
 function styleShape(el){ el.style.strokeWidth=fmt(state.strokeW); el.style.stroke=state.strokeColor; el.style.fill=state.fillOn?state.fillColor:"none"; el.style.strokeDasharray=state.dashOn?"4 3":"none"; }
 function styleLine(el){ styleShape(el); el.style.fill="none"; }
 function styleText(el, opts = {}){
@@ -1602,54 +1395,6 @@ function buildConnHandles(el){
   state.handles.push(mkHandle(()=>[num(p.label,"x"),num(p.label,"y")],(x,y)=>{selectConnLabel(el);setConnLabelManual(el);setPositionedElement(p.label,x,y);},"lbl",el));
 }
 
-
-async function finishShape(){
-  if(!state.drawMode||!state.drawing){ exitDraw(); return; }
-  const k=state.drawing.kind; if(k==="line"){ finishLineDraw(); return; }
-  captureToolStyleFromToolbar();
-  const pts=state.drawing.pts.slice(); const node=currentSymNode();
-  if(k==="point"||k==="lead"){
-    const conn=await finishConnDraw(k,pts,node);
-    exitDraw();
-    if(!node){ render(); return; }
-    if(!conn){ setStatus("Anulowano dodawanie z\u0142\u0105cza."); render(); return; }
-    pushUndo(); node.appendChild(conn); state.selection=[conn]; state.activeEl=conn;
-    render(); setStatus("Dodano z\u0142\u0105cze "+(conn.getAttribute("data-ref")?conn.getAttribute("data-ref")+":":"")+conn.getAttribute("data-pin")+".");
-    return;
-  }
-  exitDraw();
-  if(!node){ render(); return; }
-  const added=[];
-  if(k==="rect"){ if(pts.length<2){ render(); return; } const x=Math.min(pts[0][0],pts[1][0]), y=Math.min(pts[0][1],pts[1][1]), w=Math.abs(pts[1][0]-pts[0][0]), h=Math.abs(pts[1][1]-pts[0][1]); if(w<0.5||h<0.5){ render(); setStatus("Za ma&#322;y prostok&#261;t."); return; } const el=mkEl("rect",{x,y,width:w,height:h,class:"sym"}); styleShape(el); added.push(el); }
-  else if(k==="circle"){ if(pts.length<2){ render(); return; } const r=Math.hypot(pts[1][0]-pts[0][0],pts[1][1]-pts[0][1]); if(r<0.5){ render(); setStatus("Za ma&#322;y okr&#261;g."); return; } const el=mkEl("circle",{cx:pts[0][0],cy:pts[0][1],r:Math.round(r*100)/100,class:"sym"}); styleShape(el); added.push(el); }
-  else if(k==="arc"){ if(pts.length<3){ render(); return; } const el=mkEl("path",{d:arcPath(pts[0],pts[1],pts[2]),class:"sym"}); styleShape(el); added.push(el); }
-  else if(k==="text"){ const c=pts[0]; const t=prompt("Tekst:","TXT"); if(t===null){ render(); return; } const el=mkEl("text",{x:c[0],y:c[1],class:"pin"}); el.textContent=t; styleText(el); added.push(el); }
-  else if(k==="pin"){ const c=pts[0]; const t=prompt("Etykieta przy&#322;&#261;cza (pin):","A1"); if(t===null){ render(); return; } const anch=prompt("Wyr&oacute;wnanie: start / middle / end","start"); if(anch===null){ render(); return; } const el=mkEl("text",{x:c[0],y:c[1],class:"pin"}); if(["start","middle","end"].includes(anch)) el.setAttribute("text-anchor",anch); el.textContent=t; styleText(el); added.push(el); }
-  else if(k==="node"){ const el=mkEl("circle",{cx:pts[0][0],cy:pts[0][1],r:4,class:"node"}); styleNode(el); added.push(el); }
-  if(!added.length){ render(); return; }
-  pushUndo(); added.forEach(e=>node.appendChild(e)); state.selection=added; state.activeEl=added[added.length-1]; render(); setStatus("Dodano: "+k);
-}
-function finishLineDraw(){
-  if(!state.drawMode){ return; }
-  const snaps=state.drawing?state.drawing.snaps.slice():[];
-  const pts=(state.drawing?state.drawing.pts:[]).filter((p,i,a)=> i===0 || p[0]!==a[i-1][0] || p[1]!==a[i-1][1]); // usu&#324; powt&oacute;rzone
-  captureToolStyleFromToolbar();
-  exitDraw();
-  if(pts.length>=2){ const node=currentSymNode(); if(node){ pushUndo();
-    let el;
-    if(pts.length===2) el=mkEl("line",{x1:pts[0][0],y1:pts[0][1],x2:pts[1][0],y2:pts[1][1],class:"sym"});
-    else el=mkEl("polyline",{points:pts.map(p=>p.join(",")).join(" "),class:"sym"});
-    styleLine(el);
-    const a=snaps[0], b=snaps[snaps.length-1];
-    if(a&&b&&!(a.ref===b.ref&&a.pin===b.pin)){
-      const net=(prompt("Oznacznik/potencja\u0142 po\u0142\u0105czenia:","\u2014")||"\u2014").trim(), id=nextProposalId();
-      const proposal={id,from:{ref:a.ref,pin:a.pin,raw:a.ref+":"+a.pin},to:{ref:b.ref,pin:b.pin,raw:b.ref+":"+b.pin},signal:"",net,wire:"do ustalenia",notes:"propozycja z edytora"};
-      const cls=NetlistModel.wireClass(proposal); el.setAttribute("class",cls); el.style.stroke=wireColor(cls); el.setAttribute("data-conn-id",id); el.setAttribute("data-route","manual"); el.setAttribute("data-from",proposal.from.raw); el.setAttribute("data-to",proposal.to.raw); el.setAttribute("data-net",net); el.setAttribute("data-wire",proposal.wire); el.setAttribute("data-notes",proposal.notes);
-    }
-    node.appendChild(el); state.selection=[el]; state.activeEl=el; render(); setStatus("Dodano "+(pts.length===2?"lini&#281;":"&#322;aman&#261; ("+pts.length+" pkt)")+"."); return; } }
-  render(); setStatus("Zako&#324;czono rysowanie.");
-}
-function exitDraw(){ state.drawMode=null; state.drawing=null; stage.style.cursor=""; for(const kk in DRAW_BTN){ const b=document.getElementById(DRAW_BTN[kk]); if(b) b.classList.remove("primary"); } clearHighlight(); syncDrawBanner(); }
 function updateHostOnly(){
   rebuildHost(scene.host);
   attachBodyHandlers();
@@ -2014,6 +1759,7 @@ function inlineSheetDefs(sheet){
     collectUsedSymbols: (root, sheetSvg) => collectUsedSymbols(root, sheetSvg),
   });
 }
+wireSidebarLists();
 wireFileIo();
 
 function markActiveDirty(){

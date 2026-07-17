@@ -10,6 +10,23 @@ import { summarizeNetlistHealth } from "./netlist-validate.js";
 import { bindModalA11y } from "./ui-dialog.js";
 
 /**
+ * Odświeżanie health/UI spisu z debounce (po render / zmianie arkusza).
+ * @param {{ refreshNetlistUI: () => void, debounceMs?: number }} opts
+ */
+export function createNetlistLiveValidator({ refreshNetlistUI, debounceMs = 180 }) {
+  let timer = null;
+  function scheduleRefresh() {
+    if (typeof refreshNetlistUI !== "function") return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      timer = null;
+      refreshNetlistUI();
+    }, debounceMs);
+  }
+  return { scheduleRefresh };
+}
+
+/**
  * UI i ładowanie spisu połączeń — wydzielone z main.js.
  */
 export function createNetlistUi(deps) {

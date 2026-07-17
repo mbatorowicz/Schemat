@@ -17,13 +17,15 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Złącza | `conn-model.js` + `conn-theme.js` | geometria vs etykieta (`touchLabel`) |
 | Zapis arkusza | `sheet-persistence.js` | `dirty`, `inlineSheetDefsSafe` |
 | Formularze toolbara | `toolbar-form.css` + `toolbar-context.js` | layout pól nazw, widoczność grup |
+| Shell UI | `index.html` `#toolbarMode` + `#toolbarContext` | 2 linie: tryb + kontekst |
 | Wording UI | `ui-wording.js` | etykiety, tooltips, statusy, breadcrumb |
 | Badge zapisu | `save-badge.js` + `project-perm-ui.js` | dirty / perm / ok |
 | Dialogi / toasty | `ui-dialog.js` | confirm, toast, a11y modal |
 | Baner rysowania | `draw-mode-ui.js` | DRAW_HINT / DRAW_LABELS / syncDrawBanner |
-| Empty sidebar | `sidebar-lists.js` / `sidebar-empty.js` | puste listy + CTA |
+| Tryb rysowania | `draw-mode.js` | startDraw / preview / finishShape / joint snap |
+| Listy sidebara | `sidebar-lists.js` / `sidebar-empty.js` | symbole, arkusze, elementy + empty states |
 | Boot UI | `project-boot.js` | komunikaty startu |
-| Netlista health | `netlist-validate.js` | podsumowanie spójności |
+| Netlista health | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh |
 
 ## Przepływ symboli (nie psuj tego łańcucha)
 

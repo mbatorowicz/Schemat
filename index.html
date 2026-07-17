@@ -11,13 +11,12 @@
   #app { display:grid; grid-template-rows:auto 1fr; height:100vh; }
   #toolbar { display:flex; flex-direction:column; background:#e2e8f0; border-bottom:1px solid var(--line); }
   #toolbar .toolbar-line { display:flex; flex-wrap:wrap; gap:2px 4px; align-items:stretch; align-content:flex-start; padding:4px 6px; min-width:0; width:100%; }
-  #toolbarProject { border-bottom:1px solid var(--line); }
-  #toolbarEdit { border-bottom:1px solid var(--line); }
+  #toolbarMode { border-bottom:1px solid var(--line); }
   #toolbarContext { background:#f8fafc; border-top:1px solid var(--line); }
-  #toolbar .grp { display:flex; flex:0 0 auto; flex-direction:column; gap:2px; padding:0 6px; border-right:1px solid var(--line); }
+  #toolbar .grp { display:flex; flex:0 0 auto; flex-direction:column; gap:2px; padding:0 4px; border-right:1px solid var(--line); justify-content:center; }
   #toolbar .grp:last-child { border-right:none; }
   #toolbar .grp-row { display:flex; gap:3px; align-items:center; min-height:28px; }
-  #toolbar .grp-lbl { font:600 9px Arial; letter-spacing:.04em; text-transform:uppercase; color:#64748b; text-align:center; user-select:none; }
+  #toolbar .grp-lbl { display:none; }
   #toolbar .context-hidden { display:none; }
   #toolbar .grp-row.context-hidden { display:none; }
   #toolbar .selection-info { min-width:128px; max-width:210px; font:600 12px Arial; color:#1e3a8a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -142,7 +141,7 @@
 <body>
 <div id="app">
   <div id="toolbar">
-    <div id="toolbarProject" class="toolbar-line">
+    <div id="toolbarMode" class="toolbar-line">
       <div class="grp">
         <div class="grp-row">
           <button id="btnOpen" class="btn-labeled tbtn primary" title="Otwórz projekt"><span class="btn-text">Otwórz</span></button>
@@ -150,14 +149,73 @@
           <button id="btnGrant" class="tbtn" style="display:none" title="Przywróć dostęp" aria-hidden="true" tabindex="-1"></button>
           <button type="button" id="saveBadge" data-kind="idle" title="Status zapisu"><span class="save-badge-dot" aria-hidden="true"></span><span id="saveBadgeLabel">Brak projektu</span></button>
         </div>
-        <div class="grp-lbl">Plik</div>
+      </div>
+
+      <div class="grp">
+        <div class="grp-row">
+          <button id="btnUndo" class="tbtn" title="Cofnij (Ctrl+Z)"></button>
+          <button id="btnRedo" class="tbtn" title="Ponów (Ctrl+Y)"></button>
+          <span class="sep"></span>
+          <button id="btnCopy" class="tbtn" title="Kopiuj (Ctrl+C)"></button>
+          <button id="btnCut" class="tbtn" title="Wytnij (Ctrl+X)"></button>
+          <button id="btnPaste" class="tbtn" title="Wklej (Ctrl+V)"></button>
+        </div>
+      </div>
+
+      <div class="grp" id="drawGroup">
+        <div class="grp-row">
+          <button id="btnAddLine" class="tbtn" title="Linia"></button>
+          <button id="btnAddRect" class="tbtn" title="Prostokąt"></button>
+          <button id="btnAddCircle" class="tbtn" title="Koło"></button>
+          <button id="btnAddArc" class="tbtn" title="Łuk"></button>
+          <button id="btnAddText" class="tbtn" title="Tekst"></button>
+        </div>
+      </div>
+
+      <div class="grp" id="leadGroup">
+        <div class="grp-row">
+          <button id="btnAddLead" class="tbtn" title="Kreska"></button>
+          <button id="btnAddPoint" class="tbtn" title="Punkt"></button>
+          <button id="btnAddNode" class="tbtn" title="Węzeł"></button>
+          <button id="btnAddPin" class="tbtn" title="Pin"></button>
+        </div>
+      </div>
+      <div class="grp context-hidden" id="markGroup" aria-hidden="true"></div>
+
+      <div class="grp" id="libActionsGroup">
+        <div class="grp-row">
+          <button id="btnAddSym" class="tbtn" title="Nowy symbol"></button>
+          <button id="btnDupSym" class="tbtn" title="Duplikuj"></button>
+          <button id="btnExportSym" class="tbtn" title="Eksportuj"></button>
+          <button id="btnDelSym" class="tbtn danger" title="Usuń"></button>
+        </div>
+      </div>
+
+      <div class="grp" id="sheetInsertGroup">
+        <div class="grp-row">
+          <select id="insertSym" title="Symbol do wstawienia" style="max-width:110px"></select>
+          <button id="btnInsertUse" class="tbtn" title="Wstaw"></button>
+        </div>
+      </div>
+
+      <div class="grp" id="netlistGroup">
+        <div class="grp-row">
+          <button id="btnNetlistOpen" class="tbtn" title="Spis">&#8801;</button>
+          <select id="netlistConn" title="Wybierz połączenie" style="width:130px"><option value="">spis</option></select>
+          <button id="btnRouteConn" class="btn-labeled tbtn" title="Trasuj" disabled><span class="btn-text">Trasuj</span></button>
+          <button id="btnExportNetlist" class="tbtn" title="Propozycje">&#8644;</button>
+          <span id="netlistHealth" title="Spójność spisu ze schematem"></span>
+        </div>
       </div>
 
       <div class="grp" id="moreGroup">
         <div class="grp-row">
-          <button type="button" id="btnMore" class="btn-labeled tbtn" title="Więcej akcji"><span class="btn-text">Więcej</span></button>
+          <button type="button" id="btnMore" class="btn-labeled tbtn" title="Więcej"><span class="btn-text">Więcej</span></button>
+          <button id="btnZoomOut" class="tbtn" title="Oddal"></button>
+          <button id="btnZoomIn" class="tbtn" title="Przybliż"></button>
+          <button id="btnFit" class="tbtn" title="Dopasuj"></button>
+          <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
         </div>
-        <div class="grp-lbl">Menu</div>
         <div id="morePanel" role="menu" aria-label="Więcej akcji">
           <div class="more-lbl">Utwórz / plik</div>
           <div class="more-row" id="createGroup">
@@ -178,108 +236,20 @@
             <label class="mini"><input type="checkbox" id="snap" checked/> snap</label>
             <label class="mini"><input type="checkbox" id="showHandles" checked/> uchwyty</label>
             <label class="mini"><input type="checkbox" id="rotateOwnedLabels" checked/> obracaj napisy</label>
+            <button type="button" id="btnShortcuts" class="btn-labeled tbtn" title="Skróty"><span class="btn-text">Skróty</span></button>
           </div>
         </div>
       </div>
-
-      <div class="grp" id="contextBreadcrumb">
-        <div class="grp-row"><span id="breadcrumbText" class="breadcrumb-text">&mdash;</span></div>
-        <div class="grp-lbl">Kontekst</div>
-      </div>
-
-      <div class="grp" id="viewGroup">
-        <div class="grp-row">
-          <button id="btnZoomOut" class="tbtn" title="Oddal"></button>
-          <button id="btnZoomIn" class="tbtn" title="Przybliż"></button>
-          <button id="btnFit" class="tbtn" title="Dopasuj"></button>
-          <span class="sep"></span>
-          <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
-          <button type="button" id="btnShortcuts" class="btn-labeled tbtn" title="Skróty klawiszowe"><span class="btn-text">Skróty</span></button>
-        </div>
-        <div class="grp-lbl">Widok</div>
-      </div>
-    </div>
-
-    <div id="toolbarEdit" class="toolbar-line">
-      <div class="grp">
-        <div class="grp-row">
-          <button id="btnUndo" class="tbtn" title="Cofnij (Ctrl+Z)"></button>
-          <button id="btnRedo" class="tbtn" title="Pon&oacute;w (Ctrl+Y)"></button>
-        </div>
-        <div class="grp-lbl">Historia</div>
-      </div>
-
-      <div class="grp">
-        <div class="grp-row">
-          <button id="btnCopy" class="tbtn" title="Kopiuj (Ctrl+C)"></button>
-          <button id="btnCut" class="tbtn" title="Wytnij (Ctrl+X)"></button>
-          <button id="btnPaste" class="tbtn" title="Wklej (Ctrl+V), w miejscu: Ctrl+Shift+V"></button>
-        </div>
-        <div class="grp-lbl">Schowek</div>
-      </div>
-
-      <div class="grp" id="drawGroup">
-        <div class="grp-row">
-          <button id="btnAddLine" class="tbtn" title="Dodaj lini&#281;"></button>
-          <button id="btnAddRect" class="tbtn" title="Dodaj prostok&#261;t"></button>
-          <button id="btnAddCircle" class="tbtn" title="Dodaj ko&#322;o"></button>
-          <button id="btnAddArc" class="tbtn" title="Dodaj &#322;uk"></button>
-          <button id="btnAddText" class="tbtn" title="Dodaj tekst"></button>
-        </div>
-        <div class="grp-lbl">Rysowanie</div>
-      </div>
-
-      <div class="grp" id="leadGroup">
-        <div class="grp-row">
-          <button id="btnAddLead" class="tbtn" title="Kreska"></button>
-          <button id="btnAddPoint" class="tbtn" title="Punkt"></button>
-        </div>
-        <div class="grp-lbl">Z&#322;&#261;cza</div>
-      </div>
-
-      <div class="grp" id="markGroup">
-        <div class="grp-row">
-          <button id="btnAddNode" class="tbtn" title="W&#281;ze&#322;"></button>
-          <button id="btnAddPin" class="tbtn" title="Pin"></button>
-        </div>
-        <div class="grp-lbl">Oznaczenia</div>
-      </div>
-
-      <div class="grp" id="libActionsGroup">
-        <div class="grp-row">
-          <button id="btnAddSym" class="tbtn" title="Nowy symbol"></button>
-          <button id="btnDupSym" class="tbtn" title="Duplikuj"></button>
-          <button id="btnExportSym" class="tbtn" title="Eksportuj symbol"></button>
-          <button id="btnDelSym" class="tbtn danger" title="Usuń"></button>
-        </div>
-        <div class="grp-lbl">Akcje</div>
-      </div>
-
-      <div class="grp" id="sheetInsertGroup">
-        <div class="grp-row">
-          <label class="mini">Wstaw</label>
-          <select id="insertSym" title="Symbol do wstawienia" style="max-width:120px"></select>
-          <button id="btnInsertUse" class="tbtn" title="Wstaw"></button>
-        </div>
-        <div class="grp-lbl">Schemat</div>
-      </div>
-
-      <div class="grp" id="netlistGroup">
-        <div class="grp-row">
-          <button id="btnNetlistOpen" class="tbtn" title="Spis">&#8801;</button>
-          <select id="netlistConn" title="Wybierz połączenie" style="width:150px"><option value="">spis połączeń</option></select>
-          <button id="btnRouteConn" class="btn-labeled tbtn" title="Trasuj" disabled><span class="btn-text">Trasuj</span></button>
-          <button id="btnExportNetlist" class="tbtn" title="Propozycje">&#8644;</button>
-          <span id="netlistHealth" title="Spójność spisu ze schematem"></span>
-        </div>
-        <div class="grp-lbl">Połączenia</div>
-      </div>
+      <div class="grp context-hidden" id="viewGroup" aria-hidden="true"></div>
     </div>
 
     <div id="toolbarContext" class="toolbar-line">
+      <div class="grp" id="contextBreadcrumb">
+        <div class="grp-row"><span id="breadcrumbText" class="breadcrumb-text">&mdash;</span></div>
+      </div>
+
       <div class="grp">
-        <div class="grp-row"><span id="selectionInfo" class="selection-info">Styl nowych obiekt&oacute;w</span></div>
-        <div class="grp-lbl">Zaznaczenie</div>
+        <div class="grp-row"><span id="selectionInfo" class="selection-info">Styl nowych obiektów</span></div>
       </div>
 
       <div class="grp context-hidden toolbar-form" id="libSymbolMetaGroup">
@@ -294,7 +264,7 @@
             <label class="toolbar-form__label" for="instPrefix" id="lblInstPrefix">Oznaczenie</label>
             <input type="text" id="instPrefix" class="toolbar-form__input toolbar-form__input--designation"/>
           </span>
-          <label class="toolbar-form__check" id="lblInstNumbered" title="Domyślna numeracja instancji na schemacie (np. B1, B2)"><input type="checkbox" id="instNumbered" checked/> <span id="txtInstNumbered">Numeruj</span></label>
+          <label class="toolbar-form__check" id="lblInstNumbered" title="Domyślna numeracja instancji na schemacie"><input type="checkbox" id="instNumbered" checked/> <span id="txtInstNumbered">Numeruj</span></label>
           <span class="toolbar-form__field">
             <label class="toolbar-form__label" for="instStart" id="lblInstStart">Od</label>
             <input type="number" id="instStart" class="toolbar-form__input toolbar-form__input--number" value="1" min="1" step="1"/>
@@ -303,7 +273,6 @@
             <button type="button" id="btnSaveSymbol" class="btn-labeled tbtn" disabled><span class="btn-text" id="txtSaveSymbol">Zapisz</span></button>
           </span>
         </div>
-        <div class="grp-lbl" id="lblGroupSymbol">Symbol</div>
       </div>
 
       <div class="grp context-hidden toolbar-form" id="resourceNameGroup">
@@ -316,36 +285,33 @@
             <button type="button" id="btnSaveResource" class="btn-labeled tbtn"><span class="btn-text" id="txtSaveResource">Zapisz</span></button>
           </span>
         </div>
-        <div class="grp-lbl" id="lblGroupResource">Schemat</div>
       </div>
 
       <div class="grp" id="arrangeGroup">
         <div class="grp-row">
           <button id="btnFlipH" class="tbtn" title="Odbij w poziomie"></button>
           <button id="btnFlipV" class="tbtn" title="Odbij w pionie"></button>
-          <button id="btnRotL" class="tbtn" title="Obr&oacute;t w lewo"></button>
-          <button id="btnRotR" class="tbtn" title="Obr&oacute;t w prawo"></button>
-          <input type="number" id="rotAng" value="90" step="15" style="width:44px" title="k&#261;t obrotu w stopniach"/>
+          <button id="btnRotL" class="tbtn" title="Obrót w lewo"></button>
+          <button id="btnRotR" class="tbtn" title="Obrót w prawo"></button>
+          <input type="number" id="rotAng" value="90" step="15" style="width:44px" title="kąt obrotu"/>
           <span class="sep"></span>
-          <button id="btnClone" class="tbtn" title="Klonuj zaznaczenie (Ctrl+D)"></button>
-          <button id="btnDelShape" class="tbtn danger" title="Usu&#324; zaznaczenie (Delete)"></button>
+          <button id="btnClone" class="tbtn" title="Klonuj (Ctrl+D)"></button>
+          <button id="btnDelShape" class="tbtn danger" title="Usuń (Delete)"></button>
         </div>
-        <div class="grp-lbl">U&#322;&oacute;&#380;</div>
       </div>
 
       <div class="grp" id="primaryStyleGroup">
         <div class="grp-row">
-          <label class="mini">G&#322;&oacute;wny</label>
-          <input type="color" id="strokeColor" value="#0f172a" title="Kolor g&#322;&oacute;wny: tekst / obrys"/>
-          <span id="primaryColorMixed" class="mixed-mark">r&oacute;&#380;ne</span>
+          <label class="mini">Główny</label>
+          <input type="color" id="strokeColor" value="#0f172a" title="Kolor główny"/>
+          <span id="primaryColorMixed" class="mixed-mark">różne</span>
         </div>
-        <div class="grp-lbl">Kolor</div>
       </div>
 
       <div class="grp" id="strokeStyleGroup">
         <div class="grp-row">
           <label class="mini">Grub.</label>
-          <select id="strokeW" title="Grubo&#347;&#263; linii">
+          <select id="strokeW" title="Grubość">
             <option value="">&mdash;</option>
             <option value="0.6">0.6</option>
             <option value="1">1</option>
@@ -357,30 +323,27 @@
           </select>
           <label class="mini"><input type="checkbox" id="dashOn"/> przerywana</label>
         </div>
-        <div class="grp-lbl">Obrys</div>
       </div>
 
       <div class="grp" id="fillStyleGroup">
         <div class="grp-row">
-          <input type="color" id="fillColor" value="#ffd21a" title="Kolor wype&#322;nienia"/>
-          <span id="fillColorMixed" class="mixed-mark">r&oacute;&#380;ne</span>
-          <label class="mini"><input type="checkbox" id="fillOn"/> wype&#322;nienie</label>
+          <input type="color" id="fillColor" value="#ffd21a" title="Wypełnienie"/>
+          <span id="fillColorMixed" class="mixed-mark">różne</span>
+          <label class="mini"><input type="checkbox" id="fillOn"/> wypełnienie</label>
         </div>
-        <div class="grp-lbl">Wype&#322;nienie</div>
       </div>
 
       <div class="grp" id="textStyleGroup">
         <div class="grp-row">
-          <label class="mini">Rozm.</label><input type="number" id="fontSize" value="9" min="1" step="1" placeholder="&mdash;" style="width:48px"/>
+          <label class="mini">Rozm.</label><input type="number" id="fontSize" value="9" min="1" step="1" placeholder="—" style="width:48px"/>
           <label class="mini">Waga</label>
-          <select id="fontWeight" title="Grubo&#347;&#263; czcionki">
+          <select id="fontWeight" title="Waga">
             <option value="">&mdash;</option>
             <option value="400">normalna</option>
-            <option value="500">&#347;rednia</option>
+            <option value="500">średnia</option>
             <option value="700">pogrubiona</option>
           </select>
         </div>
-        <div class="grp-lbl">Tekst</div>
       </div>
 
       <div id="status">&nbsp;</div>

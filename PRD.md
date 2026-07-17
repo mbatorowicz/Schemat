@@ -6,7 +6,7 @@
 | **Projekt** | Transporter boczny do drukarki · CS-TB-48 |
 | **Wytwórca** | CNC Solutions |
 | **Norma** | EN 60204-1 (schematy elektryczne maszyn) |
-| **Wersja dokumentu** | 1.5 · 2026-07-17 |
+| **Wersja dokumentu** | 1.6 · 2026-07-17 |
 
 ---
 
@@ -252,6 +252,8 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - Potwierdzenia w modalu (nie `confirm()`); krótkie toasty przy zapisie i błędach.
 - Empty state sidebara z CTA „Otwórz projekt”; overlay skrótów (`?`).
 - Przy Zapisz / Trasuj: podsumowanie spójności netlista ↔ schemat (`#netlistHealth`).
+- Health spisu (`#netlistHealth`) odświeża się na żywo po `render` / zmianie arkusza (debounce ~180 ms).
+- Toolbar w **dwóch** liniach: `#toolbarMode` (plik + narzędzia trybu) oraz `#toolbarContext` (breadcrumb + styl).
 
 ---
 
@@ -260,8 +262,10 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 | Plik | Rola |
 |------|------|
 | `Schemat/index.html` | Aplikacja edytora (Vite), modal `#connMeta` |
-| `Schemat/src/main.js` | UI, routing, rysowanie, integracja modułów |
-| `Schemat/src/netlist-ui.js` | UI spisu połączeń |
+| `Schemat/src/main.js` | UI, routing, integracja modułów |
+| `Schemat/src/draw-mode.js` | Tryb rysowania (punkty, preview, finish) |
+| `Schemat/src/sidebar-lists.js` | Listy sidebara (symbole, arkusze, elementy) |
+| `Schemat/src/netlist-ui.js` | UI spisu połączeń + live validator |
 | `Schemat/src/file-io.js` | Zapis/odczyt plików |
 | `Schemat/src/element-factory.js` | Fabryka elementów SVG |
 | `Schemat/src/dom-selectors.js` | Bezpieczne selektory CSS |
@@ -306,10 +310,12 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 | Priorytet | Element | Status |
 |-----------|---------|--------|
-| Wysoki | Dalszy podział `main.js` na moduły UI (draw, toolbar, file-io) | W toku — m.in. `draw-mode-ui`, `project-perm-ui`, `ui-dialog`, `sidebar-empty` |
-| Średni | Walidator spójności netlisty vs schemat | Częściowo — podsumowanie przy Zapisz/Trasuj + `#netlistHealth` |
+| Wysoki | Dalszy podział `main.js` na moduły UI (draw, toolbar, file-io) | W toku — `draw-mode.js`, `sidebar-lists.js`, `file-io.js`, … |
+| Średni | Walidator spójności netlisty vs schemat | Live refresh `#netlistHealth` + podsumowanie przy Zapisz/Trasuj |
 | Niski | Skróty klawiszowe w overlay pomocy | Zrobione (`shortcuts-help.js`, `?`) |
 | Niski | E-02 jako arkusz w tym samym edytorze | Otwarte |
+
+**Zrealizowane (1.6):** ekstrakcja `draw-mode.js` + `createSidebarLists`; live validator netlisty (`createNetlistLiveValidator`); toolbar 2-liniowy.
 
 **Zrealizowane (1.5):** badge zapisu/uprawnień; menu Więcej; etykiety Otwórz/Zapisz/Trasuj; modale confirm + toasty; empty states; a11y dialogów; overlay skrótów; walidacja netlisty przy zapisie.
 

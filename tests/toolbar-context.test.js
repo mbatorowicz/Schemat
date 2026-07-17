@@ -6,6 +6,8 @@ describe("resolveToolbarGroups", () => {
   it("pokazuje akcje biblioteki i ukrywa wstawianie na schemacie", () => {
     const g = resolveToolbarGroups({ onLib: true, onSheet: false, symSelected: false, hasSelection: false, hasDir: true });
     expect(g.drawGroup).toBe(true);
+    expect(g.leadGroup).toBe(true);
+    expect(g.markGroup).toBe(false);
     expect(g.libActionsGroup).toBe(true);
     expect(g.libSymbolMetaGroup).toBe(false);
     expect(g.resourceNameGroup).toBe(true);
@@ -23,7 +25,7 @@ describe("resolveToolbarGroups", () => {
     const g = resolveToolbarGroups({ onLib: false, onSheet: true, symSelected: false, hasSelection: true, hasDir: true });
     expect(g.drawGroup).toBe(true);
     expect(g.leadGroup).toBe(true);
-    expect(g.markGroup).toBe(true);
+    expect(g.markGroup).toBe(false);
     expect(g.sheetInsertGroup).toBe(true);
     expect(g.resourceNameMode).toBe("sheet");
     expect(g.arrangeGroup).toBe(true);
