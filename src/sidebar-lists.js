@@ -14,10 +14,12 @@ import {
   symbolCatalogLabel,
   symbolCatalogSubtitle,
   symbolDesignation,
+  symbolDisplayName,
 } from "./symbol-save.js";
 import {
   sheetCatalogLabel,
   sheetCatalogSubtitle,
+  sheetDisplayTitle,
 } from "./sheet-catalog.js";
 import { libSymbolGroups } from "./symbol-resolver.js";
 import { sheetBasename as linkedSheetBasename } from "./project-files.js";
@@ -26,6 +28,52 @@ import { fmt } from "./svg-utils.js";
 
 export { syncSidebarEmptyStates } from "./sidebar-empty.js";
 export { emptyListCopy } from "./ui-wording.js";
+
+/**
+ * Inline rename etykiety na liście (Enter = zapis, Esc = anuluj, blur = zapis).
+ */
+export function beginListInlineRename({ labelEl, initialValue, onCommit, onCancel }) {
+  if (!labelEl || labelEl.dataset.editing === "1") return null;
+  labelEl.dataset.editing = "1";
+  const prevText = labelEl.textContent;
+  const inp = document.createElement("input");
+  inp.type = "text";
+  inp.className = "list-rename-input";
+  inp.value = initialValue ?? prevText ?? "";
+  inp.setAttribute("aria-label", W.list.renameAria);
+  labelEl.replaceChildren(inp);
+
+  let done = false;
+  const finish = (commit) => {
+    if (done) return;
+    done = true;
+    const next = inp.value;
+    labelEl.dataset.editing = "0";
+    labelEl.textContent = prevText;
+    if (commit) onCommit?.(next);
+    else onCancel?.();
+  };
+
+  inp.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      finish(true);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation();
+      finish(false);
+    }
+  });
+  inp.addEventListener("blur", () => finish(true));
+  inp.addEventListener("click", (e) => e.stopPropagation());
+  inp.addEventListener("pointerdown", (e) => e.stopPropagation());
+  requestAnimationFrame(() => {
+    inp.focus();
+    inp.select();
+  });
+  return { input: inp, finish };
+}
 
 /**
  * @param {object} deps
@@ -54,6 +102,8 @@ export function createSidebarLists(deps) {
     setStatus,
     render,
     saveProject,
+    renameSheetTitle,
+    renameSymbolTitle,
   } = deps;
 
   const listCollator = new Intl.Collator("pl", { numeric: true, sensitivity: "base" });
@@ -201,6 +251,24 @@ export function createSidebarLists(deps) {
     syncElementListSelection();
   }
 
+  function startSheetRename(sh, titleEl) {
+    if (typeof renameSheetTitle !== "function") return;
+    beginListInlineRename({
+      labelEl: titleEl,
+      initialValue: sheetDisplayTitle(sh),
+      onCommit: (value) => {
+        const res = renameSheetTitle(sh, value);
+        if (res && res.ok === false) {
+          titleEl.textContent = sheetCatalogLabel(sh);
+          if (res.message) setStatus(res.message);
+        }
+      },
+      onCancel: () => {
+        titleEl.textContent = sheetCatalogLabel(sh);
+      },
+    });
+  }
+
   function sheetListItem(sh) {
     const li = document.createElement("li");
     li.dataset.id = sh.id;
@@ -214,11 +282,17 @@ export function createSidebarLists(deps) {
     subEl.textContent = sheetCatalogSubtitle(sh);
     labels.append(titleEl, subEl);
     li.appendChild(labels);
-    li.title = [sh.relPath || sh.name, subEl.textContent ? W.list.sheetFileHint(linkedSheetBasename(sh.name)) : ""]
-      .filter(Boolean)
-      .join(" ");
+    const fileHint = subEl.textContent ? W.list.sheetFileHint(linkedSheetBasename(sh.name)) : "";
+    li.title = [W.list.renameHint, sh.relPath || sh.name, fileHint].filter(Boolean).join(" · ");
     li.onclick = () => selectSheet(sh);
+    li.ondblclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      selectSheet(sh);
+      startSheetRename(sh, titleEl);
+    };
     li._sheet = sh;
+    li._startRename = () => startSheetRename(sh, titleEl);
     li.classList.toggle("sel", state.active === sh);
     return li;
   }
@@ -269,10 +343,30 @@ export function createSidebarLists(deps) {
     });
   }
 
+  function startSymbolRename(sym, idEl) {
+    if (typeof renameSymbolTitle !== "function") return;
+    const initial =
+      symbolDisplayName(sym.node) || symbolCatalogLabel(sym.node, sym.id);
+    beginListInlineRename({
+      labelEl: idEl,
+      initialValue: initial,
+      onCommit: (value) => {
+        const res = renameSymbolTitle(sym, value);
+        if (res && res.ok === false) {
+          idEl.textContent = symbolCatalogLabel(sym.node, sym.id);
+          if (res.message) setStatus(res.message);
+        }
+      },
+      onCancel: () => {
+        idEl.textContent = symbolCatalogLabel(sym.node, sym.id);
+      },
+    });
+  }
+
   function symbolListItem(sym) {
     const li = document.createElement("li");
     li.dataset.id = sym.id;
-    li.title = W.list.editSymbol;
+    li.title = W.list.renameHint;
     const svg = document.createElementNS(SVGNS, "svg");
     svg.setAttribute("class", "sym-thumb");
     svg.setAttribute("viewBox", "-30 -30 60 60");
@@ -302,6 +396,14 @@ export function createSidebarLists(deps) {
     });
     li.append(svg, labels, add);
     li.onclick = () => selectSymbol(sym.id);
+    li.ondblclick = (e) => {
+      if (e.target.closest(".sym-add")) return;
+      e.preventDefault();
+      e.stopPropagation();
+      selectSymbol(sym.id);
+      startSymbolRename(sym, idEl);
+    };
+    li._startRename = () => startSymbolRename(sym, idEl);
     li.classList.toggle("sel", state.active === state.lib && state.selId === sym.id);
     requestAnimationFrame(() => {
       try {
@@ -386,6 +488,24 @@ export function createSidebarLists(deps) {
     });
   }
 
+  function renameSelectedListItem() {
+    if (state.active && state.active !== state.lib) {
+      const li = [...schlist.children].find((el) => el._sheet === state.active);
+      if (li?._startRename) {
+        li._startRename();
+        return true;
+      }
+    }
+    if (state.active === state.lib && state.selId) {
+      const li = [...symlist.children].find((el) => el.dataset.id === state.selId);
+      if (li?._startRename) {
+        li._startRename();
+        return true;
+      }
+    }
+    return false;
+  }
+
   return {
     buildSymbolList,
     buildElementList,
@@ -394,5 +514,6 @@ export function createSidebarLists(deps) {
     validateSymbolConnections,
     renderElementProps,
     compareListText,
+    renameSelectedListItem,
   };
 }

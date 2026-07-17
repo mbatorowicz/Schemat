@@ -1,4 +1,4 @@
-/** SSOT — etykiety, tooltips, statusy i breadcrumb (bez przykładowych nazw projektu). */
+/** SSOT — etykiety, tooltips i statusy (bez przykładowych nazw projektu). */
 
 export const BANNED_UI_TERMS = [
   "ID typu",
@@ -52,7 +52,7 @@ export const W = {
     unifiedProject: "Zapisz aktywny plik i ca\u0142y projekt (biblioteka, schematy, ustawienia)",
     file: "Zapisz zawarto\u015b\u0107 pliku na dysk",
     project: "Zapisz bibliotek\u0119, zmienione schematy i ustawienia projektu",
-    symbol: "Zapisz nazw\u0119, oznaczenie i domy\u015bln\u0105 numeracj\u0119",
+    symbol: "Zapisz oznaczenie i domy\u015bln\u0105 numeracj\u0119",
     sheet: "Zapisz nazw\u0119 wy\u015bwietlan\u0105 schematu",
     library: "Zmie\u0144 nazw\u0119 pliku biblioteki",
     projectRename: "Zmie\u0144 nazw\u0119 folderu projektu",
@@ -90,6 +90,8 @@ export const W = {
     sheetFileHint: (file) => `Plik: ${file}`,
     insertSymbol: (ozn) => `Wstaw na schemat (${ozn})`,
     editSymbol: "Edytuj symbol",
+    renameHint: "Podw\u00f3jne klikni\u0119cie lub F2 \u2014 zmie\u0144 nazw\u0119",
+    renameAria: "Zmiana nazwy",
   },
   empty: {
     sheets: "Brak schematów — otwórz projekt lub utwórz schemat.",
@@ -162,34 +164,6 @@ export function symbolSelectionSummary(name, oznLabel) {
   const ozn = (oznLabel || "").trim();
   if (ozn && ozn !== name) return `${name} · ${ozn}`;
   return name;
-}
-
-/** Krótka etykieta na belce; pełna ścieżka w title. */
-export function formatContextBreadcrumb({ projectName, leafKind, leafName, drawingLabel }) {
-  if (drawingLabel) {
-    return { label: drawingLabel, title: drawingLabel };
-  }
-  const leaf = (leafName || "").trim();
-  const kind =
-    leafKind === "library" ? "Bibl." : leafKind === "sheet" ? "Schemat" : "";
-  const label = leaf ? (kind ? `${kind} · ${leaf}` : leaf) : kind || "—";
-  const titleParts = [];
-  if (projectName) titleParts.push(`Projekt: ${projectName}`);
-  if (leafKind === "library") titleParts.push(leaf ? `Biblioteka: ${leaf}` : "Biblioteka");
-  else if (leafKind === "sheet") titleParts.push(leaf ? `Schemat: ${leaf}` : "Schemat");
-  return { label, title: titleParts.length ? titleParts.join(" › ") : label };
-}
-
-export function breadcrumbProject(name) {
-  return name || "Projekt";
-}
-
-export function breadcrumbLibrary(selName) {
-  return selName || "Biblioteka";
-}
-
-export function breadcrumbSheet(name) {
-  return name || "Schemat";
 }
 
 export const status = {
@@ -268,10 +242,8 @@ export function collectWordingStrings() {
     status.resourceInvalidLibrary,
     status.resourceInvalidProject,
     status.pickSheet,
-    breadcrumbProject(""),
-    breadcrumbLibrary(""),
-    breadcrumbSheet(""),
-    formatContextBreadcrumb({ leafKind: "sheet", leafName: "" }).label,
+    W.list.renameHint,
+    W.list.renameAria,
   ];
   return out;
 }

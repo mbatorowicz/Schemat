@@ -92,10 +92,16 @@ import {
   resourceNamePlaceholder,
   paramsSaveTip,
   symbolSelectionSummary,
-  formatContextBreadcrumb,
   status,
 } from './ui-wording.js';
-import { applySymbolForm, readSymbolFormFromDom, symbolDisplayName, symbolCatalogLabel, symbolDesignation } from './symbol-save.js';
+import {
+  applySymbolForm,
+  applySymbolDisplayName,
+  readSymbolFormFromDom,
+  symbolDisplayName,
+  symbolCatalogLabel,
+  symbolDesignation,
+} from './symbol-save.js';
 import {
   sheetDisplayTitle,
   sheetCatalogLabel,
@@ -108,7 +114,7 @@ import {
 import { createConfirmDialog, createToastHost, bindModalA11y } from './ui-dialog.js';
 import { createSavePermBadge } from './project-perm-ui.js';
 import { createSidebarLists } from './sidebar-lists.js';
-import { DRAW_LABELS, createDrawBannerSync } from './draw-mode-ui.js';
+import { createDrawBannerSync } from './draw-mode-ui.js';
 import { createDrawMode } from './draw-mode.js';
 import { bindShortcutsHelp } from './shortcuts-help.js';
 import { summarizeNetlistHealth } from './netlist-validate.js';
@@ -207,7 +213,6 @@ const elemProps = document.getElementById("elemProps");
 const elemPropsTitle = document.getElementById("elemPropsTitle");
 const elemPropsBody = document.getElementById("elemPropsBody");
 const statusEl = document.getElementById("status");
-const breadcrumbEl = document.getElementById("breadcrumbText");
 const drawBannerEl = document.getElementById("drawBanner");
 const toolbarEl = document.getElementById("toolbar");
 const hud = document.getElementById("hud");
@@ -235,6 +240,7 @@ let refreshNetlistUI=()=>{}, loadNetlistText=async()=>false, autoLoadNetlistForS
 let scheduleNetlistRefresh=()=>{};
 let buildSymbolList=()=>{}, buildElementList=()=>{}, syncListSelection=()=>{}, syncElementListSelection=()=>{};
 let validateSymbolConnections=()=>[], renderElementProps=()=>{}, compareListText=(a,b)=>String(a).localeCompare(String(b),"pl");
+let renameSelectedListItem=()=>false;
 let startDraw=()=>{}, startLineDraw=()=>{}, addDrawPoint=()=>{}, drawPreview=()=>{};
 let finishShape=async()=>{}, finishLineDraw=()=>{}, exitDraw=()=>{}, jointCandidates=()=>[], nearestJoint=()=>null;
 let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm;
@@ -288,6 +294,40 @@ function wireDrawMode(){
   ({ startDraw, startLineDraw, addDrawPoint, drawPreview, finishShape, finishLineDraw, exitDraw, jointCandidates, nearestJoint }=d);
 }
 
+function renameSheetTitleFromList(sh, title){
+  if(!sh||sh===state.lib) return { ok:false, message:status.pickSheet };
+  const next=String(title||"").trim();
+  if(next===sheetDisplayTitle(sh)) return { ok:true, unchanged:true };
+  pushUndo();
+  const res=applySheetDisplayTitle(sh, next);
+  if(!res.ok){
+    if(state.undo.length) state.undo.pop();
+    return res;
+  }
+  buildSymbolList();
+  syncListSelection();
+  syncToolbarContext();
+  render();
+  setStatus(res.message);
+  saveProject();
+  return res;
+}
+function renameSymbolTitleFromList(sym, title){
+  if(!sym||state.active!==state.lib) return { ok:false, message:status.symbolPickLibrary };
+  pushUndo();
+  const res=applySymbolDisplayName(sym, title);
+  if(!res.ok||res.unchanged){
+    if(state.undo.length) state.undo.pop();
+    return res;
+  }
+  buildSymbolList();
+  syncListSelection();
+  syncNameFields();
+  markSheetDirty(state.lib);
+  setStatus(res.message);
+  saveProject();
+  return res;
+}
 function wireSidebarLists(){
   const s=createSidebarLists({
     state, symlist, schlist, elemList, elemSec, elemProps, elemPropsTitle, elemPropsBody,
@@ -298,8 +338,10 @@ function wireSidebarLists(){
     selectSheetElement:(...a)=>selectSheetElement(...a),
     insertUse:(...a)=>insertUse(...a),
     setInstanceRef, setStatus, render, saveProject,
+    renameSheetTitle: renameSheetTitleFromList,
+    renameSymbolTitle: renameSymbolTitleFromList,
   });
-  ({ buildSymbolList, buildElementList, syncListSelection, syncElementListSelection, validateSymbolConnections, renderElementProps, compareListText }=s);
+  ({ buildSymbolList, buildElementList, syncListSelection, syncElementListSelection, validateSymbolConnections, renderElementProps, compareListText, renameSelectedListItem }=s);
 }
 
 function wireFileIo(){
@@ -485,7 +527,6 @@ function selectedConnOnSheet(){
 }
 function applyStaticWording(){
   const set=(id,text)=>{ const el=document.getElementById(id); if(el) el.textContent=text; };
-  set("lblSymName", W.field.name);
   set("lblInstPrefix", W.field.designation);
   set("lblInstStart", W.field.numberFrom);
   set("lblGroupSymbol", W.group.symbol);
@@ -493,15 +534,11 @@ function applyStaticWording(){
   set("txtSaveResource", W.save.params);
   set("txtInstNumbered", W.field.numberToggle);
   const tip=(id,text)=>{ const el=document.getElementById(id); if(el) el.title=text; };
-  tip("lblSymName", W.fieldTip.symbolName);
-  tip("symName", W.fieldTip.symbolName);
   tip("lblInstPrefix", W.fieldTip.symbolDesignation);
   tip("instPrefix", W.fieldTip.symbolDesignation);
   tip("lblInstNumbered", W.fieldTip.numberToggle);
   tip("txtInstNumbered", W.fieldTip.numberToggle);
-  const symName=document.getElementById("symName");
   const instPrefix=document.getElementById("instPrefix");
-  if(symName) symName.placeholder=W.placeholder.symbolName;
   if(instPrefix) instPrefix.placeholder=W.placeholder.designation;
   const connRef=document.getElementById("connMetaRef");
   const connPin=document.getElementById("connMetaPin");
@@ -562,16 +599,13 @@ function syncLibrarySelectionInfo(){
   }
 }
 function syncNameFields(){
-  const symInp=document.getElementById("symName"), prefixInp=document.getElementById("instPrefix");
+  const prefixInp=document.getElementById("instPrefix");
   const numChk=document.getElementById("instNumbered"), startInp=document.getElementById("instStart");
   const btnSym=document.getElementById("btnSaveSymbol");
-  if(!symInp) return;
   if(state.active===state.lib){
     const sym=state.symbols.find(s=>s.id===state.selId);
     if(sym){
-      symInp.value=symbolDisplayName(sym.node);
-      symInp.placeholder=W.placeholder.symbolName;
-      symInp.disabled=false; if(btnSym) btnSym.disabled=false;
+      if(btnSym) btnSym.disabled=false;
       const rule=refBaseForSymbol(state.selId);
       if(prefixInp){
         prefixInp.disabled=false;
@@ -589,7 +623,7 @@ function syncNameFields(){
       return;
     }
   }
-  symInp.disabled=true; if(btnSym) btnSym.disabled=true;
+  if(btnSym) btnSym.disabled=true;
   if(prefixInp){ prefixInp.disabled=true; prefixInp.value=""; prefixInp.placeholder=W.placeholder.designation; }
   if(numChk){ numChk.disabled=true; }
   if(startInp){ startInp.disabled=true; startInp.value="1"; }
@@ -599,7 +633,8 @@ function syncNameFields(){
 function saveSymbol(){
   const sym=state.symbols.find(s=>s.id===state.selId);
   if(!sym||state.active!==state.lib){ setStatus(status.symbolPickLibrary); return; }
-  const form=readSymbolFormFromDom();
+  const fallbackName=symbolDisplayName(sym.node)||symbolCatalogLabel(sym.node, sym.id);
+  const form=readSymbolFormFromDom(document, { fallbackName });
   const undoBefore=state.undo.length;
   pushUndo();
   const result=applySymbolForm({
@@ -621,32 +656,17 @@ function saveSymbol(){
 }
 async function saveResourceName(){
   const onLib=state.active===state.lib;
-  const onSheet=state.active&&state.active!==state.lib;
-  const mode=onSheet?"sheet":onLib?"library":state.dir?"project":null;
+  const mode=onLib?"library":state.dir?"project":null;
   if(!mode){ return; }
   const inp=document.getElementById("resourceNameInput");
   const v=(inp?.value||"").trim();
   const rw={ writeHandle, getFileHandleByPath };
-  if(mode==="sheet"){
-    if(!state.active||state.active===state.lib){ setStatus(status.pickSheet); return; }
-    pushUndo();
-    const res=applySheetDisplayTitle(state.active, v);
-    if(!res.ok){ setStatus(res.message); return; }
-    buildSymbolList();
-    syncResourceNameFields("sheet");
-    syncContextBreadcrumb();
-    render();
-    setStatus(res.message);
-    saveProject();
-    return;
-  }
   if(mode==="library"){
     if(!state.lib){ return; }
     const res=await renameLibraryOnDisk({ lib: state.lib, newFileName: v, dir: state.dir, settingsCfg, readWrite: rw });
     if(!res.ok){ setStatus(res.message); return; }
     if(!res.unchanged) await saveProjectSettings();
     syncResourceNameFields("library");
-    syncContextBreadcrumb();
     syncSaveButtons();
     setStatus(res.message);
     saveProject();
@@ -658,7 +678,6 @@ async function saveResourceName(){
     if(!res.ok){ setStatus(res.message); return; }
     if(res.dir) state.dir=res.dir;
     syncResourceNameFields("project");
-    syncContextBreadcrumb();
     setStatus(res.message);
   }
 }
@@ -678,7 +697,6 @@ function syncToolbarContext(){
   Object.entries(vis).forEach(([id,show])=>toggle(id,show));
   syncResourceNameFields(resourceNameMode);
   syncSaveButtons();
-  syncContextBreadcrumb();
 }
 function syncSymbolToolbar(){ syncToolbarContext(); }
 function ensureLib(){ if(!state.lib){ const p=parseSvg(baseDocText()); state.lib={handle:null,name:"E-00_symbole.svg",svg:p.svg,doc:p.doc}; } }
@@ -1268,31 +1286,6 @@ stage.addEventListener("pointerup",ev=>{
 stage.addEventListener("dblclick",ev=>{ if(state.drawMode){ ev.preventDefault(); void finishShape(); } });
 
 // ---- interaktywne rysowanie (createDrawMode / wireDrawMode) ----
-function syncContextBreadcrumb(){
-  if(!breadcrumbEl) return;
-  let leafKind=null, leafName="";
-  if(state.drawMode){
-    const bc=formatContextBreadcrumb({ drawingLabel: DRAW_LABELS[state.drawMode]||state.drawMode });
-    breadcrumbEl.textContent=bc.label;
-    breadcrumbEl.title=bc.title;
-    return;
-  }
-  if(state.active===state.lib){
-    leafKind="library";
-    const sym=state.symbols.find(s=>s.id===state.selId);
-    leafName=sym?symbolCatalogLabel(sym.node,sym.id):(state.selId||"");
-  } else if(state.active&&state.sheets.includes(state.active)){
-    leafKind="sheet";
-    leafName=sheetDisplayTitle(state.active)||state.active.name||"";
-  }
-  const bc=formatContextBreadcrumb({
-    projectName: state.dir?.name||"",
-    leafKind,
-    leafName,
-  });
-  breadcrumbEl.textContent=bc.label;
-  breadcrumbEl.title=bc.title;
-}
 /* syncDrawBanner — tworzony w bootstrap (draw-mode-ui.js) */
 let connMetaResolve=null;
 function openConnMetaModal(node){
@@ -1889,9 +1882,13 @@ document.getElementById("btnClone").onclick=cloneSelection;
 document.getElementById("btnDelShape").onclick=deleteActiveEl;
 document.getElementById("btnSaveSymbol").onclick=saveSymbol;
 document.getElementById("btnSaveResource").onclick=()=>{ saveResourceName(); };
-["symName","instPrefix","instNumbered","instStart"].forEach(id=>{
-  const el=document.getElementById(id); if(!el) return;
-  if(id==="symName"||id==="instPrefix") el.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveSymbol(); } });
+const instPrefixEl=document.getElementById("instPrefix");
+if(instPrefixEl) instPrefixEl.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveSymbol(); } });
+document.addEventListener("keydown",(e)=>{
+  if(e.key!=="F2"||e.ctrlKey||e.metaKey||e.altKey) return;
+  const t=e.target;
+  if(t&&(t.tagName==="INPUT"||t.tagName==="TEXTAREA"||t.tagName==="SELECT"||t.isContentEditable)) return;
+  if(renameSelectedListItem()){ e.preventDefault(); }
 });
 document.getElementById("btnAddSym").onclick=addSymbol;
 document.getElementById("btnDelSym").onclick=deleteSymbol;
@@ -2263,7 +2260,6 @@ try{
     initTextBar,
     syncSelectionToolbar,
     syncToolbarContext,
-    syncContextBreadcrumb,
     refreshNetlistUI,
     routeConnButton: document.getElementById("btnRouteConn"),
     getRouteSelectedConnection: () => routeSelectedConnection,

@@ -22,7 +22,6 @@ describe("app-bootstrap", () => {
       initTextBar: () => {},
       syncSelectionToolbar: () => {},
       syncToolbarContext: () => {},
-      syncContextBreadcrumb: () => {},
       refreshNetlistUI: () => {},
       routeConnButton: btn,
       getRouteSelectedConnection: () => routeFn,

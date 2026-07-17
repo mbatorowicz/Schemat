@@ -1,4 +1,4 @@
-/** SSOT — nazwa wyświetlana schematu (lista, breadcrumb) vs nazwa dokumentu w ramce (.ttl). */
+/** SSOT — nazwa wyświetlana schematu (lista) vs nazwa dokumentu w ramce (.ttl). */
 
 import { sheetBasename } from "./project-files.js";
 import { qsById } from "./dom-selectors.js";
@@ -29,7 +29,7 @@ export function isSheetTitlePollutedByDoc(sheet) {
 }
 
 /**
- * Nazwa arkusza (lista, breadcrumb, pole „Nazwa schematu”).
+ * Nazwa arkusza (lista schematów).
  * Źródło: data-sheet-title (gdy nie jest tytułem projektu) → nazwa pliku bez .svg.
  * Nie używa .ttl — to nazwa dokumentu/projektu w ramce.
  */

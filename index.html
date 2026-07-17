@@ -76,6 +76,8 @@
   #symlist li.sel .sym-ozn { color:#dbeafe; }
   .sym-add { flex:0 0 25px; width:25px; height:25px; padding:0; font:bold 18px Arial; line-height:1; margin-top:4px; }
   #symlist li.sel .sym-add { border-color:#bfdbfe; color:#1e3a8a; }
+  .list-rename-input { width:100%; min-width:0; box-sizing:border-box; margin:0; padding:1px 4px; border:1px solid #93c5fd; border-radius:3px; font:600 13px Arial; color:#0f172a; background:#fff; outline:none; }
+  #schlist li.sel .list-rename-input, #symlist li.sel .list-rename-input { border-color:#bfdbfe; }
   #sidebarSymbolDefs { position:absolute; width:0; height:0; overflow:hidden; pointer-events:none; }
   #stagewrap { position:relative; min-width:0; background:#fff; overflow:hidden; user-select:none; -webkit-user-select:none; }
   #stage { width:100%; height:100%; display:block; background:#fff; touch-action:none; user-select:none; -webkit-user-select:none; -moz-user-select:none; }
@@ -89,7 +91,6 @@
   #saveBadge[data-kind="ok"] { border-color:#86efac; background:#f0fdf4; color:#166534; }
   #saveBadge[data-kind="idle"] { opacity:.85; }
   #saveBadge .save-badge-dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex:0 0 auto; }
-  #contextBreadcrumb .breadcrumb-text { font:600 12px Arial; color:#1e3a8a; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
   #netlistConn option[data-ok="1"] { color:#15803d; }
   #netlistConn option[data-ok="0"] { color:#b91c1c; }
   #drawBanner { position:absolute; left:50%; top:44px; transform:translateX(-50%); display:none; align-items:center; gap:10px; background:#eff6ff; border:1px solid #93c5fd; border-radius:6px; padding:6px 12px; font:600 12px Arial; color:#1e40af; z-index:19; pointer-events:none; }
@@ -237,21 +238,11 @@
     </div>
 
     <div id="toolbarContext" class="toolbar-line">
-      <div class="grp" id="contextBreadcrumb">
-        <div class="grp-row"><span id="breadcrumbText" class="breadcrumb-text">&mdash;</span></div>
-      </div>
-
       <div class="grp">
         <div class="grp-row"><span id="selectionInfo" class="selection-info">Styl</span></div>
       </div>
 
       <div class="grp context-hidden toolbar-form" id="libSymbolMetaGroup">
-        <div class="toolbar-form__row">
-          <span class="toolbar-form__field">
-            <label class="toolbar-form__label" for="symName" id="lblSymName">Nazwa</label>
-            <input type="text" id="symName" class="toolbar-form__input toolbar-form__input--name"/>
-          </span>
-        </div>
         <div class="toolbar-form__row">
           <span class="toolbar-form__field">
             <label class="toolbar-form__label" for="instPrefix" id="lblInstPrefix">Oznaczenie</label>

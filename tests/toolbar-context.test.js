@@ -21,13 +21,14 @@ describe("resolveToolbarGroups", () => {
     expect(g.resourceNameMode).toBe("library");
   });
 
-  it("na schemacie pokazuje rysowanie i wstawianie", () => {
+  it("na schemacie pokazuje rysowanie; nazwa schematu jest na liście", () => {
     const g = resolveToolbarGroups({ onLib: false, onSheet: true, symSelected: false, hasSelection: true, hasDir: true });
     expect(g.drawGroup).toBe(true);
     expect(g.leadGroup).toBe(true);
     expect(g.markGroup).toBe(false);
     expect(g.sheetInsertGroup).toBe(false);
-    expect(g.resourceNameMode).toBe("sheet");
+    expect(g.resourceNameMode).toBe(null);
+    expect(g.resourceNameGroup).toBe(false);
     expect(g.arrangeGroup).toBe(true);
     expect(g.libSymbolMetaGroup).toBe(false);
   });

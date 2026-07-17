@@ -34,7 +34,6 @@ export function bootstrapEditorSync(ctx) {
     initTextBar,
     syncSelectionToolbar,
     syncToolbarContext,
-    syncContextBreadcrumb,
     refreshNetlistUI,
     routeConnButton,
   } = ctx;
@@ -56,6 +55,5 @@ export function bootstrapEditorSync(ctx) {
   initTextBar();
   syncSelectionToolbar();
   syncToolbarContext();
-  if(typeof syncContextBreadcrumb==="function") syncContextBreadcrumb();
   if(typeof refreshNetlistUI==="function") refreshNetlistUI();
 }

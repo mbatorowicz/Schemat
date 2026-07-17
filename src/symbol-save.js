@@ -8,7 +8,7 @@ import { status as Wstatus } from "./ui-wording.js";
 
 
 
-/** Nazwa widoczna w UI (listy, breadcrumb). Osobno od oznaczenia technicznego. */
+/** Nazwa widoczna w UI (listy). Osobno od oznaczenia technicznego. */
 
 export const SYMBOL_NAME_ATTR = "data-symbol-name";
 
@@ -24,7 +24,7 @@ export function symbolDisplayName(node) {
 
 
 
-/** Etykieta główna w listach, breadcrumb i nagłówku zaznaczenia. Nazwa > oznaczenie > id. */
+/** Etykieta główna w listach i nagłówku zaznaczenia. Nazwa > oznaczenie > id. */
 export function symbolCatalogLabel(node, id = "") {
   const name = symbolEffectiveDisplayName(node, id);
   if (name) return name;
@@ -102,6 +102,27 @@ export function libSymbolIdExists(libSvg, id, exceptId) {
 
  */
 
+/** Zmiana samej nazwy wyświetlanej (lista symboli). */
+export function applySymbolDisplayName(sym, title) {
+  const t = String(title || "").trim();
+  if (!isValidSymbolDisplayName(t)) {
+    return { ok: false, message: Wstatus.symbolInvalidName };
+  }
+  const node = sym?.node;
+  if (!node) return { ok: false, message: Wstatus.symbolPickLibrary };
+  const prev = symbolDisplayName(node);
+  if (t === prev) {
+    return { ok: true, unchanged: true, title: t, prev, message: Wstatus.symbolSaved(t, symbolDesignation(node, sym.id)) };
+  }
+  node.setAttribute(SYMBOL_NAME_ATTR, t);
+  return {
+    ok: true,
+    title: t,
+    prev,
+    message: Wstatus.symbolRenamed(prev || symbolCatalogLabel(node, sym.id), t),
+  };
+}
+
 export function applySymbolForm(ctx) {
 
   const { sym, libSvg, sheets, form, rewriteSymbolIdRefs, XLINK } = ctx;
@@ -169,28 +190,22 @@ export function applySymbolForm(ctx) {
 
 
 
-export function readSymbolFormFromDom(doc = document) {
-
+/**
+ * Formularz oznaczenia/numeracji z toolbara.
+ * Nazwa wyświetlana jest na liście — przekaż `fallbackName` (z atrybutu symbolu).
+ */
+export function readSymbolFormFromDom(doc = document, { fallbackName = "" } = {}) {
   const nameEl = doc.getElementById("symName");
-
   const prefixEl = doc.getElementById("instPrefix");
-
   const numEl = doc.getElementById("instNumbered");
-
   const startEl = doc.getElementById("instStart");
-
+  const fromInput = (nameEl?.value || "").trim();
   return {
-
-    name: (nameEl?.value || "").trim(),
-
+    name: fromInput || String(fallbackName || "").trim(),
     prefix: (prefixEl?.value || "").trim(),
-
     numbered: numEl ? numEl.checked : true,
-
     start: parseInt(startEl?.value, 10) || 1,
-
   };
-
 }
 
 
