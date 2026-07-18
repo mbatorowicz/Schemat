@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { resolveToolbarGroups, formatLibrarySelectionInfo } from "../src/toolbar-context.js";
+import {
+  resolveToolbarGroups,
+  resolveInstanceMetaKind,
+  formatLibrarySelectionInfo,
+} from "../src/toolbar-context.js";
 import { W } from "../src/ui-wording.js";
 
 describe("resolveToolbarGroups", () => {
@@ -12,7 +16,8 @@ describe("resolveToolbarGroups", () => {
     expect(g.libSymbolMetaGroup).toBe(false);
     expect(g.resourceNameGroup).toBe(true);
     expect(g.resourceNameMode).toBe("library");
-    expect(g.sheetInsertGroup).toBe(false); // wstawianie tylko z sidebara
+    expect(g.sheetInsertGroup).toBe(false);
+    expect(g.sheetInstanceMetaGroup).toBe(false);
   });
 
   it("pokazuje meta symbolu i nazwę biblioteki gdy wybrany symbol", () => {
@@ -31,6 +36,31 @@ describe("resolveToolbarGroups", () => {
     expect(g.resourceNameGroup).toBe(false);
     expect(g.arrangeGroup).toBe(true);
     expect(g.libSymbolMetaGroup).toBe(false);
+    expect(g.sheetInstanceMetaGroup).toBe(false);
+  });
+
+  it("pokazuje meta instancji gdy pojedynczy use lub conn", () => {
+    const useG = resolveToolbarGroups({
+      onLib: false,
+      onSheet: true,
+      symSelected: false,
+      hasSelection: true,
+      hasDir: true,
+      instanceMetaKind: "use",
+    });
+    expect(useG.sheetInstanceMetaGroup).toBe(true);
+    expect(useG.instanceMetaKind).toBe("use");
+
+    const connG = resolveToolbarGroups({
+      onLib: false,
+      onSheet: true,
+      symSelected: false,
+      hasSelection: true,
+      hasDir: true,
+      instanceMetaKind: "conn",
+    });
+    expect(connG.sheetInstanceMetaGroup).toBe(true);
+    expect(connG.instanceMetaKind).toBe("conn");
   });
 
   it("pokazuje rename projektu gdy brak aktywnego arkusza/biblioteki", () => {
@@ -42,6 +72,20 @@ describe("resolveToolbarGroups", () => {
     const g = resolveToolbarGroups({ onLib: false, onSheet: false, symSelected: false, hasSelection: false, hasDir: false });
     expect(g.moreGroup).toBe(true);
     expect(g.createGroup).toBe(true);
+  });
+});
+
+describe("resolveInstanceMetaKind", () => {
+  it("zwraca use / conn tylko przy pojedynczym zaznaczeniu na arkuszu", () => {
+    const useEl = { tagName: "use", getAttribute: () => null };
+    const connEl = { tagName: "g", getAttribute: (n) => (n === "data-role" ? "conn" : null) };
+    const textEl = { tagName: "text", getAttribute: () => null };
+
+    expect(resolveInstanceMetaKind({ onSheet: true, selection: [useEl] })).toBe("use");
+    expect(resolveInstanceMetaKind({ onSheet: true, selection: [connEl] })).toBe("conn");
+    expect(resolveInstanceMetaKind({ onSheet: true, selection: [textEl] })).toBe(null);
+    expect(resolveInstanceMetaKind({ onSheet: true, selection: [useEl, connEl] })).toBe(null);
+    expect(resolveInstanceMetaKind({ onSheet: false, selection: [useEl] })).toBe(null);
   });
 });
 

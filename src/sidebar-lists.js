@@ -98,10 +98,7 @@ export function createSidebarLists(deps) {
     selectSymbol,
     selectSheetElement,
     insertUse,
-    setInstanceRef,
     setStatus,
-    render,
-    saveProject,
     renameSheetTitle,
     renameSymbolTitle,
   } = deps;
@@ -131,7 +128,6 @@ export function createSidebarLists(deps) {
     const sections = sheetElementPropertySections(el, idx);
     if (elemPropsTitle) elemPropsTitle.textContent = sheetElementListLabel(el, idx);
     elemPropsBody.innerHTML = "";
-    const kind = sheetElementKind(el);
     sections.forEach((sec) => {
       const s = document.createElement("section");
       const h = document.createElement("h4");
@@ -142,33 +138,8 @@ export function createSidebarLists(deps) {
         const dt = document.createElement("dt");
         dt.textContent = k;
         const dd = document.createElement("dd");
-        if (sec.title === "Oznaczenia (spis połączeń)" && k === "Oznaczenie" && kind === "use") {
-          const inp = document.createElement("input");
-          inp.type = "text";
-          inp.value = (el.getAttribute("data-ref") || "").trim();
-          inp.style.width = "100%";
-          inp.style.font = "11px Arial";
-          inp.title = "Oznaczenie instancji na schemacie (data-ref)";
-          inp.addEventListener("change", () => {
-            const res = setInstanceRef(el, inp.value);
-            if (!res.ok) {
-              setStatus(res.reason || "Nie udało się zmienić oznaczenia.");
-              inp.value = el.getAttribute("data-ref") || "";
-              return;
-            }
-            if (res.changed) {
-              render();
-              buildElementList();
-              syncElementListSelection();
-              setStatus("Oznaczenie: " + inp.value);
-              saveProject();
-            }
-          });
-          dd.appendChild(inp);
-        } else {
-          dd.textContent = v == null || v === "" ? "—" : String(v);
-          dd.title = dd.textContent;
-        }
+        dd.textContent = v == null || v === "" ? "—" : String(v);
+        dd.title = dd.textContent;
         dl.appendChild(dt);
         dl.appendChild(dd);
       });

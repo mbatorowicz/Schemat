@@ -19,6 +19,7 @@ export const W = {
   field: {
     name: "Nazwa",
     designation: "Oznaczenie",
+    pin: "Pin",
     numberFrom: "Od",
     numberToggle: "Numeruj",
     sheetName: "Nazwa schematu",
@@ -30,6 +31,9 @@ export const W = {
       "Nazwa czytelna w listach i nag\u0142\u00f3wku. Nie jest oznaczeniem instancji na rysunku.",
     symbolDesignation:
       "Typ elementu na schemacie. Wiele symboli w bibliotece mo\u017ce mie\u0107 to samo oznaczenie; numeracja instancji jest wsp\u00f3lna.",
+    instanceRef:
+      "Oznaczenie instancji na schemacie (np. K1). Musi by\u0107 unikalne w\u015br\u00f3d symboli na arkuszu.",
+    connPin: "Numer lub nazwa styku z\u0142\u0105cza.",
     numberToggle:
       "Domy\u015blna numeracja przy wstawianiu instancji. Numer na schemacie to osobne pole.",
   },

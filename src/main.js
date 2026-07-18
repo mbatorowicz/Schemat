@@ -82,7 +82,7 @@ import {
   librarySettingPathForHandle,
   DEFAULT_WALK_DEPTH,
 } from './project-paths.js';
-import { resolveToolbarGroups } from './toolbar-context.js';
+import { resolveToolbarGroups, resolveInstanceMetaKind } from './toolbar-context.js';
 import {
   W,
   saveFileLabel,
@@ -337,7 +337,7 @@ function wireSidebarLists(){
     selectSymbol:(...a)=>selectSymbol(...a),
     selectSheetElement:(...a)=>selectSheetElement(...a),
     insertUse:(...a)=>insertUse(...a),
-    setInstanceRef, setStatus, render, saveProject,
+    setStatus,
     renameSheetTitle: renameSheetTitleFromList,
     renameSymbolTitle: renameSymbolTitleFromList,
   });
@@ -528,6 +528,8 @@ function selectedConnOnSheet(){
 function applyStaticWording(){
   const set=(id,text)=>{ const el=document.getElementById(id); if(el) el.textContent=text; };
   set("lblInstPrefix", W.field.designation);
+  set("lblInstRef", W.field.designation);
+  set("lblInstPin", W.field.pin);
   set("lblInstStart", W.field.numberFrom);
   set("lblGroupSymbol", W.group.symbol);
   set("txtSaveSymbol", W.save.params);
@@ -536,6 +538,10 @@ function applyStaticWording(){
   const tip=(id,text)=>{ const el=document.getElementById(id); if(el) el.title=text; };
   tip("lblInstPrefix", W.fieldTip.symbolDesignation);
   tip("instPrefix", W.fieldTip.symbolDesignation);
+  tip("lblInstRef", W.fieldTip.instanceRef);
+  tip("instRefInput", W.fieldTip.instanceRef);
+  tip("lblInstPin", W.fieldTip.connPin);
+  tip("instPinInput", W.fieldTip.connPin);
   tip("lblInstNumbered", W.fieldTip.numberToggle);
   tip("txtInstNumbered", W.fieldTip.numberToggle);
   const instPrefix=document.getElementById("instPrefix");
@@ -689,13 +695,20 @@ function syncSaveButtons(){
 }
 function syncToolbarContext(){
   const onLib=state.active===state.lib;
-  const onSheet=state.active&&state.active!==state.lib;
+  const onSheet=!!(state.active&&state.active!==state.lib);
   const symSelected=onLib&&state.symbols.some(s=>s.id===state.selId);
-  const groups=resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection: state.selection.length>0, hasDir: !!state.dir });
-  const { resourceNameMode, ...vis }=groups;
+  const instanceMetaKind=resolveInstanceMetaKind({ onSheet, selection: state.selection });
+  const groups=resolveToolbarGroups({
+    onLib, onSheet, symSelected,
+    hasSelection: state.selection.length>0,
+    hasDir: !!state.dir,
+    instanceMetaKind,
+  });
+  const { resourceNameMode, instanceMetaKind: metaMode, ...vis }=groups;
   const toggle=(id,show)=>{ const el=document.getElementById(id); if(el) el.classList.toggle("context-hidden",!show); };
   Object.entries(vis).forEach(([id,show])=>toggle(id,show));
   syncResourceNameFields(resourceNameMode);
+  syncSheetInstanceMeta(metaMode);
   syncSaveButtons();
 }
 function syncSymbolToolbar(){ syncToolbarContext(); }
@@ -927,7 +940,7 @@ function selectSheetElement(el,opts){
   if(scroll && el._elemListItem) el._elemListItem.scrollIntoView({block:"nearest"});
   setStatus("Zaznaczono: "+sheetElementListLabel(el,Array.prototype.indexOf.call(node.children,el)));
 }
-function setInstanceRef(use,v){
+function setInstanceRef(use,v,opts){
   const node=use&&use.parentNode; if(!node) return {ok:false,reason:"Brak elementu."};
   v=(v||"").trim().replace(/^-/,"");
   if(!v) return {ok:false,reason:"Oznaczenie instancji nie może być puste."};
@@ -936,7 +949,7 @@ function setInstanceRef(use,v){
   if(v===oldRef) return {ok:true,changed:false};
   const used=new Set([...node.querySelectorAll("use[data-ref]")].map(u=>u.getAttribute("data-ref")).filter(r=>r&&r!==oldRef));
   if(used.has(v)) return {ok:false,reason:"Instancja "+v+" jest już na schemacie."};
-  pushUndo();
+  if(!(opts&&opts.skipUndo)) pushUndo();
   use.setAttribute("data-ref",v);
   [...node.querySelectorAll('text[data-owner-ref="'+oldRef+'"]')].forEach(t=>{
     t.setAttribute("data-owner-ref",v);
@@ -945,6 +958,87 @@ function setInstanceRef(use,v){
   });
   [...node.querySelectorAll('[data-role="conn"][data-ref="'+oldRef+'"]')].forEach(c=>c.setAttribute("data-ref",v));
   return {ok:true,changed:true};
+}
+function syncSheetInstanceMeta(mode){
+  const refInp=document.getElementById("instRefInput");
+  const pinField=document.getElementById("instPinField");
+  const pinInp=document.getElementById("instPinInput");
+  const symInfo=document.getElementById("instSymInfo");
+  if(!mode||!refInp){
+    if(refInp&&document.activeElement!==refInp&&document.activeElement!==pinInp){
+      refInp.value="";
+      if(pinInp) pinInp.value="";
+    }
+    if(pinField) pinField.classList.add("context-hidden");
+    if(symInfo){ symInfo.textContent=""; symInfo.classList.add("context-hidden"); }
+    return;
+  }
+  const el=state.selection.length===1?state.selection[0]:null;
+  if(!el) return;
+  const editing=document.activeElement===refInp||document.activeElement===pinInp;
+  if(!editing){
+    refInp.value=(el.getAttribute("data-ref")||"").trim();
+    if(mode==="conn"&&pinInp) pinInp.value=(el.getAttribute("data-pin")||"").trim();
+  }
+  if(pinField) pinField.classList.toggle("context-hidden", mode!=="conn");
+  if(symInfo){
+    if(mode==="use"){
+      const sym=el.getAttribute("data-sym")||((el.getAttribute("href")||el.getAttributeNS(XLINK,"href")||"").replace(/^#/,""));
+      symInfo.textContent=sym||"";
+      symInfo.title=sym?W.selection.symbolTitle(sym):"";
+      symInfo.classList.toggle("context-hidden", !sym);
+    } else {
+      symInfo.textContent="";
+      symInfo.classList.add("context-hidden");
+    }
+  }
+}
+function commitSheetInstanceMeta(){
+  const mode=resolveInstanceMetaKind({ onSheet: !!(state.active&&state.active!==state.lib), selection: state.selection });
+  if(!mode) return;
+  const el=state.selection[0];
+  if(!el) return;
+  if(mode==="use"){
+    const refInp=document.getElementById("instRefInput");
+    const res=setInstanceRef(el, refInp?refInp.value:"");
+    if(!res.ok){
+      setStatus(res.reason||"Nie udało się zmienić oznaczenia.");
+      if(refInp) refInp.value=el.getAttribute("data-ref")||"";
+      return;
+    }
+    if(res.changed){
+      markActiveDirty();
+      render();
+      buildElementList();
+      syncElementListSelection();
+      syncSheetInstanceMeta("use");
+      setStatus("Oznaczenie: "+(el.getAttribute("data-ref")||""));
+      saveProject();
+    }
+    return;
+  }
+  const refInp=document.getElementById("instRefInput");
+  const pinInp=document.getElementById("instPinInput");
+  const ref=(refInp&&refInp.value||"").trim().replace(/^-/,"");
+  const pin=(pinInp&&pinInp.value||"").trim();
+  if(!pin){ setStatus("Pin nie może być pusty."); if(pinInp) pinInp.value=el.getAttribute("data-pin")||""; return; }
+  if(!ref){ setStatus("Oznaczenie nie może być puste."); if(refInp) refInp.value=el.getAttribute("data-ref")||""; return; }
+  const oldRef=el.getAttribute("data-ref")||"";
+  const oldPin=el.getAttribute("data-pin")||"";
+  if(ref===oldRef&&pin===oldPin) return;
+  pushUndo();
+  el.setAttribute("data-ref",ref);
+  el.setAttribute("data-pin",pin);
+  updateConnLabel(el);
+  if(isConnPoint(el)) applyConnStyle(el);
+  else syncConnJointAnchor(el);
+  markActiveDirty();
+  render();
+  buildElementList();
+  syncElementListSelection();
+  syncSheetInstanceMeta("conn");
+  setStatus("Złącze "+ref+":"+pin);
+  saveProject();
 }
 /* buildSymbolList / buildElementList / sync* — createSidebarLists (wireSidebarLists) */
 
@@ -1085,7 +1179,30 @@ function editElement(el){
     const v=prompt("Symbol (<use>) \u2014 id z biblioteki:\n"+ids.join(", "), cur); if(v===null) return;
     if(!state.lib||!resolveLibSymbol(state.lib.svg,v)){ setStatus("Brak symbolu "+v+" w bibliotece."); return; }
     const ref=prompt("Oznaczenie instancji:",el.getAttribute("data-ref")||""); if(ref===null) return;
-    pushUndo(); el.setAttribute("href","#"+v); el.setAttributeNS(XLINK,"xlink:href","#"+v); if(ref.trim()) el.setAttribute("data-ref",ref.trim().replace(/^-/,"")); render(); setStatus("Podmieniono symbol na #"+v);
+    const cleaned=(ref||"").trim().replace(/^-/,"");
+    if(cleaned){
+      if(!isValidInstanceRef(cleaned)){ setStatus("Instancja: litery (w tym polskie), cyfry, _, -."); return; }
+      const node=el.parentNode;
+      const oldRef=el.getAttribute("data-ref")||"";
+      if(cleaned!==oldRef){
+        const used=new Set([...node.querySelectorAll("use[data-ref]")].map(u=>u.getAttribute("data-ref")).filter(r=>r&&r!==oldRef));
+        if(used.has(cleaned)){ setStatus("Instancja "+cleaned+" jest już na schemacie."); return; }
+      }
+    }
+    pushUndo();
+    el.setAttribute("href","#"+v);
+    el.setAttributeNS(XLINK,"xlink:href","#"+v);
+    el.setAttribute("data-sym",v);
+    if(cleaned){
+      const res=setInstanceRef(el, cleaned, { skipUndo:true });
+      if(!res.ok){ setStatus(res.reason||"Nie udało się zmienić oznaczenia."); }
+    }
+    render();
+    buildElementList();
+    syncElementListSelection();
+    syncToolbarContext();
+    setStatus("Podmieniono symbol na #"+v);
+    saveProject();
   } else {
     setStatus("Ten element edytujesz uchwytami (przeci\u0105gaj punkty).");
   }
@@ -1884,6 +2001,13 @@ document.getElementById("btnSaveSymbol").onclick=saveSymbol;
 document.getElementById("btnSaveResource").onclick=()=>{ saveResourceName(); };
 const instPrefixEl=document.getElementById("instPrefix");
 if(instPrefixEl) instPrefixEl.addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); saveSymbol(); } });
+["instRefInput","instPinInput"].forEach((id)=>{
+  const el=document.getElementById(id); if(!el) return;
+  el.addEventListener("change",()=>{ commitSheetInstanceMeta(); });
+  el.addEventListener("keydown",(e)=>{
+    if(e.key==="Enter"){ e.preventDefault(); el.blur(); }
+  });
+});
 document.addEventListener("keydown",(e)=>{
   if(e.key!=="F2"||e.ctrlKey||e.metaKey||e.altKey) return;
   const t=e.target;

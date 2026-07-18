@@ -41,8 +41,21 @@
   width: 52px;
 }
 
+#toolbar .toolbar-form__input--pin {
+  width: 44px;
+}
+
 #toolbar .toolbar-form__input--number {
   width: 44px;
+}
+
+#toolbar #instSymInfo {
+  font: 600 11px Arial, Helvetica, sans-serif;
+  color: #64748b;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #toolbar .toolbar-form__input--resource {
