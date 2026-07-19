@@ -3,6 +3,8 @@ import {
   resolveSelectionPropsMode,
   readSelectionPropsState,
   selectionPropsFocusField,
+  selectionInstanceUse,
+  selectionElRef,
   leadPropsFromConn,
 } from "../src/selection-props.js";
 import { num, fmt } from "../src/svg-utils.js";
@@ -17,8 +19,42 @@ describe("resolveSelectionPropsMode", () => {
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [connEl] })).toBe("conn");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [textEl] })).toBe("text");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [connEl], connLabelSel: connEl })).toBe("text");
-    expect(resolveSelectionPropsMode({ onSheet: true, selection: [useEl, textEl] })).toBe(null);
     expect(resolveSelectionPropsMode({ onSheet: false, selection: [useEl] })).toBe(null);
+  });
+
+  it("dla grupy instancji (use + etykieta) zwraca use", () => {
+    const useEl = {
+      tagName: "use",
+      getAttribute: (n) => (n === "data-ref" ? "SB1" : null),
+    };
+    const textEl = {
+      tagName: "text",
+      getAttribute: (n) => (n === "data-owner-ref" ? "SB1" : null),
+    };
+    expect(resolveSelectionPropsMode({ onSheet: true, selection: [useEl, textEl] })).toBe("use");
+    expect(selectionInstanceUse([useEl, textEl])).toBe(useEl);
+  });
+
+  it("dla mieszanego zaznaczenia różnych ref zwraca null", () => {
+    const useA = { tagName: "use", getAttribute: (n) => (n === "data-ref" ? "SB1" : null) };
+    const useB = { tagName: "use", getAttribute: (n) => (n === "data-ref" ? "SB2" : null) };
+    expect(resolveSelectionPropsMode({ onSheet: true, selection: [useA, useB] })).toBe(null);
+    expect(selectionInstanceUse([useA, useB])).toBe(null);
+  });
+});
+
+describe("selectionElRef", () => {
+  it("czyta ref z use / text / conn", () => {
+    expect(selectionElRef({ tagName: "use", getAttribute: (n) => (n === "data-ref" ? "K1" : null) })).toBe("K1");
+    expect(
+      selectionElRef({ tagName: "text", getAttribute: (n) => (n === "data-owner-ref" ? "K1" : null) })
+    ).toBe("K1");
+    expect(
+      selectionElRef({
+        tagName: "g",
+        getAttribute: (n) => (n === "data-role" ? "conn" : n === "data-ref" ? "X1" : null),
+      })
+    ).toBe("X1");
   });
 });
 
@@ -32,6 +68,13 @@ describe("readSelectionPropsState", () => {
       ref: "K1",
       symId: "SK-33-34",
       isLead: false,
+    });
+
+    const label = { textContent: "Schneider XAL" };
+    expect(readSelectionPropsState({ mode: "use", el: use, labelEl: label })).toMatchObject({
+      ref: "K1",
+      text: "Schneider XAL",
+      symId: "SK-33-34",
     });
 
     const conn = {
