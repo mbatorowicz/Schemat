@@ -60,7 +60,7 @@ import {
   restoreProjectSnapshot,
   restorePrefsSnapshot,
 } from "./persistence.js";
-import { qsById, qsaByOwnerRef } from "./dom-selectors.js";
+import { qsById } from "./dom-selectors.js";
 import { mkHandle, mkPrev } from "./element-factory.js";
 import { createNetlistUi, createNetlistLiveValidator } from "./netlist-ui.js";
 import { createFileIo } from "./file-io.js";
@@ -92,7 +92,6 @@ import {
   resolveSelectionPropsMode,
   readSelectionPropsState,
   selectionPropsFocusField,
-  selectionInstanceUse,
   leadPropsFromConn,
 } from "./selection-props.js";
 import {
@@ -1435,46 +1434,6 @@ function selectionTextTarget() {
       : null)
   );
 }
-function isDesignationLabelText(txt, ref) {
-  const t = String(txt || "").trim();
-  const r = String(ref || "").trim();
-  return !t || t === r || t === "-" + r;
-}
-/**
- * Etykieta „Opis” przy instancji:
- * — gdy jest tekst inny niż samo oznaczenie → ten tekst (opis),
- * — gdy jest tylko numer / brak drugiego napisu → główna etykieta (edycja treści przy symbolu).
- */
-function instanceDescriptionLabel(use) {
-  if (!use || !use.parentNode) return null;
-  const ref = (use.getAttribute("data-ref") || "").trim();
-  if (!ref) return null;
-  const labels = qsaByOwnerRef(use.parentNode, ref);
-  if (!labels.length) return null;
-  const custom = labels.find((t) => !isDesignationLabelText(t.textContent, ref));
-  if (custom) return custom;
-  if (labels.length > 1) {
-    return labels.slice().sort((a, b) => num(a, "y") - num(b, "y"))[labels.length - 1];
-  }
-  return labels[0];
-}
-/** Tworzy etykietę pod symbolem, gdy instancja nie ma żadnego text[data-owner-ref]. */
-function ensureInstanceDescriptionLabel(use) {
-  let lbl = instanceDescriptionLabel(use);
-  if (lbl) return lbl;
-  const node = use && use.parentNode;
-  if (!node) return null;
-  const ref = (use.getAttribute("data-ref") || "").trim();
-  if (!ref) return null;
-  lbl = mkEl("text", { x: num(use, "x") + 5, y: num(use, "y") + 18, class: "did", "data-owner-ref": ref });
-  lbl.textContent = "";
-  styleText(lbl);
-  node.appendChild(lbl);
-  return lbl;
-}
-function selectionUseTarget() {
-  return selectionInstanceUse(state.selection) || null;
-}
 function fillSelPropSymOptions(symSel, currentId) {
   if (!symSel) return;
   const cur = currentId || "";
@@ -1522,10 +1481,8 @@ function syncSelectionProps(mode) {
     state._selPropTextEl = null;
     return;
   }
-  const useEl = mode === "use" ? selectionUseTarget() : null;
-  const el = mode === "use" ? useEl : state.selection.length === 1 ? state.selection[0] : null;
-  const connLbl = connLabelEl();
-  const descLbl = mode === "use" && useEl ? instanceDescriptionLabel(useEl) : null;
+  const el = state.selection.length === 1 ? state.selection[0] : null;
+  const labelEl = connLabelEl();
   const lead =
     mode === "conn" && el && typeof isConnLead === "function" && isConnLead(el)
       ? leadPropsFromConn(el, connParts(el), { num, fmt })
@@ -1533,8 +1490,7 @@ function syncSelectionProps(mode) {
   const st = readSelectionPropsState({
     mode,
     el,
-    connLabelEl: connLbl,
-    labelEl: descLbl,
+    connLabelEl: labelEl,
     getHref: (node) => node.getAttribute("href") || node.getAttributeNS(XLINK, "href") || "",
     lead,
   });
@@ -1552,17 +1508,9 @@ function syncSelectionProps(mode) {
   if (pinField) pinField.classList.toggle("context-hidden", mode !== "conn");
   if (lenField) lenField.classList.toggle("context-hidden", !(mode === "conn" && st.isLead));
   if (dirField) dirField.classList.toggle("context-hidden", !(mode === "conn" && st.isLead));
-  if (textField) textField.classList.toggle("context-hidden", mode !== "text" && mode !== "use");
+  if (textField) textField.classList.toggle("context-hidden", mode !== "text");
   if (symField) symField.classList.toggle("context-hidden", mode !== "use");
-  const textLbl = document.getElementById("lblSelPropText");
-  if (textLbl) textLbl.textContent = mode === "use" ? W.field.description : W.field.text;
-  if (textInp) {
-    textInp.title = mode === "use" ? W.fieldTip.instanceDescription : W.fieldTip.selectionText;
-    if (mode === "use") textInp.placeholder = W.field.description;
-    else textInp.placeholder = W.placeholder.text;
-  }
   if (mode === "text") state._selPropTextEl = selectionTextTarget();
-  else if (mode === "use") state._selPropTextEl = descLbl;
   else state._selPropTextEl = null;
 }
 function focusSelectionPropsField(mode, opts) {
@@ -1613,7 +1561,7 @@ function commitSelectionProps() {
     return;
   }
 
-  const el = mode === "use" ? selectionUseTarget() : state.selection[0];
+  const el = state.selection[0];
   if (!el) return;
   if (mode === "use") {
     let changed = false;
@@ -1644,50 +1592,14 @@ function commitSelectionProps() {
     } else if (res.changed) {
       setStatus(status.instanceRefSet(el.getAttribute("data-ref") || ""));
     }
-    const nextDesc = textInp ? textInp.value : "";
-    let descEl = instanceDescriptionLabel(el);
-    const prevDesc = descEl ? String(descEl.textContent || "") : "";
-    if (nextDesc !== prevDesc) {
-      const refNow = (el.getAttribute("data-ref") || "").trim();
-      if (!nextDesc.trim()) {
-        if (descEl) {
-          const labels = qsaByOwnerRef(el.parentNode, refNow);
-          if (!changed && !state._selPropUndoPushed) pushUndo();
-          // Drugi napis (właściwy opis) — usuń; jedyna etykieta — wróć do oznaczenia.
-          if (labels.length > 1 && !isDesignationLabelText(prevDesc, refNow)) descEl.remove();
-          else descEl.textContent = refNow ? "-" + refNow : "";
-          changed = true;
-        }
-      } else {
-        if (!descEl) {
-          if (!changed && !state._selPropUndoPushed) pushUndo();
-          descEl = ensureInstanceDescriptionLabel(el);
-          changed = true;
-        } else if (!changed && !state._selPropUndoPushed) {
-          pushUndo();
-        }
-        if (descEl && descEl.textContent !== nextDesc) {
-          descEl.textContent = nextDesc;
-          changed = true;
-        }
-      }
-      if (changed && !res.changed && nextSym === curSym) {
-        setStatus(status.selectionText(nextDesc));
-      }
-    }
     if (changed) {
       markActiveDirty();
       render();
       buildElementList();
       syncElementListSelection();
-      // po dodaniu opisu rozszerz zaznaczenie o nową etykietę
-      const node = el.parentNode;
-      if (node) state.selection = expandToInstanceMembers(node, [el]);
       syncSelectionProps("use");
       saveProject();
     }
-    state._selPropUndoPushed = false;
-    state._selPropOrig = null;
     return;
   }
   // conn
@@ -1751,17 +1663,7 @@ function initSelectionPropsForm() {
     if (!inp) return;
     inp.addEventListener("focus", () => {
       if (inp === textInp) {
-        const onSheet = !!(state.active && state.active !== state.lib);
-        const mode = resolveSelectionPropsMode({
-          onSheet,
-          selection: state.selection,
-          connLabelSel: state.connLabelSel,
-        });
-        let el = selectionTextTarget();
-        if (mode === "use") {
-          const useEl = selectionUseTarget();
-          el = useEl ? instanceDescriptionLabel(useEl) : null;
-        }
+        const el = selectionTextTarget();
         state._selPropTextEl = el;
         state._selPropOrig = el ? el.textContent : "";
         if (el && !state._selPropUndoPushed) {
@@ -1781,15 +1683,9 @@ function initSelectionPropsForm() {
       } else if (e.key === "Escape") {
         e.preventDefault();
         if (inp === textInp && state._selPropTextEl && state._selPropOrig != null) {
-          const t = state._selPropTextEl;
-          if (!state._selPropOrig) {
-            if (t.parentNode) t.remove();
-          } else {
-            t.textContent = state._selPropOrig;
-          }
+          state._selPropTextEl.textContent = state._selPropOrig;
           if (isConnLabelMode()) state.connLabelSel.setAttribute("data-pin", state._selPropOrig);
           inp.value = state._selPropOrig;
-          state._selPropTextEl = null;
           render();
         } else if (state._selPropOrig != null) {
           inp.value = state._selPropOrig;
@@ -1800,28 +1696,7 @@ function initSelectionPropsForm() {
     });
     if (inp === textInp) {
       inp.addEventListener("input", () => {
-        const onSheet = !!(state.active && state.active !== state.lib);
-        const mode = resolveSelectionPropsMode({
-          onSheet,
-          selection: state.selection,
-          connLabelSel: state.connLabelSel,
-        });
-        let el = state._selPropTextEl || selectionTextTarget();
-        if (mode === "use") {
-          const useEl = selectionUseTarget();
-          if (!el && useEl && inp.value) {
-            if (!state._selPropUndoPushed) {
-              pushUndo();
-              state._selPropUndoPushed = true;
-            }
-            el = ensureInstanceDescriptionLabel(useEl);
-            state._selPropTextEl = el;
-            if (el && state.selection.indexOf(el) < 0) {
-              const node = useEl.parentNode;
-              if (node) state.selection = expandToInstanceMembers(node, [useEl]);
-            }
-          }
-        }
+        const el = state._selPropTextEl || selectionTextTarget();
         if (!el) return;
         el.textContent = inp.value;
         if (isConnLabelMode()) state.connLabelSel.setAttribute("data-pin", inp.value);
