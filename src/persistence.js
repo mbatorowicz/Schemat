@@ -1,9 +1,6 @@
 /** Trwałość projektu — IndexedDB + localStorage. Dysk ma pierwszeństwo przed cache. */
 
-import {
-  projectCacheScore,
-  libraryCacheScore,
-} from "./boot-cache.js";
+import { projectCacheScore, libraryCacheScore } from "./boot-cache.js";
 
 const DB_NAME = "edytor";
 const STORE = "kv";

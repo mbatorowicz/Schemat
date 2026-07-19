@@ -20,6 +20,10 @@ export const W = {
     name: "Nazwa",
     designation: "Oznaczenie",
     pin: "Pin",
+    text: "Tre\u015b\u0107",
+    length: "D\u0142ugo\u015b\u0107",
+    direction: "Kierunek",
+    symbol: "Symbol",
     numberFrom: "Od",
     numberToggle: "Numeruj",
     sheetName: "Nazwa schematu",
@@ -27,15 +31,25 @@ export const W = {
     projectName: "Nazwa folderu projektu",
   },
   fieldTip: {
-    symbolName:
-      "Nazwa czytelna w listach i nag\u0142\u00f3wku. Nie jest oznaczeniem instancji na rysunku.",
+    symbolName: "Nazwa czytelna w listach i nag\u0142\u00f3wku. Nie jest oznaczeniem instancji na rysunku.",
     symbolDesignation:
       "Typ elementu na schemacie. Wiele symboli w bibliotece mo\u017ce mie\u0107 to samo oznaczenie; numeracja instancji jest wsp\u00f3lna.",
     instanceRef:
-      "Oznaczenie instancji na schemacie (np. K1). Musi by\u0107 unikalne w\u015br\u00f3d symboli na arkuszu.",
-    connPin: "Numer lub nazwa styku z\u0142\u0105cza.",
-    numberToggle:
-      "Domy\u015blna numeracja przy wstawianiu instancji. Numer na schemacie to osobne pole.",
+      "Oznaczenie instancji na schemacie (np. K1). Musi by\u0107 unikalne w\u015br\u00f3d symboli na arkuszu. Enter zatwierdza, Esc cofa.",
+    connPin: "Numer lub nazwa styku z\u0142\u0105cza. Enter zatwierdza, Esc cofa.",
+    selectionText: "Tre\u015b\u0107 napisu. Enter zatwierdza, Esc cofa.",
+    leadLength: "D\u0142ugo\u015b\u0107 kreski przy\u0142\u0105cza (min. krok siatki). Enter zatwierdza.",
+    leadDir: "Kierunek zewn\u0119trzny kreski: N / E / S / W.",
+    instanceSymbol: "Id symbolu z biblioteki dla zaznaczonej instancji <use>.",
+    numberToggle: "Domy\u015blna numeracja przy wstawianiu instancji. Numer na schemacie to osobne pole.",
+  },
+  dialog: {
+    newProject: "Nowy projekt",
+    folderNotEmpty: "Folder niepusty",
+    newLibrary: "Nowa biblioteka",
+    openProject: "Otw\u00f3rz projekt",
+    deleteSymbol: "Usu\u0144 symbol",
+    newSheet: "Nowy schemat",
   },
   group: {
     symbol: "Symbol",
@@ -96,6 +110,20 @@ export const W = {
     editSymbol: "Edytuj symbol",
     renameHint: "Podw\u00f3jne klikni\u0119cie lub F2 \u2014 zmie\u0144 nazw\u0119",
     renameAria: "Zmiana nazwy",
+    instanceGroup: (ref, n) => `${ref} \u00b7 ${n} elem.`,
+    instanceGroupKind: "Instancja",
+    instanceGroupHint:
+      "Zaznacz symbol, etykiet\u0119 i z\u0142\u0105cza razem (przesuwaj\u0105 si\u0119 wsp\u00f3lnie)",
+  },
+  align: {
+    left: "Wyr\u00f3wnaj do lewej",
+    centerH: "Wyr\u00f3wnaj do \u015brodka w poziomie",
+    right: "Wyr\u00f3wnaj do prawej",
+    top: "Wyr\u00f3wnaj do g\u00f3ry",
+    centerV: "Wyr\u00f3wnaj do \u015brodka w pionie",
+    bottom: "Wyr\u00f3wnaj do do\u0142u",
+    needTwo: "Zaznacz co najmniej 2 obiekty do wyr\u00f3wnania.",
+    done: (mode, n) => `Wyr\u00f3wnano (${n} jednostek).`,
   },
   empty: {
     sheets: "Brak schematów — otwórz projekt lub utwórz schemat.",
@@ -206,6 +234,29 @@ export const status = {
   resourceInvalidLibrary: "Nazwa biblioteki musi ko\u0144czy\u0107 si\u0119 na .svg.",
   resourceInvalidProject: "Nazwa projektu nie mo\u017ce zawiera\u0107 \\ ani /.",
   pickSheet: "Wybierz schemat na li\u015bcie po lewej.",
+  selectionText(text) {
+    return `Tre\u015b\u0107: ${text}`;
+  },
+  instanceRefSet(ref) {
+    return `Oznaczenie: ${ref}`;
+  },
+  instanceRefFailed: "Nie uda\u0142o si\u0119 zmieni\u0107 oznaczenia.",
+  pinEmpty: "Pin nie mo\u017ce by\u0107 pusty.",
+  refEmpty: "Oznaczenie nie mo\u017ce by\u0107 puste.",
+  leadDirInvalid: "Kierunek musi by\u0107 N, E, S lub W.",
+  connMeta(ref, pin) {
+    return `Z\u0142\u0105cze ${ref}:${pin}`;
+  },
+  symbolMissing(id) {
+    return `Brak symbolu ${id} w bibliotece.`;
+  },
+  symbolSwapped(id) {
+    return `Podmieniono symbol na #${id}`;
+  },
+  editWithHandles: "Ten element edytujesz uchwytami (przeci\u0105gaj punkty).",
+  undoEmpty: "Brak czego cofn\u0105\u0107.",
+  undone: "Cofni\u0119to.",
+  redone: "Ponowiono.",
 };
 
 export function emptyListCopy(kind) {
@@ -225,6 +276,7 @@ export function collectWordingStrings() {
     ...Object.values(W.fieldTip),
     ...Object.values(W.placeholder).filter((s) => s !== "RRRR-MM-DD"),
     ...Object.values(W.list),
+    ...Object.values(W.align).filter((v) => typeof v === "string"),
     W.selection.pickSymbol,
     W.selection.newObjectStyle,
     ...Object.values(W.empty),
@@ -233,6 +285,13 @@ export function collectWordingStrings() {
     W.confirm.dirtyLibrary,
     W.confirm.sheetNoProject,
     W.confirm.replaceManualRoute,
+    ...Object.values(W.dialog),
+    W.field.length,
+    W.field.direction,
+    W.field.symbol,
+    W.fieldTip.leadLength,
+    W.fieldTip.leadDir,
+    W.fieldTip.instanceSymbol,
     status.symbolEmptyName,
     status.symbolInvalidName,
     status.symbolEmptyDesignation,

@@ -2,10 +2,7 @@ import { readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
 
 const root = resolve(import.meta.dirname, "../..");
-const files = [
-  "schematy/project/CS-TB-48/Zasilanie.svg",
-  "schematy/project/CS-TB-48/Bezpieczenstwo.svg",
-];
+const files = ["schematy/project/CS-TB-48/Zasilanie.svg", "schematy/project/CS-TB-48/Bezpieczenstwo.svg"];
 
 for (const rel of files) {
   const p = resolve(root, rel);

@@ -34,7 +34,7 @@ function rotateDir(dir, angle) {
   const order = ["N", "E", "S", "W"];
   const i = order.indexOf(dir);
   if (i < 0) return "E";
-  return order[(i + Math.round((+angle || 0) / 90) % 4 + 4) % 4];
+  return order[(i + (Math.round((+angle || 0) / 90) % 4) + 4) % 4];
 }
 
 export function createNetlistRouting(ctx) {
@@ -69,7 +69,9 @@ export function createNetlistRouting(ctx) {
     if (!def) return null;
     const aliases = pinAliases(pin);
     return (
-      [...def.querySelectorAll('[data-role="conn"][data-pin]')].find((c) => aliases.includes(pinKey(c.getAttribute("data-pin")))) || null
+      [...def.querySelectorAll('[data-role="conn"][data-pin]')].find((c) =>
+        aliases.includes(pinKey(c.getAttribute("data-pin")))
+      ) || null
     );
   }
 
@@ -80,7 +82,9 @@ export function createNetlistRouting(ctx) {
     const ref = NetlistModel.normalizeRef(endpoint.ref);
     const aliases = pinAliases(endpoint.pin);
     const direct = [...node.querySelectorAll('[data-role="conn"][data-ref]')].find(
-      (c) => NetlistModel.normalizeRef(c.getAttribute("data-ref")) === ref && aliases.includes(pinKey(c.getAttribute("data-pin")))
+      (c) =>
+        NetlistModel.normalizeRef(c.getAttribute("data-ref")) === ref &&
+        aliases.includes(pinKey(c.getAttribute("data-pin")))
     );
     if (direct) {
       return {
@@ -95,7 +99,9 @@ export function createNetlistRouting(ctx) {
         pin: direct.getAttribute("data-pin"),
       };
     }
-    const instances = [...node.querySelectorAll("use[data-ref]")].filter((u) => NetlistModel.normalizeRef(u.getAttribute("data-ref")) === ref);
+    const instances = [...node.querySelectorAll("use[data-ref]")].filter(
+      (u) => NetlistModel.normalizeRef(u.getAttribute("data-ref")) === ref
+    );
     if (!instances.length) return { ok: false, reason: "brak instancji " + ref };
     for (const use of instances) {
       const conn = connForPin(definitionForUse(use, sheet.svg), endpoint.pin);

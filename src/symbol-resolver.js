@@ -16,9 +16,7 @@ export function libSymbolGroups(svg) {
 export function resolveLibSymbol(libSvg, id) {
   if (!libSvg || !id) return null;
   const canon = canonicalSymbolId(id);
-  return (
-    libSymbolGroups(libSvg).find((g) => g.id === canon || g.id === id) || null
-  );
+  return libSymbolGroups(libSvg).find((g) => g.id === canon || g.id === id) || null;
 }
 
 export function resolveSheetSymbol(sheetSvg, id) {
@@ -27,12 +25,7 @@ export function resolveSheetSymbol(sheetSvg, id) {
   if (!defs) return null;
   const canon = canonicalSymbolId(id);
   return (
-    [...defs.children].find(
-      (n) =>
-        n.tagName?.toLowerCase() === "g" &&
-        n.id &&
-        (n.id === canon || n.id === id)
-    ) || null
+    [...defs.children].find((n) => n.tagName?.toLowerCase() === "g" && n.id && (n.id === canon || n.id === id)) || null
   );
 }
 
@@ -56,26 +49,6 @@ export function stripSheetEmbeddedSymbols(sheetSvg, libSvg) {
     const canon = canonicalSymbolId(id);
     if (libIds.has(id) || libIds.has(canon)) {
       g.remove();
-      changed = true;
-    }
-  });
-  return changed;
-}
-
-export function syncUseSymbolHrefs(root) {
-  if (!root) return false;
-  let changed = false;
-  root.querySelectorAll("use").forEach((use) => {
-    const raw = (use.getAttribute("href") || use.getAttributeNS(XLINK, "href") || "").replace(/^#/, "");
-    if (!raw) return;
-    const canon = canonicalSymbolId(raw);
-    if (canon !== raw) {
-      use.setAttribute("href", "#" + canon);
-      use.setAttributeNS(XLINK, "xlink:href", "#" + canon);
-      changed = true;
-    }
-    if (use.getAttribute("data-sym") !== canon) {
-      use.setAttribute("data-sym", canon);
       changed = true;
     }
   });

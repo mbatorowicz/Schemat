@@ -50,7 +50,15 @@ export function createSheetDocument(opts) {
 
   return {
     ok: true,
-    sheet: { handle: null, name: name.split("/").pop() || name, relPath: name, svg: parsed.svg, doc: parsed.doc, id, dirty: true },
+    sheet: {
+      handle: null,
+      name: name.split("/").pop() || name,
+      relPath: name,
+      svg: parsed.svg,
+      doc: parsed.doc,
+      id,
+      dirty: true,
+    },
     id,
     name,
   };

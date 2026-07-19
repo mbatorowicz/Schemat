@@ -1,28 +1,18 @@
 /** Zapis parametrów symbolu — nazwa wyświetlana + oznaczenie (id SVG) + domyślna numeracja na schemacie. */
 
-
-
 import { libSymbolGroups } from "./symbol-resolver.js";
 import { symbolEffectiveDisplayName, symbolListSubtitle } from "./symbol-display.js";
 import { status as Wstatus } from "./ui-wording.js";
-
-
 
 /** Nazwa widoczna w UI (listy). Osobno od oznaczenia technicznego. */
 
 export const SYMBOL_NAME_ATTR = "data-symbol-name";
 
-
-
 export function symbolDisplayName(node) {
-
   if (!node?.getAttribute) return "";
 
   return (node.getAttribute(SYMBOL_NAME_ATTR) || "").trim();
-
 }
-
-
 
 /** Etykieta główna w listach i nagłówku zaznaczenia. Nazwa > oznaczenie > id. */
 export function symbolCatalogLabel(node, id = "") {
@@ -41,8 +31,6 @@ export function symbolListPrimaryLabel(node, id) {
   return symbolCatalogLabel(node, id);
 }
 
-
-
 /** Oznaczenie techniczne typu elementu (B, SK, SB…) — wspólne dla wielu symboli w bibliotece. */
 export function symbolDesignation(node, fallbackId = "") {
   if (!node) return fallbackId || "";
@@ -50,37 +38,23 @@ export function symbolDesignation(node, fallbackId = "") {
   return fromAttr || node.id || fallbackId || "";
 }
 
-
-
 export function isValidSymbolDisplayName(v) {
-
   const s = (v || "").trim();
 
   return s.length >= 1 && s.length <= 120;
-
 }
-
-
 
 /** Id techniczne / oznaczenie (href SVG) — litery, cyfry, _, - */
 
 export function isValidSymbolName(v) {
-
   return !!v && /^[\p{L}_][\p{L}\p{N}_\-]*$/u.test(v);
-
 }
 
-
-
 export function libSymbolIdExists(libSvg, id, exceptId) {
-
   if (!libSvg || !id) return false;
 
   return libSymbolGroups(libSvg).some((g) => g.id === id && g.id !== exceptId);
-
 }
-
-
 
 /**
 
@@ -112,7 +86,13 @@ export function applySymbolDisplayName(sym, title) {
   if (!node) return { ok: false, message: Wstatus.symbolPickLibrary };
   const prev = symbolDisplayName(node);
   if (t === prev) {
-    return { ok: true, unchanged: true, title: t, prev, message: Wstatus.symbolSaved(t, symbolDesignation(node, sym.id)) };
+    return {
+      ok: true,
+      unchanged: true,
+      title: t,
+      prev,
+      message: Wstatus.symbolSaved(t, symbolDesignation(node, sym.id)),
+    };
   }
   node.setAttribute(SYMBOL_NAME_ATTR, t);
   return {
@@ -124,7 +104,6 @@ export function applySymbolDisplayName(sym, title) {
 }
 
 export function applySymbolForm(ctx) {
-
   const { sym, libSvg, sheets, form, rewriteSymbolIdRefs, XLINK } = ctx;
 
   const node = sym.node;
@@ -137,18 +116,12 @@ export function applySymbolForm(ctx) {
 
   const prevDisplay = symbolDisplayName(node);
 
-
-
   if (!isValidSymbolDisplayName(name)) {
-
     return { ok: false, message: Wstatus.symbolInvalidName };
-
   }
 
   if (!designation) {
-
     return { ok: false, message: Wstatus.symbolEmptyDesignation };
-
   }
 
   if (!isValidSymbolName(designation)) {
@@ -156,8 +129,7 @@ export function applySymbolForm(ctx) {
   }
 
   let idChanged = false;
-  const canRenameId =
-    designation !== oldId && !libSymbolIdExists(libSvg, designation, oldId);
+  const canRenameId = designation !== oldId && !libSymbolIdExists(libSvg, designation, oldId);
 
   if (canRenameId) {
     rewriteSymbolIdRefs(libSvg, oldId, designation, XLINK);
@@ -188,8 +160,6 @@ export function applySymbolForm(ctx) {
   };
 }
 
-
-
 /**
  * Formularz oznaczenia/numeracji z toolbara.
  * Nazwa wyświetlana jest na liście — przekaż `fallbackName` (z atrybutu symbolu).
@@ -207,5 +177,3 @@ export function readSymbolFormFromDom(doc = document, { fallbackName = "" } = {}
     start: parseInt(startEl?.value, 10) || 1,
   };
 }
-
-

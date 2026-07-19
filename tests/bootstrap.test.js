@@ -19,7 +19,6 @@ describe("app-bootstrap", () => {
         routeFn = vi.fn();
       },
       wireSelectionModel: () => {},
-      initTextBar: () => {},
       syncSelectionToolbar: () => {},
       syncToolbarContext: () => {},
       refreshNetlistUI: () => {},

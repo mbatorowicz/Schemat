@@ -1,12 +1,7 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  pickJsonCache,
-  readJsonCache,
-  writeJsonCache,
-  idbSet,
-} from "../src/persistence.js";
+import { pickJsonCache, readJsonCache, writeJsonCache, idbSet } from "../src/persistence.js";
 import { shouldWriteProjectCache, projectCacheScore } from "../src/boot-cache.js";
 
 describe("pickJsonCache", () => {
@@ -50,6 +45,8 @@ describe("readJsonCache", () => {
 
   it("shouldWriteProjectCache chroni przed pustym nadpisaniem", () => {
     expect(shouldWriteProjectCache({ sheets: [] }, { sheets: [{ id: "a", text: "x" }] })).toBe(false);
-    expect(shouldWriteProjectCache({ sheets: [{ id: "b", text: "yy" }] }, { sheets: [{ id: "a", text: "x" }] })).toBe(true);
+    expect(shouldWriteProjectCache({ sheets: [{ id: "b", text: "yy" }] }, { sheets: [{ id: "a", text: "x" }] })).toBe(
+      true
+    );
   });
 });

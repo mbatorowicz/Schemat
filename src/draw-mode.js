@@ -105,7 +105,14 @@ export function createDrawMode(deps) {
     const out = [];
     [...node.children].forEach((el) => {
       if (isConnGroup(el) && el.getAttribute("data-ref")) {
-        pushConnContactCandidates(out, el, (x, y) => [x, y], el.getAttribute("data-ref"), el.getAttribute("data-pin"), el);
+        pushConnContactCandidates(
+          out,
+          el,
+          (x, y) => [x, y],
+          el.getAttribute("data-ref"),
+          el.getAttribute("data-pin"),
+          el
+        );
         return;
       }
       if (el.tagName.toLowerCase() !== "use" || !el.getAttribute("data-ref")) return;
@@ -116,7 +123,14 @@ export function createDrawMode(deps) {
       const ref = el.getAttribute("data-ref");
       if (!def) return;
       [...def.querySelectorAll('[data-role="conn"]')].forEach((c) => {
-        pushConnContactCandidates(out, c, (x, y) => rotatePoint(ux + x, uy + y, ux, uy, angle), ref, c.getAttribute("data-pin"), el);
+        pushConnContactCandidates(
+          out,
+          c,
+          (x, y) => rotatePoint(ux + x, uy + y, ux, uy, angle),
+          ref,
+          c.getAttribute("data-pin"),
+          el
+        );
       });
     });
     return out;
@@ -239,7 +253,12 @@ export function createDrawMode(deps) {
       state.selection = [conn];
       state.activeEl = conn;
       render();
-      setStatus("Dodano złącze " + (conn.getAttribute("data-ref") ? conn.getAttribute("data-ref") + ":" : "") + conn.getAttribute("data-pin") + ".");
+      setStatus(
+        "Dodano złącze " +
+          (conn.getAttribute("data-ref") ? conn.getAttribute("data-ref") + ":" : "") +
+          conn.getAttribute("data-pin") +
+          "."
+      );
       return;
     }
     exitDraw();
@@ -345,7 +364,8 @@ export function createDrawMode(deps) {
       if (node) {
         pushUndo();
         let el;
-        if (pts.length === 2) el = mkEl("line", { x1: pts[0][0], y1: pts[0][1], x2: pts[1][0], y2: pts[1][1], class: "sym" });
+        if (pts.length === 2)
+          el = mkEl("line", { x1: pts[0][0], y1: pts[0][1], x2: pts[1][0], y2: pts[1][1], class: "sym" });
         else el = mkEl("polyline", { points: pts.map((p) => p.join(",")).join(" "), class: "sym" });
         styleLine(el);
         const a = snaps[0];

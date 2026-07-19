@@ -22,26 +22,34 @@ export function useColorAwareClone(node) {
       })
       .replace(/(\.node\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
         const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0 ? all : prefix + "fill:var(--object-stroke," + value + ")";
+        return value === "none" || value.indexOf("var(") >= 0
+          ? all
+          : prefix + "fill:var(--object-stroke," + value + ")";
       })
       .replace(/(\.pin\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
         const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0 ? all : prefix + "fill:var(--object-stroke," + value + ")";
+        return value === "none" || value.indexOf("var(") >= 0
+          ? all
+          : prefix + "fill:var(--object-stroke," + value + ")";
       })
       .replace(/(\.did\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
         const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0 ? all : prefix + "fill:var(--object-stroke," + value + ")";
+        return value === "none" || value.indexOf("var(") >= 0
+          ? all
+          : prefix + "fill:var(--object-stroke," + value + ")";
       });
     return clone;
   }
   [clone, ...clone.querySelectorAll("*")].forEach((n) => {
     const attr = n.getAttribute && n.getAttribute("stroke");
-    if (attr && attr !== "none" && attr.indexOf("var(") < 0) n.setAttribute("stroke", "var(--object-stroke," + attr + ")");
+    if (attr && attr !== "none" && attr.indexOf("var(") < 0)
+      n.setAttribute("stroke", "var(--object-stroke," + attr + ")");
     if (n.style && n.style.stroke && n.style.stroke !== "none" && n.style.stroke.indexOf("var(") < 0)
       n.style.stroke = "var(--object-stroke," + n.style.stroke + ")";
     if (n.classList && (n.classList.contains("node") || n.classList.contains("pin") || n.classList.contains("did"))) {
       const fill = n.getAttribute("fill");
-      if (fill && fill !== "none" && fill.indexOf("var(") < 0) n.setAttribute("fill", "var(--object-stroke," + fill + ")");
+      if (fill && fill !== "none" && fill.indexOf("var(") < 0)
+        n.setAttribute("fill", "var(--object-stroke," + fill + ")");
       if (n.style && n.style.fill && n.style.fill !== "none" && n.style.fill.indexOf("var(") < 0)
         n.style.fill = "var(--object-stroke," + n.style.fill + ")";
     }
@@ -98,8 +106,7 @@ export function appendEditDefSymbol(id, editDefs, added, { libSvg, sheetSvg, xli
 export function assembleEditDefs(editDefs, opts) {
   const { libSvg, sheetSvg, sheetNode, xlinkNs, libraryPreview = false } = opts;
   editDefs.innerHTML = "";
-  const styleEl =
-    (libSvg && libSvg.querySelector("defs style")) || (sheetSvg && sheetSvg.querySelector("defs style"));
+  const styleEl = (libSvg && libSvg.querySelector("defs style")) || (sheetSvg && sheetSvg.querySelector("defs style"));
   if (styleEl) editDefs.appendChild(useColorAwareClone(styleEl));
 
   const added = new Set();

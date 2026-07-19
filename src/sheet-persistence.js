@@ -34,14 +34,7 @@ export function preserveDirtySheets(previousSheets, loadedSheets) {
  * Nadpisuje tylko top-level definicje symboli obecne w bibliotece.
  */
 export function inlineSheetDefsSafe(sheet, deps) {
-  const {
-    svgNs,
-    libSvg,
-    resolveLibSymbol,
-    resolveSheetSymbol,
-    useColorAwareClone,
-    collectUsedSymbols,
-  } = deps;
+  const { svgNs, libSvg, resolveLibSymbol, resolveSheetSymbol, useColorAwareClone, collectUsedSymbols } = deps;
   const svg = sheet?.svg;
   if (!svg) return { ok: false, reason: "brak svg" };
 

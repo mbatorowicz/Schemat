@@ -31,7 +31,6 @@ export function bootstrapEditorSync(ctx) {
     drawGrid,
     wireNetlistRouting,
     wireSelectionModel,
-    initTextBar,
     syncSelectionToolbar,
     syncToolbarContext,
     refreshNetlistUI,
@@ -52,8 +51,7 @@ export function bootstrapEditorSync(ctx) {
       if (fn) fn();
     };
   }
-  initTextBar();
   syncSelectionToolbar();
   syncToolbarContext();
-  if(typeof refreshNetlistUI==="function") refreshNetlistUI();
+  if (typeof refreshNetlistUI === "function") refreshNetlistUI();
 }

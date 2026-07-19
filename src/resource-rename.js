@@ -1,10 +1,12 @@
 /** Rename plików projektu / schematu / biblioteki na dysku. */
 
-import { normalizeRelPath, sheetBasename, netlistNamesForSheet } from "./project-files.js";
+import { normalizeRelPath } from "./project-files.js";
 import { status as Wstatus } from "./ui-wording.js";
 
 export function sheetBaseNameFromInput(v) {
-  const s = String(v || "").trim().replace(/\.svg$/i, "");
+  const s = String(v || "")
+    .trim()
+    .replace(/\.svg$/i, "");
   if (!s) return { ok: false, message: Wstatus.resourceEmpty };
   if (!/^[\p{L}\p{N}_\-]+$/u.test(s)) return { ok: false, message: Wstatus.resourceInvalidSheet };
   return { ok: true, value: s };
@@ -62,57 +64,6 @@ async function renameFileViaCopy(dir, oldHandle, oldRelPath, newFileName, readWr
   return { handle: newHandle, relPath: normalizeRelPath(newRel) };
 }
 
-/**
- * @param {{ sheet: object, newBase: string, dir: FileSystemDirectoryHandle, readWrite: object }} opts
- */
-export async function renameSheetOnDisk({ sheet, newBase, dir, readWrite }) {
-  const parsed = sheetBaseNameFromInput(newBase);
-  if (!parsed.ok) return parsed;
-  const newName = `${parsed.value}.svg`;
-  if (sheet.name === newName) return { ok: true, unchanged: true, sheet };
-
-  const oldBase = sheetBasename(sheet.name);
-  const oldHandle = sheet.handle;
-  if (!oldHandle || !dir) return { ok: false, message: "Brak uchwytu pliku schematu." };
-
-  let handle = oldHandle;
-  let relPath = sheet.relPath || sheet.name;
-
-  const moved = await tryHandleMove(oldHandle, newName);
-  if (moved) {
-    sheet.name = newName;
-    if (sheet.relPath) {
-      const dirPart = sheet.relPath.includes("/") ? sheet.relPath.replace(/\/[^/]+$/, "/") : "";
-      sheet.relPath = normalizeRelPath(dirPart + newName);
-      relPath = sheet.relPath;
-    } else sheet.relPath = newName;
-  } else {
-    const rw = await renameFileViaCopy(dir, oldHandle, relPath, newName, readWrite);
-    handle = rw.handle;
-    relPath = rw.relPath;
-    sheet.name = newName;
-    sheet.relPath = relPath;
-    sheet.handle = handle;
-  }
-
-  for (const nlName of netlistNamesForSheet(oldBase + ".svg")) {
-    try {
-      const nlHandle = await dir.getFileHandle(nlName);
-      const newNl = netlistNamesForSheet(newName)[0];
-      await tryHandleMove(nlHandle, newNl);
-    } catch {
-      /* brak spisu — OK */
-    }
-  }
-
-  sheet.dirty = true;
-  return {
-    ok: true,
-    sheet,
-    message: Wstatus.sheetRenamed(oldBase, parsed.value),
-  };
-}
-
 export async function renameLibraryOnDisk({ lib, newFileName, dir, settingsCfg, readWrite }) {
   const parsed = libraryFileNameFromInput(newFileName);
   if (!parsed.ok) return parsed;
@@ -129,9 +80,7 @@ export async function renameLibraryOnDisk({ lib, newFileName, dir, settingsCfg, 
     lib.handle = rw.handle;
     settingsCfg.library = rw.relPath;
   } else {
-    const dirPart = settingsCfg.library?.includes("/")
-      ? settingsCfg.library.replace(/\/[^/]+$/, "/")
-      : "";
+    const dirPart = settingsCfg.library?.includes("/") ? settingsCfg.library.replace(/\/[^/]+$/, "/") : "";
     settingsCfg.library = normalizeRelPath(dirPart + parsed.value);
   }
 

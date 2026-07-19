@@ -3,97 +3,61 @@
 import { describe, it, expect } from "vitest";
 
 import {
-
   applySymbolForm,
-
   isValidSymbolName,
-
   isValidSymbolDisplayName,
-
   libSymbolIdExists,
-
   symbolDisplayName,
-
   symbolDesignation,
-
   symbolListPrimaryLabel,
-
   symbolCatalogLabel,
-
   symbolCatalogSubtitle,
-
   SYMBOL_NAME_ATTR,
-
 } from "../src/symbol-save.js";
 
 import { normalizeLibLayout } from "../src/library-loader.js";
 
 import { refBaseForSymbol } from "../src/instance-refs.js";
 
-
-
 function mockSym(id, attrs = {}) {
-
   const node = {
-
     id,
 
     tagName: "g",
 
     getAttribute(n) {
-
       return attrs[n] ?? null;
-
     },
 
     setAttribute(n, v) {
-
       attrs[n] = v;
-
     },
 
     removeAttribute(n) {
-
       delete attrs[n];
-
     },
-
   };
 
   return { node };
-
 }
 
-
-
 function mockLibSvg(groups = []) {
-
   const defs = { children: groups };
 
   return {
-
     querySelector(sel) {
-
       return sel === "defs" ? defs : null;
-
     },
-
   };
-
 }
 
-
-
 describe("applySymbolForm", () => {
-
   it("zapisuje nazwę wyświetlaną, oznaczenie (id SVG) i numerację w jednym kroku", () => {
-
     const sym = mockSym("B1", {});
 
     const rewrites = [];
 
     const result = applySymbolForm({
-
       sym,
 
       libSvg: mockLibSvg([sym.node]),
@@ -105,7 +69,6 @@ describe("applySymbolForm", () => {
       rewriteSymbolIdRefs: (svg, a, b) => rewrites.push([a, b]),
 
       XLINK: "http://www.w3.org/1999/xlink",
-
     });
 
     expect(result.ok).toBe(true);
@@ -125,19 +88,13 @@ describe("applySymbolForm", () => {
     expect(rewrites).toEqual([["B1", "B"]]);
 
     expect(result.newId).toBe("B");
-
   });
 
-
-
   it("odrzuca pustą nazwę lub oznaczenie", () => {
-
     const sym = mockSym("A", {});
 
     expect(
-
       applySymbolForm({
-
         sym,
 
         libSvg: mockLibSvg([sym.node]),
@@ -149,15 +106,11 @@ describe("applySymbolForm", () => {
         rewriteSymbolIdRefs: () => {},
 
         XLINK: "",
-
       }).ok
-
     ).toBe(false);
 
     expect(
-
       applySymbolForm({
-
         sym,
 
         libSvg: mockLibSvg([sym.node]),
@@ -169,21 +122,14 @@ describe("applySymbolForm", () => {
         rewriteSymbolIdRefs: () => {},
 
         XLINK: "",
-
       }).ok
-
     ).toBe(false);
-
   });
 
-
-
   it("akceptuje nazwę ze spacją — oznaczenie bez spacji staje się id SVG", () => {
-
     const sym = mockSym("B1", {});
 
     const result = applySymbolForm({
-
       sym,
 
       libSvg: mockLibSvg([sym.node]),
@@ -195,7 +141,6 @@ describe("applySymbolForm", () => {
       rewriteSymbolIdRefs: () => {},
 
       XLINK: "",
-
     });
 
     expect(result.ok).toBe(true);
@@ -203,7 +148,6 @@ describe("applySymbolForm", () => {
     expect(sym.node.id).toBe("B");
 
     expect(sym.node.getAttribute(SYMBOL_NAME_ATTR)).toBe("Czujnik Fotooptyczn");
-
   });
 
   it("pozwala wielu symbolom mieć wspólne oznaczenie SB bez zmiany id SVG", () => {
@@ -225,21 +169,14 @@ describe("applySymbolForm", () => {
     expect(rewrites).toEqual([]);
     expect(result.newId).toBe("przycisk-stop");
   });
-
 });
 
-
-
 describe("symbolDisplayName / symbolDesignation", () => {
-
   it("rozdziela nazwę wyświetlaną od oznaczenia technicznego", () => {
-
     const sym = mockSym("B", {
-
       [SYMBOL_NAME_ATTR]: "Czujnik",
 
       "data-inst-prefix": "B",
-
     });
 
     expect(symbolDisplayName(sym.node)).toBe("Czujnik");
@@ -251,17 +188,13 @@ describe("symbolDisplayName / symbolDesignation", () => {
     const skLabel = symbolListPrimaryLabel(mockSym("SK", {}).node, "SK");
     expect(skLabel).toBe("SK");
     expect(symbolCatalogSubtitle(mockSym("SK", {}).node, "SK")).toBe("");
-
   });
 
   it("preferuje oznaczenie nad legacy id B1 w liście", () => {
-
     const sym = mockSym("B1", {
-
       "data-inst-prefix": "B",
 
       [SYMBOL_NAME_ATTR]: "Czujnik fotooptyczny",
-
     });
 
     expect(symbolCatalogLabel(sym.node, sym.node.id)).toBe("Czujnik fotooptyczny");
@@ -273,45 +206,27 @@ describe("symbolDisplayName / symbolDesignation", () => {
     expect(symbolCatalogLabel(bare.node, bare.node.id)).toBe("B");
 
     expect(symbolCatalogSubtitle(bare.node, bare.node.id)).toBe("");
-
   });
-
 });
-
-
 
 describe("isValidSymbolDisplayName", () => {
-
   it("akceptuje nazwy ze spacją", () => {
-
     expect(isValidSymbolDisplayName("Czujnik Fotooptyczn")).toBe(true);
-
   });
-
 });
 
-
-
 describe("isValidSymbolName", () => {
-
   it("akceptuje oznaczenia techniczne B, SK, SB", () => {
-
     expect(isValidSymbolName("B")).toBe(true);
 
     expect(isValidSymbolName("SK")).toBe(true);
 
     expect(isValidSymbolName("Czujnik Fotooptyczn")).toBe(false);
-
   });
-
 });
 
-
-
 describe("libSymbolIdExists", () => {
-
   it("ignoruje id elementów wewnątrz symbolu", () => {
-
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 
     normalizeLibLayout(svg, "http://www.w3.org/2000/svg");
@@ -331,17 +246,11 @@ describe("libSymbolIdExists", () => {
     defs.appendChild(sym);
 
     expect(libSymbolIdExists(svg, "SK", "SK1")).toBe(false);
-
   });
-
 });
 
-
-
 describe("refBaseForSymbol", () => {
-
   it("używa id symbolu jako bazy numeracji na schemacie", () => {
-
     const sym = mockSym("B", { "data-inst-prefix": "B", "data-inst-numbered": "1", "data-inst-start": "1" });
 
     const rule = refBaseForSymbol("B", sym.node);
@@ -349,17 +258,11 @@ describe("refBaseForSymbol", () => {
     expect(rule.base).toBe("B");
 
     expect(rule.numbered).toBe(true);
-
   });
-
 });
 
-
-
 describe("applySymbolForm z DOM biblioteki", () => {
-
   it("B1 → oznaczenie B + nazwa wyświetlana", () => {
-
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
 
     normalizeLibLayout(svg, "http://www.w3.org/2000/svg");
@@ -375,7 +278,6 @@ describe("applySymbolForm z DOM biblioteki", () => {
     const sym = { node: symEl };
 
     const result = applySymbolForm({
-
       sym,
 
       libSvg: svg,
@@ -387,7 +289,6 @@ describe("applySymbolForm z DOM biblioteki", () => {
       rewriteSymbolIdRefs: () => {},
 
       XLINK: "http://www.w3.org/1999/xlink",
-
     });
 
     expect(result.ok).toBe(true);
@@ -397,9 +298,5 @@ describe("applySymbolForm z DOM biblioteki", () => {
     expect(symEl.getAttribute(SYMBOL_NAME_ATTR)).toBe("Czujnik Fotooptyczn");
 
     expect(symEl.getAttribute("data-inst-prefix")).toBe("B");
-
   });
-
 });
-
-

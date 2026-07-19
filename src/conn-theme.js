@@ -16,9 +16,7 @@ export function readConnStrokeWidth(connG, state) {
   if (!connG) return CONN_THEME.strokeWidth;
   const kind = connG.getAttribute("data-kind");
   const isPoint = kind === "point" || kind === "term";
-  const primary = isPoint
-    ? connG.querySelector('[data-part="joint"]')
-    : connG.querySelector('[data-part="stub"]');
+  const primary = isPoint ? connG.querySelector('[data-part="joint"]') : connG.querySelector('[data-part="stub"]');
   const fallback = connG.querySelector('[data-part="stub"]') || connG.querySelector('[data-part="joint"]');
   for (const el of [primary, fallback]) {
     if (!el) continue;

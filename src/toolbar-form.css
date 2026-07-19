@@ -26,13 +26,19 @@
 }
 
 #toolbar .toolbar-form__label {
-  font: 600 11px Arial, Helvetica, sans-serif;
+  font:
+    600 11px Arial,
+    Helvetica,
+    sans-serif;
   color: #475569;
   min-width: 0;
 }
 
 #toolbar .toolbar-form__input {
-  font: 12px Arial, Helvetica, sans-serif;
+  font:
+    12px Arial,
+    Helvetica,
+    sans-serif;
   padding: 3px 5px;
   border: 1px solid #94a3b8;
   background: #fff;
@@ -51,17 +57,21 @@
   width: 44px;
 }
 
+#toolbar .toolbar-form__input--text {
+  width: 160px;
+}
+
 #toolbar .toolbar-form__input--number {
   width: 44px;
 }
 
-#toolbar #instSymInfo {
-  font: 600 11px Arial, Helvetica, sans-serif;
-  color: #64748b;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+#toolbar .toolbar-form__input--dir {
+  width: 48px;
+}
+
+#toolbar .toolbar-form__input--sym {
+  width: 140px;
+  max-width: 180px;
 }
 
 #toolbar .toolbar-form__input--resource {
@@ -75,6 +85,9 @@
 }
 
 #toolbar .toolbar-form__check {
-  font: 11px Arial, Helvetica, sans-serif;
+  font:
+    11px Arial,
+    Helvetica,
+    sans-serif;
   color: #475569;
 }

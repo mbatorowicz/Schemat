@@ -13,6 +13,13 @@ describe("svg-utils sanitize", () => {
     const raw = '<svg><rect id="a" onload="alert(1)"/></svg>';
     expect(sanitizeSvgText(raw)).not.toMatch(/onload/i);
   });
+
+  it("neutralizuje javascript: i data: w href", () => {
+    const js = '<svg><use href="javascript:alert(1)"/></svg>';
+    const data = '<svg><image xlink:href="data:text/html,x"/></svg>';
+    expect(sanitizeSvgText(js)).not.toMatch(/javascript:/i);
+    expect(sanitizeSvgText(data)).not.toMatch(/data:text/i);
+  });
 });
 
 describe("dom-selectors", () => {

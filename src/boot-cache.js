@@ -4,8 +4,7 @@
 export function projectCacheScore(snap) {
   if (!snap) return 0;
   const sheets = snap.sheets?.length ?? 0;
-  const chars =
-    snap.sheets?.reduce((n, sh) => n + String(sh.text || "").length, 0) ?? 0;
+  const chars = snap.sheets?.reduce((n, sh) => n + String(sh.text || "").length, 0) ?? 0;
   return sheets * 1_000_000_000 + chars + (snap.savedAt ?? 0);
 }
 
@@ -33,9 +32,10 @@ export function shouldWriteProjectCache(newSnap, existingSnap) {
   return newScore >= oldScore;
 }
 
-export function shouldWriteLibraryCache(newSnap, existingSnap) {
+export function shouldWriteLibraryCache(newSnap, existingSnap, scoreFloor = 0) {
   const newScore = libraryCacheScore(newSnap);
-  const oldScore = libraryCacheScore(existingSnap);
+  const oldScore = Math.max(libraryCacheScore(existingSnap), scoreFloor);
+  if (newScore === 0 && oldScore === 0) return true;
   if (newScore === 0 && oldScore > 0) return false;
   return newScore >= oldScore;
 }

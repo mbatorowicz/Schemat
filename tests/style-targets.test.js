@@ -10,12 +10,24 @@ import { applyPrimaryColor } from "../src/element-styles.js";
 function mockStyle(initial = {}) {
   const store = { ...initial };
   return {
-    get fill() { return store.fill || ""; },
-    set fill(v) { store.fill = v; },
-    get stroke() { return store.stroke || ""; },
-    set stroke(v) { store.stroke = v; },
-    setProperty(name, value) { store[name] = value; },
-    getPropertyValue(name) { return store[name] || ""; },
+    get fill() {
+      return store.fill || "";
+    },
+    set fill(v) {
+      store.fill = v;
+    },
+    get stroke() {
+      return store.stroke || "";
+    },
+    set stroke(v) {
+      store.stroke = v;
+    },
+    setProperty(name, value) {
+      store[name] = value;
+    },
+    getPropertyValue(name) {
+      return store[name] || "";
+    },
   };
 }
 
@@ -88,10 +100,14 @@ describe("style-targets", () => {
     const stub = { style: mockStyle() };
     const record = { el: g, tag: "g", cs: { stroke: "#000" } };
     const rgbToHex = () => "#aabbcc";
-    const color = primaryColorFromRecord(record, {
-      ...ctx(),
-      connParts: () => ({ stub, joint: stub, label, contacts: [] }),
-    }, { rgbToHex });
+    const color = primaryColorFromRecord(
+      record,
+      {
+        ...ctx(),
+        connParts: () => ({ stub, joint: stub, label, contacts: [] }),
+      },
+      { rgbToHex }
+    );
     expect(color).toBe("#aabbcc");
   });
 

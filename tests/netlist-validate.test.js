@@ -6,8 +6,7 @@ describe("summarizeNetlistHealth", () => {
     const netlist = {
       connections: [{ id: "A" }, { id: "B" }, { id: "C" }],
     };
-    const diag = (r) =>
-      r.id === "B" ? { ok: false, reason: "brak pinu" } : { ok: true, reason: "" };
+    const diag = (r) => (r.id === "B" ? { ok: false, reason: "brak pinu" } : { ok: true, reason: "" });
     const h = summarizeNetlistHealth(netlist, diag);
     expect(h.total).toBe(3);
     expect(h.ok).toBe(2);

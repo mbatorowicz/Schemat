@@ -4,28 +4,28 @@
 
 Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logiki w `main.js`.
 
-| Obszar | Moduł SSOT | Odpowiedzialność |
-|--------|------------|------------------|
-| Symbole, href | `symbol-service.js` | `parseUseHref`, `resolveSymbolDef`, `definitionForUseElement`, `auditSymbolsOnSheet`, migracja refs |
-| Defs podglądu/zapisu | `defs-assembler.js` | `useColorAwareClone`, `assembleEditDefs`, aliasy id |
-| Mapowanie DOM | `dom-pairing.js` | `childPair`, `forEachPaired` — src ↔ klon |
-| Render | `render-pipeline.js` | `rebuildEditDefs`, `rebuildHost`, `bboxInRoot` |
-| Scena DOM | `stage-layers.js` | `createStageLayers`, gettery `host`/`sel`/…, `hostRootFrom` |
-| Boot | `app-bootstrap.js` | kolejność init + `wireSceneDependentModules` |
-| Migracje | `project-migrate.js` | `migrateProject()` — jedna kolejność |
-| Typografia | `element-styles.js` | `applyTextStyle` — bez nadpisywania bez `force` |
-| Złącza | `conn-model.js` + `conn-theme.js` | geometria vs etykieta (`touchLabel`) |
-| Zapis arkusza | `sheet-persistence.js` | `dirty`, `inlineSheetDefsSafe` |
-| Formularze toolbara | `toolbar-form.css` + `toolbar-context.js` | layout pól nazw, widoczność grup |
-| Shell UI | `index.html` `#toolbarMode` + `#toolbarContext` | 2 linie: tryb + kontekst |
-| Wording UI | `ui-wording.js` | etykiety, tooltips, statusy, breadcrumb |
-| Badge zapisu | `save-badge.js` + `project-perm-ui.js` | dirty / perm / ok |
-| Dialogi / toasty | `ui-dialog.js` | confirm, toast, a11y modal |
-| Baner rysowania | `draw-mode-ui.js` | DRAW_HINT / DRAW_LABELS / syncDrawBanner |
-| Tryb rysowania | `draw-mode.js` | startDraw / preview / finishShape / joint snap |
-| Listy sidebara | `sidebar-lists.js` / `sidebar-empty.js` | symbole, arkusze, elementy + empty states |
-| Boot UI | `project-boot.js` | komunikaty startu |
-| Netlista health | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh |
+| Obszar               | Moduł SSOT                                           | Odpowiedzialność                                                                                    |
+| -------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Symbole, href        | `symbol-service.js`                                  | `parseUseHref`, `resolveSymbolDef`, `definitionForUseElement`, `auditSymbolsOnSheet`, migracja refs |
+| Defs podglądu/zapisu | `defs-assembler.js`                                  | `useColorAwareClone`, `assembleEditDefs`, aliasy id                                                 |
+| Mapowanie DOM        | `dom-pairing.js`                                     | `childPair`, `forEachPaired` — src ↔ klon                                                           |
+| Render               | `render-pipeline.js`                                 | `rebuildEditDefs`, `rebuildHost`, `bboxInRoot`                                                      |
+| Scena DOM            | `stage-layers.js`                                    | `createStageLayers`, gettery `host`/`sel`/…, `hostRootFrom`                                         |
+| Boot                 | `app-bootstrap.js`                                   | kolejność init + `wireSceneDependentModules`                                                        |
+| Migracje             | `project-migrate.js`                                 | `migrateProject()` — jedna kolejność                                                                |
+| Typografia           | `element-styles.js`                                  | `applyTextStyle` — bez nadpisywania bez `force`                                                     |
+| Złącza               | `conn-model.js` + `conn-theme.js`                    | geometria vs etykieta (`touchLabel`)                                                                |
+| Zapis arkusza        | `sheet-persistence.js`                               | `dirty`, `inlineSheetDefsSafe`                                                                      |
+| Formularze toolbara  | `toolbar-form.css` + `toolbar-context.js`            | layout pól nazw, widoczność grup                                                                    |
+| Shell UI             | `index.html` `#toolbarMode` + `#toolbarContext`      | 2 linie: tryb + kontekst                                                                            |
+| Wording UI           | `ui-wording.js`                                      | etykiety, tooltips, statusy, breadcrumb                                                             |
+| Badge zapisu         | `save-badge.js` + `project-perm-ui.js`               | dirty / perm / ok                                                                                   |
+| Dialogi / toasty     | `ui-dialog.js`                                       | confirm, toast, a11y modal                                                                          |
+| Baner rysowania      | `draw-mode-ui.js`                                    | DRAW_HINT / DRAW_LABELS / syncDrawBanner                                                            |
+| Tryb rysowania       | `draw-mode.js`                                       | startDraw / preview / finishShape / joint snap                                                      |
+| Listy sidebara       | `sidebar-lists.js` / `sidebar-empty.js`              | symbole, arkusze, elementy + empty states                                                           |
+| Boot UI              | `project-boot.js`                                    | komunikaty startu                                                                                   |
+| Netlista health      | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh                                                                     |
 
 ## Przepływ symboli (nie psuj tego łańcucha)
 
@@ -44,6 +44,7 @@ inlineSheetDefsSafe()     ← osadza używane symbole z biblioteki
 ```
 
 **Reguły:**
+
 - Podgląd: zawsze `assembleEditDefs` — nigdy ręczne klonowanie symboli w `main.js`
 - Snap/netlista: zawsze `definitionForUseElement(use, lib, sheetSvg)`
 - Zapis: zawsze `useColorAwareClone` z `defs-assembler.js`
@@ -67,6 +68,7 @@ cd Schemat && npm test
 ```
 
 Kluczowe scenariusze ręczne:
+
 1. Otwórz CS-TB-48 → arkusze Zasilanie/Bezpieczenstwo/Enable/Naped/Zator; symbole G1, F1, SK1, Q widoczne na Zasilaniu
 2. Przełącz arkusz → netlista `polaczenia_<arkusz>.md` ładuje się automatycznie
 3. Przycisk **Trasuj** — trasuje wybrane połączenie (nie `undefined` onclick)

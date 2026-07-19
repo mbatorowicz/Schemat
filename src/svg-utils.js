@@ -17,6 +17,9 @@ export function sanitizeSvgText(text) {
   s = s.replace(/<script[\s\S]*?<\/script>/gi, "");
   s = s.replace(/<foreignObject[\s\S]*?<\/foreignObject>/gi, "");
   s = s.replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // javascript: / data: w href i xlink:href (use, image, a)
+  s = s.replace(/\s(xlink:href|href)\s*=\s*("|')\s*(javascript:|data:)/gi, " $1=$2#");
+  s = s.replace(/\s(xlink:href|href)\s*=\s*(javascript:|data:)[^\s>]*/gi, ' $1="#"');
   return s;
 }
 

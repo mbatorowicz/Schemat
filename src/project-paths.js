@@ -1,11 +1,6 @@
 /** Ścieżki w projekcie — dowolny układ folderów, względne odnośniki w projekt.json. */
 
-import {
-  normalizeRelPath,
-  LIBRARY_FILE_NAMES,
-  LIBRARY_DIR,
-  walkDir,
-} from "./project-files.js";
+import { normalizeRelPath, LIBRARY_FILE_NAMES, LIBRARY_DIR, walkDir } from "./project-files.js";
 
 export const DEFAULT_WALK_DEPTH = 12;
 

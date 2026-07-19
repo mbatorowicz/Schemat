@@ -121,6 +121,10 @@ for (const r of report) console.log(`  ${String(r.action).padEnd(22)} ${r.id}`);
 const uses = [...reference.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]);
 const libIds = new Set([...lib.matchAll(/<g id="([^"]+)"/g)].map((m) => m[1]));
 const missing = [...new Set(uses)].filter((u) => u !== "sch-1" && !libIds.has(u));
-console.log(missing.length ? `\nBrakujące w bibliotece: ${missing.join(", ")}` : "\nWszystkie href z arkusza są w bibliotece.");
+console.log(
+  missing.length ? `\nBrakujące w bibliotece: ${missing.join(", ")}` : "\nWszystkie href z arkusza są w bibliotece."
+);
 console.log(`\nSymbole w defs wzorca: ${[...refIds].join(", ")}`);
-console.log(`SK1 na arkuszu: ${reference.includes('data-ref="SK1"') && reference.includes('href="#NO"') ? "instancja #NO ✓" : "?"}`);
+console.log(
+  `SK1 na arkuszu: ${reference.includes('data-ref="SK1"') && reference.includes('href="#NO"') ? "instancja #NO ✓" : "?"}`
+);

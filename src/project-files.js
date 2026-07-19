@@ -1,7 +1,7 @@
 /** Konwencja powiązań plików projektu (nazwa arkusza ↔ spis połączeń ↔ biblioteka). */
 
 export function sheetBasename(nameOrSheet) {
-  const name = typeof nameOrSheet === "string" ? nameOrSheet : (nameOrSheet?.name || "");
+  const name = typeof nameOrSheet === "string" ? nameOrSheet : nameOrSheet?.name || "";
   return name.replace(/\.svg$/i, "").trim();
 }
 

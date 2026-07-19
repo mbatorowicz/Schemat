@@ -124,7 +124,11 @@ export function primaryColorFromRecord(record, ctx, helpers = {}) {
   }
 
   if (record.tag === "use" && sceneDefs) {
-    const href = (record.el.getAttribute("href") || record.el.getAttributeNS?.("http://www.w3.org/1999/xlink", "href") || "").replace(/^#/, "");
+    const href = (
+      record.el.getAttribute("href") ||
+      record.el.getAttributeNS?.("http://www.w3.org/1999/xlink", "href") ||
+      ""
+    ).replace(/^#/, "");
     const def = [...sceneDefs.querySelectorAll("[id]")].find((n) => n.id === href);
     if (def) {
       for (const n of [def, ...def.querySelectorAll("*")]) {

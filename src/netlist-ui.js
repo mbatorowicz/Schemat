@@ -30,14 +30,7 @@ export function createNetlistLiveValidator({ refreshNetlistUI, debounceMs = 180 
  * UI i ładowanie spisu połączeń — wydzielone z main.js.
  */
 export function createNetlistUi(deps) {
-  const {
-    getState,
-    setStatus,
-    connectionDiagnostics,
-    collectNetlistProposals,
-    saveProject,
-    getSettingsCfg,
-  } = deps;
+  const { getState, setStatus, connectionDiagnostics, collectNetlistProposals, saveProject, getSettingsCfg } = deps;
 
   function refreshNetlistUI() {
     const state = getState();

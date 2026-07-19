@@ -114,7 +114,13 @@ export function parsePathAbs(d) {
         }
         cx = x;
         cy = y;
-        segs.push({ cmd: "Q", pts: [{ x: x1, y: y1, role: "ctrl" }, { x, y, role: "anchor" }] });
+        segs.push({
+          cmd: "Q",
+          pts: [
+            { x: x1, y: y1, role: "ctrl" },
+            { x, y, role: "anchor" },
+          ],
+        });
       }
     } else if (C === "C") {
       while (i < toks.length && !/[a-zA-Z]/.test(toks[i])) {

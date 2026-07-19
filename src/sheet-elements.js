@@ -1,5 +1,5 @@
 /** Lista elementów arkusza i opis właściwości do panelu bocznego. */
-import { qsByOwnerRef } from "./dom-selectors.js";
+import { qsByOwnerRef, qsaByOwnerRef } from "./dom-selectors.js";
 
 const SHEET_CHROME_CLASSES = new Set(["fr", "fr2", "ttl", "sub", "tb", "tbb"]);
 
@@ -16,6 +16,93 @@ export function isSheetChromeElement(el) {
 export function schematicSheetChildren(node) {
   if (!node || !node.children) return [];
   return [...node.children].filter((el) => !isSheetChromeElement(el));
+}
+
+/** Oznaczenie instancji łączące use + etykiety + złącza (data-ref / data-owner-ref). */
+export function instanceRefOf(el) {
+  if (!el?.getAttribute) return "";
+  if (isConnGroupEl(el)) return (el.getAttribute("data-ref") || "").trim();
+  const tag = el.tagName ? el.tagName.toLowerCase() : "";
+  if (tag === "use") return (el.getAttribute("data-ref") || "").trim();
+  if (tag === "text") return (el.getAttribute("data-owner-ref") || "").trim();
+  return "";
+}
+
+/** Członkowie jednej instancji na arkuszu (dzieci węzła schematu). */
+export function collectInstanceMembers(node, ref) {
+  const r = String(ref || "").trim();
+  if (!node?.children || !r) return [];
+  const seen = new Set();
+  const out = [];
+  const push = (el) => {
+    if (!el || seen.has(el) || el.parentNode !== node) return;
+    seen.add(el);
+    out.push(el);
+  };
+  [...node.children].forEach((el) => {
+    if (el.tagName && el.tagName.toLowerCase() === "use" && (el.getAttribute("data-ref") || "").trim() === r) {
+      push(el);
+    }
+  });
+  qsaByOwnerRef(node, r).forEach(push);
+  [...node.children].forEach((el) => {
+    if (isConnGroupEl(el) && (el.getAttribute("data-ref") || "").trim() === r) push(el);
+  });
+  return out;
+}
+
+/**
+ * Grupuje elementy listy: instancje (wspólny ref, ≥2 człony lub jest use) oraz singletony.
+ * Kolejność = pierwsze wystąpienie w dokumencie.
+ */
+export function groupSchematicElements(children) {
+  const list = Array.isArray(children) ? children : [];
+  const byRef = new Map();
+  list.forEach((el, i) => {
+    const ref = instanceRefOf(el);
+    if (!ref) return;
+    if (!byRef.has(ref)) byRef.set(ref, []);
+    byRef.get(ref).push({ el, i });
+  });
+
+  const groupedRefs = new Set();
+  byRef.forEach((items, ref) => {
+    const hasUse = items.some(({ el }) => el.tagName && el.tagName.toLowerCase() === "use");
+    if (hasUse || items.length >= 2) groupedRefs.add(ref);
+  });
+
+  const used = new Set();
+  const groups = [];
+  list.forEach((el, index) => {
+    if (used.has(el)) return;
+    const ref = instanceRefOf(el);
+    if (ref && groupedRefs.has(ref)) {
+      const members = byRef.get(ref).map((x) => x.el);
+      members.forEach((m) => used.add(m));
+      groups.push({ type: "instance", ref, members, index });
+    } else {
+      used.add(el);
+      groups.push({ type: "singleton", el, members: [el], index });
+    }
+  });
+  return groups;
+}
+
+/** Rozszerza listę elementów o pełne zestawy instancji (po data-ref). */
+export function expandToInstanceMembers(node, els) {
+  const out = [];
+  const seen = new Set();
+  (els || []).forEach((el) => {
+    if (!el) return;
+    const ref = instanceRefOf(el);
+    const pack = ref ? collectInstanceMembers(node, ref) : [el];
+    pack.forEach((m) => {
+      if (!m || seen.has(m)) return;
+      seen.add(m);
+      out.push(m);
+    });
+  });
+  return out;
 }
 
 function ownerLabelForRef(parent, ref) {
@@ -36,7 +123,7 @@ const KIND_LABELS = {
   node: "Węzeł",
   connLead: "Złącze · kreska",
   connPoint: "Złącze · punkt",
-  other: "Element"
+  other: "Element",
 };
 
 export function isConnGroupEl(el) {
@@ -65,7 +152,8 @@ export function kindDisplay(kind) {
 }
 
 function symId(el) {
-  const href = el.getAttribute("href") || (el.getAttributeNS && el.getAttributeNS("http://www.w3.org/1999/xlink", "href")) || "";
+  const href =
+    el.getAttribute("href") || (el.getAttributeNS && el.getAttributeNS("http://www.w3.org/1999/xlink", "href")) || "";
   return href.replace(/^#/, "");
 }
 
@@ -110,7 +198,8 @@ function num(el, a) {
 function geomSummary(el, kind) {
   const t = el.tagName ? el.tagName.toLowerCase() : "";
   if (kind === "use" || t === "text") {
-    const x = num(el, "x"), y = num(el, "y");
+    const x = num(el, "x"),
+      y = num(el, "y");
     const ang = el.getAttribute("data-ang");
     const parts = [];
     if (x != null && y != null) parts.push(`x=${x}, y=${y}`);
@@ -149,7 +238,9 @@ function geomSummary(el, kind) {
 
 function styleRows(el) {
   const rows = [];
-  const push = (k, v) => { if (v != null && v !== "" && v !== "none") rows.push([k, v]); };
+  const push = (k, v) => {
+    if (v != null && v !== "" && v !== "none") rows.push([k, v]);
+  };
   push("class", el.getAttribute("class"));
   push("stroke", el.style.stroke || el.getAttribute("stroke"));
   push("stroke-width", el.style.strokeWidth || el.getAttribute("stroke-width"));
@@ -198,13 +289,16 @@ function attrRows(el, skipData = true) {
 export function sheetElementPropertySections(el, index) {
   const kind = sheetElementKind(el);
   const sections = [
-    { title: "Ogólne", rows: [
-      ["Lp.", String(index + 1)],
-      ["Typ", kindDisplay(kind)],
-      ["Tag", el.tagName ? el.tagName.toLowerCase() : "—"],
-      ["Etykieta", sheetElementListLabel(el, index)]
-    ]},
-    { title: "Geometria", rows: [["Pozycja / kształt", geomSummary(el, kind)]] }
+    {
+      title: "Ogólne",
+      rows: [
+        ["Lp.", String(index + 1)],
+        ["Typ", kindDisplay(kind)],
+        ["Tag", el.tagName ? el.tagName.toLowerCase() : "—"],
+        ["Etykieta", sheetElementListLabel(el, index)],
+      ],
+    },
+    { title: "Geometria", rows: [["Pozycja / kształt", geomSummary(el, kind)]] },
   ];
 
   const ident = [];

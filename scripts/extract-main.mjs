@@ -5,9 +5,7 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "../..");
 const html = fs.readFileSync(path.join(root, "schematy/edytor.html"), "utf8");
-const m = html.match(
-  /<script src="js\/orthogonal-router\.js"><\/script>\s*<script>([\s\S]*?)<\/script>/
-);
+const m = html.match(/<script src="js\/orthogonal-router\.js"><\/script>\s*<script>([\s\S]*?)<\/script>/);
 if (!m) throw new Error("script block not found");
 let js = m[1].replace(/^"use strict";\n?/, "");
 const header = `import { connAllCss, syncConnStylesInLib } from './conn-theme.js';

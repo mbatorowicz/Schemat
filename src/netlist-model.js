@@ -50,7 +50,9 @@ export function parse(markdown) {
   lines.forEach((line) => {
     const version = line.match(/\|\s*\*\*Wersja\*\*\s*\|\s*([^|]+)\|/i);
     if (version) {
-      const parts = cleanCell(version[1]).split("·").map((s) => s.trim());
+      const parts = cleanCell(version[1])
+        .split("·")
+        .map((s) => s.trim());
       meta = { sheet: parts[0] || "", version: parts[1] || "", date: parts[2] || "" };
     }
     const heading = line.match(/^##\s+(\d+)\./);
@@ -81,7 +83,7 @@ export function parse(markdown) {
 }
 
 export function wireClass(record) {
-  const net = String(record && record.net || "").toUpperCase();
+  const net = String((record && record.net) || "").toUpperCase();
   if (net === "L") return "wL";
   if (net === "N") return "wN";
   if (net === "PE") return "wPE";
@@ -89,7 +91,8 @@ export function wireClass(record) {
   if (net === "0V" || net === "PUL0") return "w0v";
   if (net.indexOf("ESTOP") === 0) return "wsafe";
   if (net.indexOf("ENC") >= 0) return "wenc";
-  if (net.indexOf("M1.") === 0 || net.indexOf("M2.") === 0 || net.indexOf("R1-") === 0 || net === "B1S" || net === "Y1") return "wsig";
+  if (net.indexOf("M1.") === 0 || net.indexOf("M2.") === 0 || net.indexOf("R1-") === 0 || net === "B1S" || net === "Y1")
+    return "wsig";
   return "w24";
 }
 
@@ -98,8 +101,7 @@ export function markdownRow(record) {
     (record.from && record.from.raw) ||
     [record.from && record.from.ref, record.from && record.from.pin].filter(Boolean).join(":");
   const to =
-    (record.to && record.to.raw) ||
-    [record.to && record.to.ref, record.to && record.to.pin].filter(Boolean).join(":");
+    (record.to && record.to.raw) || [record.to && record.to.ref, record.to && record.to.pin].filter(Boolean).join(":");
   return (
     "| " +
     (record.id || "NOWE") +

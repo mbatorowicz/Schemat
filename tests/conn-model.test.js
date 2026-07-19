@@ -12,7 +12,9 @@ function stubCtx() {
     fmt: (v) => String(Math.round(v * 100) / 100),
     mkEl: (tag, attrs) => {
       const el = { tagName: tag, attrs: {}, children: [], style: {}, classList: { contains: () => false } };
-      el.setAttribute = (k, v) => { el.attrs[k] = v; };
+      el.setAttribute = (k, v) => {
+        el.attrs[k] = v;
+      };
       el.getAttribute = (k) => el.attrs[k] ?? null;
       el.appendChild = (c) => el.children.push(c);
       el.querySelector = () => null;

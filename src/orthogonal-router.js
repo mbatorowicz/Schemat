@@ -141,7 +141,9 @@ export function route(options) {
   const b = escapePoint(end, options.endDir, escape);
   const c1 = simplify([start, a, { x: b.x, y: a.y }, b, end]);
   const c2 = simplify([start, a, { x: a.x, y: b.y }, b, end]);
-  const clear = [c1, c2].filter((c) => candidateClear(c, obstacles, step)).sort((x, y) => pathLength(x) - pathLength(y));
+  const clear = [c1, c2]
+    .filter((c) => candidateClear(c, obstacles, step))
+    .sort((x, y) => pathLength(x) - pathLength(y));
   if (clear.length) return clear[0];
   const middle = aStar(a, b, obstacles, step);
   return middle ? simplify([start, ...middle, end]) : c1;

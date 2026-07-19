@@ -15,12 +15,12 @@ export function qsById(root, id) {
 
 export function qsByData(root, name, value) {
   if (!root?.querySelector || value == null) return null;
-  return root.querySelector('[data-' + name + '="' + cssEsc(String(value)) + '"]');
+  return root.querySelector("[data-" + name + '="' + cssEsc(String(value)) + '"]');
 }
 
 export function qsaByData(root, name, value) {
   if (!root?.querySelectorAll || value == null) return [];
-  return [...root.querySelectorAll('[data-' + name + '="' + cssEsc(String(value)) + '"]')];
+  return [...root.querySelectorAll("[data-" + name + '="' + cssEsc(String(value)) + '"]')];
 }
 
 export function qsByOwnerRef(root, ref) {

@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { resolveBootCachePlan, resolveReloadSheetsOutcome, shouldWriteProjectCache, projectCacheScore, libraryCacheScore } from "../src/boot-cache.js";
+import {
+  resolveBootCachePlan,
+  resolveReloadSheetsOutcome,
+  shouldWriteProjectCache,
+  projectCacheScore,
+  libraryCacheScore,
+} from "../src/boot-cache.js";
 
 describe("projectCacheScore", () => {
   it("preferuje snapshot z arkuszami nad pustym", () => {
@@ -47,7 +53,12 @@ describe("shouldWriteProjectCache", () => {
     expect(shouldWriteProjectCache({ sheets: [{ id: "sch-1", text: "abc" }] }, { sheets: [] })).toBe(true);
     expect(
       shouldWriteProjectCache(
-        { sheets: [{ id: "sch-1", text: "a" }, { id: "sch-2", text: "b" }] },
+        {
+          sheets: [
+            { id: "sch-1", text: "a" },
+            { id: "sch-2", text: "b" },
+          ],
+        },
         { sheets: [{ id: "sch-1", text: "a" }] }
       )
     ).toBe(true);

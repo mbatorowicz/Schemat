@@ -1,6 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { parse, parseEndpoint, normalizeRef, compareIds, wireClass } from "../src/netlist-model.js";
-import { sheetBasename, netlistNamesForSheet, pickNetlistForSheet, netlistsForSheet, librarySearchRelPaths } from "../src/project-files.js";
+import {
+  sheetBasename,
+  netlistNamesForSheet,
+  pickNetlistForSheet,
+  netlistsForSheet,
+  librarySearchRelPaths,
+} from "../src/project-files.js";
 import { refBaseForSymbol, isValidInstanceRef } from "../src/instance-refs.js";
 import { pickPointContactByToward } from "../src/conn-contact-pick.js";
 
@@ -272,5 +278,4 @@ describe("render-pipeline", () => {
     expect(pair.src.id).toBe("b");
     expect(pair.cel.id).toBe("cb");
   });
-
 });

@@ -227,8 +227,3 @@ export function createFileIo(deps) {
     downloadSvg,
   };
 }
-
-/** Inline defs z zależnościami (używane przez main przy tworzeniu fileIo). */
-export function buildInlineSheetDefs(sheet, ctx) {
-  return inlineSheetDefsSafe(sheet, ctx);
-}

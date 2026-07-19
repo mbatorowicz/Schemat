@@ -1,7 +1,19 @@
 /** Cofnij / ponów — snapshot SVG aktywnego dokumentu. */
 
+import { status as Wstatus } from "./ui-wording.js";
+
 export function createHistory(deps) {
-  const { state, parseSvg, buildSymbolList, currentSymNode, clearHighlight, clearSelInfo, render, setStatus, onMutate } = deps;
+  const {
+    state,
+    parseSvg,
+    buildSymbolList,
+    currentSymNode,
+    clearHighlight,
+    clearSelInfo,
+    render,
+    setStatus,
+    onMutate,
+  } = deps;
 
   function snapshot() {
     return new XMLSerializer().serializeToString(state.srcSvg);
@@ -42,19 +54,19 @@ export function createHistory(deps) {
 
   function doUndo() {
     if (!state.undo.length) {
-      setStatus("Brak czego cofnąć.");
+      setStatus(Wstatus.undoEmpty);
       return;
     }
     state.redo.push(snapshot());
     restore(state.undo.pop());
-    setStatus("Cofnięto.");
+    setStatus(Wstatus.undone);
   }
 
   function doRedo() {
     if (!state.redo.length) return;
     state.undo.push(snapshot());
     restore(state.redo.pop());
-    setStatus("Ponowiono.");
+    setStatus(Wstatus.redone);
   }
 
   return { snapshot, pushUndo, restore, doUndo, doRedo };

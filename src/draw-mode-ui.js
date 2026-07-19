@@ -34,10 +34,7 @@ export function createDrawBannerSync(deps) {
     const mode = getDrawMode();
     if (mode) {
       drawBannerEl.textContent =
-        "Rysujesz: " +
-        (DRAW_LABELS[mode] || mode) +
-        " — Esc anuluje" +
-        (mode === "line" ? ", Enter kończy" : "");
+        "Rysujesz: " + (DRAW_LABELS[mode] || mode) + " — Esc anuluje" + (mode === "line" ? ", Enter kończy" : "");
       drawBannerEl.classList.add("open");
       if (toolbarEl) toolbarEl.classList.add("draw-mode");
     } else {

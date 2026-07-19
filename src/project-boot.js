@@ -13,12 +13,7 @@
 export function resolveBootStatusMessage(p) {
   if (p.loadedFromDisk) {
     return {
-      message:
-        "Wczytano z dysku: " +
-        p.sheetCount +
-        " schemat(ów), biblioteka " +
-        (p.libraryLabel || "?") +
-        ".",
+      message: "Wczytano z dysku: " + p.sheetCount + " schemat(ów), biblioteka " + (p.libraryLabel || "?") + ".",
       toast: false,
       tone: "info",
     };

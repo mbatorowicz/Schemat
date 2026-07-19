@@ -53,7 +53,7 @@ export function createConnModel(ctx) {
   }
 
   function connDirVector(dir) {
-    return ({ N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] })[dir] || [1, 0];
+    return { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] }[dir] || [1, 0];
   }
 
   function syncConnJointAnchor(g) {
@@ -317,9 +317,10 @@ export function createConnModel(ctx) {
     const p = connParts(g);
     const centerQ = map(num(p.joint, "cx"), num(p.joint, "cy"));
     const center = { x: centerQ[0], y: centerQ[1] };
-    const toward = towardXY && (towardXY.x != null || towardXY[0] != null)
-      ? { x: towardXY.x != null ? towardXY.x : towardXY[0], y: towardXY.y != null ? towardXY.y : towardXY[1] }
-      : { x: center.x + 1, y: center.y };
+    const toward =
+      towardXY && (towardXY.x != null || towardXY[0] != null)
+        ? { x: towardXY.x != null ? towardXY.x : towardXY[0], y: towardXY.y != null ? towardXY.y : towardXY[1] }
+        : { x: center.x + 1, y: center.y };
     const contacts = p.contacts.map((c) => {
       const q = map(num(c, "cx"), num(c, "cy"));
       return { x: q[0], y: q[1], dir: c.getAttribute("data-contact") || "E" };
@@ -345,7 +346,9 @@ export function createConnModel(ctx) {
     }
     const p = connParts(g);
     const q = map(num(p.stub, "x2"), num(p.stub, "y2"));
-    const dir = g.getAttribute("data-dir") || dirFromDelta(num(p.stub, "x2") - num(p.stub, "x1"), num(p.stub, "y2") - num(p.stub, "y1"));
+    const dir =
+      g.getAttribute("data-dir") ||
+      dirFromDelta(num(p.stub, "x2") - num(p.stub, "x1"), num(p.stub, "y2") - num(p.stub, "y1"));
     return { x: q[0], y: q[1], dir };
   }
 

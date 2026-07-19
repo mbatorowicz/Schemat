@@ -110,4 +110,6 @@ console.log(`\nRazem: ${report.length} symboli.`);
 const libIds = new Set([...lib.matchAll(/<g id="([^"]+)"/g)].map((m) => m[1]));
 const uses = new Set([...e01.matchAll(/href="#([^"]+)"/g)].map((m) => m[1]));
 const missing = [...uses].filter((u) => !libIds.has(u) && u !== "sch-1");
-console.log(missing.length ? `Brakujące w bibliotece: ${missing.join(", ")}` : "Wszystkie href z E-01 są w bibliotece.");
+console.log(
+  missing.length ? `Brakujące w bibliotece: ${missing.join(", ")}` : "Wszystkie href z E-01 są w bibliotece."
+);

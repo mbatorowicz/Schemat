@@ -9,18 +9,10 @@ import {
   sheetElementListLabel,
   sheetElementPropertySections,
   schematicSheetChildren,
+  groupSchematicElements,
 } from "./sheet-elements.js";
-import {
-  symbolCatalogLabel,
-  symbolCatalogSubtitle,
-  symbolDesignation,
-  symbolDisplayName,
-} from "./symbol-save.js";
-import {
-  sheetCatalogLabel,
-  sheetCatalogSubtitle,
-  sheetDisplayTitle,
-} from "./sheet-catalog.js";
+import { symbolCatalogLabel, symbolCatalogSubtitle, symbolDesignation, symbolDisplayName } from "./symbol-save.js";
+import { sheetCatalogLabel, sheetCatalogSubtitle, sheetDisplayTitle } from "./sheet-catalog.js";
 import { libSymbolGroups } from "./symbol-resolver.js";
 import { sheetBasename as linkedSheetBasename } from "./project-files.js";
 import { SVGNS, XLINK } from "./svg-constants.js";
@@ -97,6 +89,7 @@ export function createSidebarLists(deps) {
     selectSheet,
     selectSymbol,
     selectSheetElement,
+    selectSheetElements,
     insertUse,
     setStatus,
     renameSheetTitle,
@@ -153,10 +146,16 @@ export function createSidebarLists(deps) {
     if (!elemList) return;
     const node = currentSymNode();
     const sel = selEls().filter((el) => node && el.parentNode === node);
-    [...elemList.children].forEach((li) => {
+    elemList.querySelectorAll("li[data-elem-item]").forEach((li) => {
       const on = sel.indexOf(li._elem) >= 0;
       li.classList.toggle("sel", on);
       if (on && li._elem === state.activeEl) li._elem._elemListItem = li;
+    });
+    elemList.querySelectorAll(".elem-group-head").forEach((head) => {
+      const members = head._members || [];
+      const n = members.filter((m) => sel.indexOf(m) >= 0).length;
+      head.classList.toggle("sel", n > 0 && n === members.length);
+      head.classList.toggle("sel-partial", n > 0 && n < members.length);
     });
     if (!isSheetActive()) {
       renderElementProps(null);
@@ -169,6 +168,27 @@ export function createSidebarLists(deps) {
         '<p class="elem-props-empty">Kliknij jeden element na liście, aby zobaczyć pełne właściwości.</p>';
       elemProps.classList.remove("context-hidden");
     } else renderElementProps(null);
+  }
+
+  function appendElemListItem(parent, el, index, { nested = false } = {}) {
+    const li = document.createElement("li");
+    li.dataset.elemItem = "1";
+    if (nested) li.classList.add("elem-nested");
+    const kind = sheetElementKind(el);
+    const main = document.createElement("span");
+    main.textContent = sheetElementListLabel(el, index);
+    const sub = document.createElement("span");
+    sub.className = "elem-kind";
+    sub.textContent = kindDisplay(kind);
+    li.append(main, sub);
+    li._elem = el;
+    el._elemListItem = li;
+    li.onclick = (e) => {
+      e.stopPropagation();
+      selectSheetElement(el);
+    };
+    parent.appendChild(li);
+    return li;
   }
 
   function buildElementList() {
@@ -196,19 +216,38 @@ export function createSidebarLists(deps) {
     }
     elemSec.classList.remove("context-hidden");
     const children = schematicSheetChildren(node);
-    children.forEach((el, i) => {
-      const li = document.createElement("li");
-      const kind = sheetElementKind(el);
-      const main = document.createElement("span");
-      main.textContent = sheetElementListLabel(el, i);
-      const sub = document.createElement("span");
-      sub.className = "elem-kind";
-      sub.textContent = kindDisplay(kind);
-      li.append(main, sub);
-      li._elem = el;
-      el._elemListItem = li;
-      li.onclick = () => selectSheetElement(el);
-      elemList.appendChild(li);
+    const groups = groupSchematicElements(children);
+    groups.forEach((g) => {
+      if (g.type === "instance" && g.members.length > 1) {
+        const wrap = document.createElement("li");
+        wrap.className = "elem-group";
+        const head = document.createElement("div");
+        head.className = "elem-group-head";
+        head._members = g.members;
+        const main = document.createElement("span");
+        main.className = "elem-group-title";
+        main.textContent = W.list.instanceGroup(g.ref, g.members.length);
+        const sub = document.createElement("span");
+        sub.className = "elem-kind";
+        sub.textContent = W.list.instanceGroupKind;
+        head.append(main, sub);
+        head.title = W.list.instanceGroupHint;
+        head.onclick = () => {
+          if (typeof selectSheetElements === "function") selectSheetElements(g.members);
+          else selectSheetElement(g.members[0]);
+        };
+        const nested = document.createElement("ul");
+        nested.className = "elem-group-items";
+        g.members.forEach((el) => {
+          const idx = children.indexOf(el);
+          appendElemListItem(nested, el, idx >= 0 ? idx : 0, { nested: true });
+        });
+        wrap.append(head, nested);
+        elemList.appendChild(wrap);
+      } else {
+        const el = g.el || g.members[0];
+        appendElemListItem(elemList, el, g.index);
+      }
     });
     syncSidebarEmptyStates({
       schEmpty,
@@ -281,7 +320,9 @@ export function createSidebarLists(deps) {
     host.innerHTML = "";
     const prefix = "sidebar-" + ++sidebarBuildSeq + "-";
     sidebarPrefix = prefix;
-    const ids = state.symbols.flatMap((s) => [s.node, ...s.node.querySelectorAll("[id]")].map((n) => n.id).filter(Boolean));
+    const ids = state.symbols.flatMap((s) =>
+      [s.node, ...s.node.querySelectorAll("[id]")].map((n) => n.id).filter(Boolean)
+    );
     const rewrite = (v) => {
       let out = (v || "").replace(/url\(#([^)]+)\)/g, (all, id) => "url(#" + prefix + id + ")");
       ids.forEach((id) => {
@@ -316,8 +357,7 @@ export function createSidebarLists(deps) {
 
   function startSymbolRename(sym, idEl) {
     if (typeof renameSymbolTitle !== "function") return;
-    const initial =
-      symbolDisplayName(sym.node) || symbolCatalogLabel(sym.node, sym.id);
+    const initial = symbolDisplayName(sym.node) || symbolCatalogLabel(sym.node, sym.id);
     beginListInlineRename({
       labelEl: idEl,
       initialValue: initial,
@@ -404,7 +444,8 @@ export function createSidebarLists(deps) {
         if (!pin) issues.push(sym.id + ": brak data-pin");
         else if (pins.has(pin)) issues.push(sym.id + ": duplikat pinu " + pin);
         else pins.add(pin);
-        if (kind === "lead" && !["N", "E", "S", "W"].includes(dir)) issues.push(sym.id + ":" + pin + " niepoprawny data-dir");
+        if (kind === "lead" && !["N", "E", "S", "W"].includes(dir))
+          issues.push(sym.id + ":" + pin + " niepoprawny data-dir");
         ["stub", "joint", "label"].forEach((part) => {
           if (!c.querySelector('[data-part="' + part + '"]')) issues.push(sym.id + ":" + pin + " brak " + part);
         });
