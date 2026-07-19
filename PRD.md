@@ -144,14 +144,15 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - FR-10: Jedna biblioteka `E-00_symbole.svg` współdzielona między projektami.
 - FR-11: CRUD symboli (nowy, duplikuj, eksportuj, usuń, zmień id).
 - FR-12: Miniatury symboli w panelu bocznym.
-- FR-13: **Oznaczenie instancji** w bibliotece (`data-inst-prefix`) + numeracja (`data-inst-numbered`, `data-inst-start`); lista symboli pokazuje nazwę wyświetlaną (`data-symbol-name`) z podtytułem oznaczenia.
+- FR-13: Meta symbolu w bibliotece: **Nazwa** (`data-symbol-name`, tylko lib), **Oznaczenie** = prefix bez numeru (`data-inst-prefix`), **Opis** (`data-symbol-desc`) + numeracja (`data-inst-numbered`, `data-inst-start`); lista: nazwa z podtytułem oznaczenia.
+- FR-13a: Na schemacie dwa napisy przy instancji: oznaczenie (`data-label="desig"`, `-SB1`) i opis (`data-label="desc"`). Belka: prefix | Nr (lokalny) | Opis; zmiana prefixu/opisu pyta: tylko schemat vs biblioteka (do lib bez numeru).
 
 ### 6.3 Arkusz schematu
 
 - FR-20: Nowy arkusz A4 z ramką i tabelką dokumentu.
 - FR-21: Wstawianie `<use>` z auto-`data-ref`.
-- FR-22: Etykiety instancji (`text[data-owner-ref]`).
-- FR-24: Lista elementów aktywnego arkusza (bez ramki A4 i tabelki); grupowanie po `data-ref` / `data-owner-ref`; kliknięcie → panel `#elemProps` **tylko do odczytu**; edycja oznaczenia / pin / treści / symbolu / długości kreski na belce `#selectionPropsGroup`.
+- FR-22: Etykiety instancji (`text[data-owner-ref]`): desig + opcjonalnie desc.
+- FR-24: Lista elementów aktywnego arkusza (bez ramki A4 i tabelki); grupowanie po `data-ref` / `data-owner-ref`; kliknięcie → panel `#elemProps` **tylko do odczytu**; edycja prefixu / nr / opisu / pin / treści / symbolu / długości kreski na belce `#selectionPropsGroup` (także przy zaznaczeniu grupy instancji).
 - FR-25: Wstawianie instancji z listy symboli (przycisk **+**); oznaczenie konfigurowane w bibliotece; spis połączeń w `#netlistGroup` (nie w panelu właściwości).
 - FR-26: Inline rename list (dblclick / F2): tytuł schematu (`data-sheet-title`, bez rename pliku na dysku), nazwa symbolu; nazwa pliku biblioteki / folderu projektu — `#resourceNameGroup`.
 
@@ -168,7 +169,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - FR-40: **Kreska** — 2 kliki, min. długość = krok siatki; modal `#connMeta` (ref + pin); kierunek wynika z geometrii dwóch klików (`data-dir`).
 - FR-41: **Punkt** — 1 klik; modal `#connMeta` (ref + pin); bez ręcznego kierunku — jeden logiczny styk, strona N/E/S/W wybierana przy trasowaniu.
 - FR-42: Edycja uchwytami jak zwykłe kształty (bez nakładania kółka na kreskę).
-- FR-43: Podwójne kliknięcie / edycja — fokus pól na belce `#selectionPropsGroup` (bez `prompt()`): pin/ref; dla kreski także długość i kierunek; dla `<use>` oznaczenie + wybór symbolu z biblioteki; dla tekstu / etykiety złącza — treść. Modal `#connMeta` tylko przy **tworzeniu** złącza.
+- FR-43: Podwójne kliknięcie / edycja — fokus pól na belce `#selectionPropsGroup` (bez `prompt()`): pin/ref; dla kreski także długość i kierunek; dla `<use>` prefix + nr + opis + wybór symbolu; dla tekstu / etykiety złącza — treść. Modal `#connMeta` tylko przy **tworzeniu** złącza. Dialog `#choiceDialog` przy promocji prefixu/opisu do biblioteki.
 - FR-44: Migracja `term→point`, `stub→lead` przy starcie.
 - FR-45: Automatyczne punkty styku — punkt: 4 na obwodzie; kreska: 1 na końcu linii.
 - FR-46: Kolor złącza domyślnie jak symbol; punkty styku zawsze czerwone.

@@ -15,6 +15,31 @@ export function isValidInstanceRef(v) {
   return !!v && /^[\p{L}_][\p{L}\p{N}_\-]*$/u.test(v);
 }
 
+/** Rozdziela data-ref na prefix (bez numeru) i numer elementu: SB1 → { prefix: "SB", num: "1" }. */
+export function splitInstanceRef(ref) {
+  const s = String(ref || "")
+    .trim()
+    .replace(/^-/, "");
+  if (!s) return { prefix: "", num: "" };
+  const m = s.match(/^(.*?)(\d+)$/);
+  if (m && m[1] && /^[\p{L}_]/u.test(m[1])) {
+    return { prefix: m[1], num: m[2] };
+  }
+  return { prefix: s, num: "" };
+}
+
+/** Składa pełne oznaczenie instancji z prefixu i numeru. */
+export function joinInstanceRef(prefix, num) {
+  const p = String(prefix || "")
+    .trim()
+    .replace(/^-/, "");
+  const n = String(num ?? "")
+    .trim()
+    .replace(/[^\d]/g, "");
+  if (!p) return "";
+  return n ? p + n : p;
+}
+
 export function refPrefixForSymbol(id) {
   const s = String(id || "").toLowerCase();
   if (s.includes("psu")) return "G";

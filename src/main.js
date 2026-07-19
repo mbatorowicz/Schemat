@@ -7,10 +7,15 @@ import {
   collectInstanceMembers,
   expandToInstanceMembers,
 } from "./sheet-elements.js";
-import { buildAlignUnits, unionBox, computeAlignDeltas } from "./selection-align.js";
+import { buildAlignUnits, resolveAlignElements, unionBox, computeAlignDeltas } from "./selection-align.js";
 import { wireColor, wireCssRules } from "./wire-theme.js";
 import { num, fmt, fmtRot, parseSvg, serializeSvg, firstSchId } from "./svg-utils.js";
-import { refBaseForSymbol as refBaseForSymbolCore, isValidInstanceRef } from "./instance-refs.js";
+import {
+  refBaseForSymbol as refBaseForSymbolCore,
+  isValidInstanceRef,
+  splitInstanceRef,
+  joinInstanceRef,
+} from "./instance-refs.js";
 import { createHistory } from "./history.js";
 import { resolveLibSymbol, resolveSheetSymbol, resolveSymbol, collectUsedSymbolIds } from "./symbol-resolver.js";
 import { markSheetDirty, countDirtySheets, inlineSheetDefsSafe, sheetKey } from "./sheet-persistence.js";
@@ -60,7 +65,7 @@ import {
   restoreProjectSnapshot,
   restorePrefsSnapshot,
 } from "./persistence.js";
-import { qsById } from "./dom-selectors.js";
+import { qsById, qsaByOwnerRef } from "./dom-selectors.js";
 import { mkHandle, mkPrev } from "./element-factory.js";
 import { createNetlistUi, createNetlistLiveValidator } from "./netlist-ui.js";
 import { createFileIo } from "./file-io.js";
@@ -92,6 +97,7 @@ import {
   resolveSelectionPropsMode,
   readSelectionPropsState,
   selectionPropsFocusField,
+  selectionInstanceUse,
   leadPropsFromConn,
 } from "./selection-props.js";
 import {
@@ -110,12 +116,16 @@ import {
   applySymbolDisplayName,
   readSymbolFormFromDom,
   symbolDisplayName,
+  symbolDescription,
+  symbolDescription2,
   symbolCatalogLabel,
   symbolDesignation,
+  SYMBOL_DESC_ATTR,
+  SYMBOL_DESC2_ATTR,
 } from "./symbol-save.js";
 import { sheetDisplayTitle, sheetCatalogLabel, applySheetDisplayTitle } from "./sheet-catalog.js";
 import { renameLibraryOnDisk, renameProjectFolderOnDisk } from "./resource-rename.js";
-import { createConfirmDialog, createToastHost, bindModalA11y } from "./ui-dialog.js";
+import { createConfirmDialog, createChoiceDialog, createToastHost, bindModalA11y } from "./ui-dialog.js";
 import { createSavePermBadge } from "./project-perm-ui.js";
 import { createSidebarLists } from "./sidebar-lists.js";
 import { createDrawBannerSync } from "./draw-mode-ui.js";
@@ -264,8 +274,11 @@ const elemEmpty = document.getElementById("elemEmpty");
 
 const confirmDialog = createConfirmDialog();
 confirmDialog.init();
+const choiceDialog = createChoiceDialog();
+choiceDialog.init();
 const toastHost = createToastHost();
 const askConfirm = (message, cfg) => confirmDialog.ask(message, cfg);
+const askChoice = (message, cfg) => choiceDialog.ask(message, cfg);
 let savePermBadge = null;
 let syncDrawBanner = () => {};
 let settingsModal = null;
@@ -692,8 +705,14 @@ function applyStaticWording() {
     const el = document.getElementById(id);
     if (el) el.textContent = text;
   };
+  set("lblSymName", W.field.name);
   set("lblInstPrefix", W.field.designation);
+  set("lblSymDesc", W.field.description);
+  set("lblSymDesc2", W.field.description2);
   set("lblSelPropRef", W.field.designation);
+  set("lblSelPropNum", W.field.elementNum);
+  set("lblSelPropDesc", W.field.description);
+  set("lblSelPropDesc2", W.field.description2);
   set("lblSelPropPin", W.field.pin);
   set("lblSelPropText", W.field.text);
   set("lblSelPropLen", W.field.length);
@@ -704,14 +723,29 @@ function applyStaticWording() {
   set("txtSaveSymbol", W.save.params);
   set("txtSaveResource", W.save.params);
   set("txtInstNumbered", W.field.numberToggle);
+  set("choiceDialogCancel", W.choice.cancel);
+  set("choiceDialogLocal", W.choice.local);
+  set("choiceDialogLib", W.choice.library);
   const tip = (id, text) => {
     const el = document.getElementById(id);
     if (el) el.title = text;
   };
+  tip("lblSymName", W.fieldTip.symbolName);
+  tip("symName", W.fieldTip.symbolName);
   tip("lblInstPrefix", W.fieldTip.symbolDesignation);
   tip("instPrefix", W.fieldTip.symbolDesignation);
-  tip("lblSelPropRef", W.fieldTip.instanceRef);
-  tip("selPropRef", W.fieldTip.instanceRef);
+  tip("lblSymDesc", W.fieldTip.symbolDescription);
+  tip("symDesc", W.fieldTip.symbolDescription);
+  tip("lblSymDesc2", W.fieldTip.symbolDescription2);
+  tip("symDesc2", W.fieldTip.symbolDescription2);
+  tip("lblSelPropRef", W.fieldTip.instancePrefix);
+  tip("selPropRef", W.fieldTip.instancePrefix);
+  tip("lblSelPropNum", W.fieldTip.instanceNum);
+  tip("selPropNum", W.fieldTip.instanceNum);
+  tip("lblSelPropDesc", W.fieldTip.instanceDescription);
+  tip("selPropDesc", W.fieldTip.instanceDescription);
+  tip("lblSelPropDesc2", W.fieldTip.instanceDescription2);
+  tip("selPropDesc2", W.fieldTip.instanceDescription2);
   tip("lblSelPropPin", W.fieldTip.connPin);
   tip("selPropPin", W.fieldTip.connPin);
   tip("lblSelPropText", W.fieldTip.selectionText);
@@ -732,6 +766,12 @@ function applyStaticWording() {
   tip("btnAlignBottom", W.align.bottom);
   const instPrefix = document.getElementById("instPrefix");
   if (instPrefix) instPrefix.placeholder = W.placeholder.designation;
+  const symName = document.getElementById("symName");
+  if (symName) symName.placeholder = W.placeholder.symbolName;
+  const symDesc = document.getElementById("symDesc");
+  if (symDesc) symDesc.placeholder = W.placeholder.description;
+  const symDesc2 = document.getElementById("symDesc2");
+  if (symDesc2) symDesc2.placeholder = W.placeholder.description2;
   const connRef = document.getElementById("connMetaRef");
   const connPin = document.getElementById("connMetaPin");
   const selPropText = document.getElementById("selPropText");
@@ -800,7 +840,10 @@ function syncLibrarySelectionInfo() {
   }
 }
 function syncNameFields() {
+  const nameInp = document.getElementById("symName");
   const prefixInp = document.getElementById("instPrefix");
+  const descInp = document.getElementById("symDesc");
+  const desc2Inp = document.getElementById("symDesc2");
   const numChk = document.getElementById("instNumbered"),
     startInp = document.getElementById("instStart");
   const btnSym = document.getElementById("btnSaveSymbol");
@@ -809,10 +852,22 @@ function syncNameFields() {
     if (sym) {
       if (btnSym) btnSym.disabled = false;
       const rule = refBaseForSymbol(state.selId);
+      if (nameInp) {
+        nameInp.disabled = false;
+        nameInp.value = symbolDisplayName(sym.node) || symbolCatalogLabel(sym.node, sym.id);
+      }
       if (prefixInp) {
         prefixInp.disabled = false;
         prefixInp.value = symbolDesignation(sym.node, sym.id);
         prefixInp.placeholder = W.placeholder.designation;
+      }
+      if (descInp) {
+        descInp.disabled = false;
+        descInp.value = symbolDescription(sym.node);
+      }
+      if (desc2Inp) {
+        desc2Inp.disabled = false;
+        desc2Inp.value = symbolDescription2(sym.node);
       }
       if (numChk) {
         numChk.disabled = false;
@@ -829,10 +884,22 @@ function syncNameFields() {
     }
   }
   if (btnSym) btnSym.disabled = true;
+  if (nameInp) {
+    nameInp.disabled = true;
+    nameInp.value = "";
+  }
   if (prefixInp) {
     prefixInp.disabled = true;
     prefixInp.value = "";
     prefixInp.placeholder = W.placeholder.designation;
+  }
+  if (descInp) {
+    descInp.disabled = true;
+    descInp.value = "";
+  }
+  if (desc2Inp) {
+    desc2Inp.disabled = true;
+    desc2Inp.value = "";
   }
   if (numChk) {
     numChk.disabled = true;
@@ -1386,6 +1453,82 @@ function selectSheetElements(els, opts) {
     ref ? "Zaznaczono instancję " + ref + " (" + list.length + ")" : "Zaznaczono: " + list.length + " elementów"
   );
 }
+function instanceTexts(node, ref) {
+  return qsaByOwnerRef(node, ref);
+}
+function instanceTextByLabel(node, ref, label) {
+  return instanceTexts(node, ref).find((t) => (t.getAttribute("data-label") || "") === label) || null;
+}
+function ensureInstanceDesigLabel(use, ref) {
+  const node = use?.parentNode;
+  if (!node || !ref) return null;
+  let lbl = instanceTextByLabel(node, ref, "desig");
+  if (lbl) return lbl;
+  const legacy = instanceTexts(node, ref).find((t) => {
+    const role = (t.getAttribute("data-label") || "").trim();
+    if (role === "desc") return false;
+    const txt = (t.textContent || "").trim();
+    return !role || txt === "-" + ref || txt === ref || !txt;
+  });
+  if (legacy) {
+    legacy.setAttribute("data-label", "desig");
+    return legacy;
+  }
+  lbl = mkEl("text", {
+    x: num(use, "x") + 5,
+    y: num(use, "y") - 5,
+    class: "did",
+    "data-owner-ref": ref,
+    "data-label": "desig",
+  });
+  lbl.textContent = "-" + ref;
+  styleText(lbl);
+  node.appendChild(lbl);
+  return lbl;
+}
+function ensureInstanceDescLabel(use, ref, text, { label = "desc", yOff = 18 } = {}) {
+  const node = use?.parentNode;
+  if (!node || !ref) return null;
+  let lbl = instanceTextByLabel(node, ref, label);
+  if (lbl) {
+    if (text != null) lbl.textContent = text;
+    return lbl;
+  }
+  const content = text != null ? String(text) : "";
+  if (!content) return null;
+  lbl = mkEl("text", {
+    x: num(use, "x") + 5,
+    y: num(use, "y") + yOff,
+    class: "did",
+    "data-owner-ref": ref,
+    "data-label": label,
+  });
+  lbl.textContent = content;
+  styleText(lbl);
+  node.appendChild(lbl);
+  return lbl;
+}
+function libSymbolNodeForUse(use) {
+  const symId = (
+    use?.getAttribute("data-sym") ||
+    use?.getAttribute("href") ||
+    (use?.getAttributeNS && use.getAttributeNS(XLINK, "href")) ||
+    ""
+  ).replace(/^#/, "");
+  if (!symId || !state.lib?.svg) return null;
+  return resolveLibSymbol(state.lib.svg, symId);
+}
+function libDescForUse(use) {
+  const node = libSymbolNodeForUse(use);
+  return node ? symbolDescription(node) : "";
+}
+function libDesc2ForUse(use) {
+  const node = libSymbolNodeForUse(use);
+  return node ? symbolDescription2(node) : "";
+}
+function selectionUseTarget() {
+  return selectionInstanceUse(state.selection) || null;
+}
 function setInstanceRef(use, v, opts) {
   const node = use && use.parentNode;
   if (!node) return { ok: false, reason: "Brak elementu." };
@@ -1400,10 +1543,15 @@ function setInstanceRef(use, v, opts) {
   if (used.has(v)) return { ok: false, reason: "Instancja " + v + " jest już na schemacie." };
   if (!(opts && opts.skipUndo)) pushUndo();
   use.setAttribute("data-ref", v);
-  [...node.querySelectorAll('text[data-owner-ref="' + oldRef + '"]')].forEach((t) => {
+  instanceTexts(node, oldRef).forEach((t) => {
     t.setAttribute("data-owner-ref", v);
+    const role = (t.getAttribute("data-label") || "").trim();
+    if (role === "desc" || role === "desc2") return;
     const txt = (t.textContent || "").trim();
-    if (!txt || txt === "-" + oldRef || txt === oldRef) t.textContent = "-" + v;
+    if (role === "desig" || !txt || txt === "-" + oldRef || txt === oldRef) {
+      if (!role) t.setAttribute("data-label", "desig");
+      t.textContent = "-" + v;
+    }
   });
   [...node.querySelectorAll('[data-role="conn"][data-ref="' + oldRef + '"]')].forEach((c) =>
     c.setAttribute("data-ref", v)
@@ -1413,13 +1561,19 @@ function setInstanceRef(use, v, opts) {
 function selectionPropsEls() {
   return {
     refInp: document.getElementById("selPropRef"),
+    numInp: document.getElementById("selPropNum"),
     pinInp: document.getElementById("selPropPin"),
+    descInp: document.getElementById("selPropDesc"),
+    desc2Inp: document.getElementById("selPropDesc2"),
     textInp: document.getElementById("selPropText"),
     lenInp: document.getElementById("selPropLen"),
     dirInp: document.getElementById("selPropDir"),
     symSel: document.getElementById("selPropSym"),
     refField: document.getElementById("selPropRefField"),
+    numField: document.getElementById("selPropNumField"),
     pinField: document.getElementById("selPropPinField"),
+    descField: document.getElementById("selPropDescField"),
+    desc2Field: document.getElementById("selPropDesc2Field"),
     textField: document.getElementById("selPropTextField"),
     lenField: document.getElementById("selPropLenField"),
     dirField: document.getElementById("selPropDirField"),
@@ -1454,35 +1608,48 @@ function fillSelPropSymOptions(symSel, currentId) {
 function syncSelectionProps(mode) {
   const {
     refInp,
+    numInp,
     pinInp,
+    descInp,
+    desc2Inp,
     textInp,
     lenInp,
     dirInp,
     symSel,
     refField,
+    numField,
     pinField,
+    descField,
+    desc2Field,
     textField,
     lenField,
     dirField,
     symField,
   } = selectionPropsEls();
-  const propsInputs = [refInp, pinInp, textInp, lenInp, dirInp, symSel].filter(Boolean);
+  const propsInputs = [refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel].filter(Boolean);
   const editing = propsInputs.some((inp) => document.activeElement === inp);
   if (!mode) {
     if (!editing) {
       if (refInp) refInp.value = "";
+      if (numInp) numInp.value = "";
       if (pinInp) pinInp.value = "";
+      if (descInp) descInp.value = "";
+      if (desc2Inp) desc2Inp.value = "";
       if (textInp) textInp.value = "";
       if (lenInp) lenInp.value = "";
     }
-    [refField, pinField, textField, lenField, dirField, symField].forEach((f) => {
+    [refField, numField, pinField, descField, desc2Field, textField, lenField, dirField, symField].forEach((f) => {
       if (f) f.classList.add("context-hidden");
     });
     state._selPropTextEl = null;
     return;
   }
-  const el = state.selection.length === 1 ? state.selection[0] : null;
+  const useEl = mode === "use" ? selectionUseTarget() : null;
+  const el = mode === "use" ? useEl : state.selection.length === 1 ? state.selection[0] : null;
   const labelEl = connLabelEl();
+  const refNow = useEl ? useEl.getAttribute("data-ref") || "" : "";
+  const descLbl = mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc") : null;
+  const desc2Lbl = mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc2") : null;
   const lead =
     mode === "conn" && el && typeof isConnLead === "function" && isConnLead(el)
       ? leadPropsFromConn(el, connParts(el), { num, fmt })
@@ -1491,11 +1658,18 @@ function syncSelectionProps(mode) {
     mode,
     el,
     connLabelEl: labelEl,
+    descText: descLbl ? descLbl.textContent || "" : useEl ? libDescForUse(useEl) : "",
+    desc2Text: desc2Lbl ? desc2Lbl.textContent || "" : useEl ? libDesc2ForUse(useEl) : "",
     getHref: (node) => node.getAttribute("href") || node.getAttributeNS(XLINK, "href") || "",
     lead,
   });
   if (!editing) {
-    if (refInp) refInp.value = st.ref;
+    if (mode === "use") {
+      if (refInp) refInp.value = st.prefix;
+      if (numInp) numInp.value = st.num;
+      if (descInp) descInp.value = st.desc;
+      if (desc2Inp) desc2Inp.value = st.desc2;
+    } else if (refInp) refInp.value = st.ref;
     if (pinInp) pinInp.value = st.pin;
     if (textInp) textInp.value = st.text;
     if (lenInp) lenInp.value = st.len;
@@ -1505,9 +1679,12 @@ function syncSelectionProps(mode) {
     fillSelPropSymOptions(symSel, st.symId);
   }
   if (refField) refField.classList.toggle("context-hidden", mode !== "use" && mode !== "conn");
+  if (numField) numField.classList.toggle("context-hidden", mode !== "use");
   if (pinField) pinField.classList.toggle("context-hidden", mode !== "conn");
   if (lenField) lenField.classList.toggle("context-hidden", !(mode === "conn" && st.isLead));
   if (dirField) dirField.classList.toggle("context-hidden", !(mode === "conn" && st.isLead));
+  if (descField) descField.classList.toggle("context-hidden", mode !== "use");
+  if (desc2Field) desc2Field.classList.toggle("context-hidden", mode !== "use");
   if (textField) textField.classList.toggle("context-hidden", mode !== "text");
   if (symField) symField.classList.toggle("context-hidden", mode !== "use");
   if (mode === "text") state._selPropTextEl = selectionTextTarget();
@@ -1524,7 +1701,47 @@ function focusSelectionPropsField(mode, opts) {
     if (typeof inp.select === "function") inp.select();
   });
 }
-function commitSelectionProps() {
+async function promoteToLibrary(kind, value, useEl) {
+  const symId = (
+    useEl.getAttribute("data-sym") ||
+    useEl.getAttribute("href") ||
+    useEl.getAttributeNS(XLINK, "href") ||
+    ""
+  ).replace(/^#/, "");
+  if (!symId || !state.lib?.svg) {
+    setStatus(status.symbolMissing(symId || "?"));
+    return false;
+  }
+  const node = resolveLibSymbol(state.lib.svg, symId);
+  if (!node) {
+    setStatus(status.symbolMissing(symId));
+    return false;
+  }
+  if (kind === "prefix") {
+    const prefix = String(value || "")
+      .trim()
+      .replace(/^-/, "");
+    if (!prefix || !isValidInstanceRef(prefix)) {
+      setStatus(status.symbolInvalidDesignation);
+      return false;
+    }
+    node.setAttribute("data-inst-prefix", prefix);
+  } else if (kind === "desc") {
+    const desc = String(value || "").trim();
+    if (desc) node.setAttribute(SYMBOL_DESC_ATTR, desc);
+    else node.removeAttribute(SYMBOL_DESC_ATTR);
+  } else if (kind === "desc2") {
+    const desc2 = String(value || "").trim();
+    if (desc2) node.setAttribute(SYMBOL_DESC2_ATTR, desc2);
+    else node.removeAttribute(SYMBOL_DESC2_ATTR);
+  }
+  markSheetDirty(state.lib);
+  buildSymbolList();
+  syncListSelection();
+  return true;
+}
+
+async function commitSelectionProps() {
   const onSheet = !!(state.active && state.active !== state.lib);
   const mode = resolveSelectionPropsMode({
     onSheet,
@@ -1532,7 +1749,7 @@ function commitSelectionProps() {
     connLabelSel: state.connLabelSel,
   });
   if (!mode) return;
-  const { refInp, pinInp, textInp, lenInp, dirInp, symSel } = selectionPropsEls();
+  const { refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel } = selectionPropsEls();
 
   if (mode === "text") {
     const textEl = selectionTextTarget();
@@ -1561,17 +1778,135 @@ function commitSelectionProps() {
     return;
   }
 
-  const el = state.selection[0];
-  if (!el) return;
   if (mode === "use") {
-    let changed = false;
-    const res = setInstanceRef(el, refInp ? refInp.value : "");
-    if (!res.ok) {
-      setStatus(res.reason || status.instanceRefFailed);
-      if (refInp) refInp.value = el.getAttribute("data-ref") || "";
+    const el = selectionUseTarget();
+    if (!el) return;
+    const curRef = (el.getAttribute("data-ref") || "").trim();
+    const curParts = splitInstanceRef(curRef);
+    const nextPrefix = ((refInp && refInp.value) || "").trim().replace(/^-/, "");
+    const nextNum = ((numInp && numInp.value) || "").trim().replace(/[^\d]/g, "");
+    const nextRef = joinInstanceRef(nextPrefix, nextNum || curParts.num);
+    const descLbl = el.parentNode ? instanceTextByLabel(el.parentNode, curRef, "desc") : null;
+    const desc2Lbl = el.parentNode ? instanceTextByLabel(el.parentNode, curRef, "desc2") : null;
+    const prevDesc = (
+      el.getAttribute("data-inst-desc") ||
+      (descLbl ? descLbl.textContent : "") ||
+      libDescForUse(el) ||
+      ""
+    ).trim();
+    const prevDesc2 = (
+      el.getAttribute("data-inst-desc2") ||
+      (desc2Lbl ? desc2Lbl.textContent : "") ||
+      libDesc2ForUse(el) ||
+      ""
+    ).trim();
+    const nextDesc = descInp ? descInp.value.trim() : prevDesc;
+    const nextDesc2 = desc2Inp ? desc2Inp.value.trim() : prevDesc2;
+    const prefixChanged = nextPrefix !== curParts.prefix;
+    const numChanged = (nextNum || "") !== (curParts.num || "");
+    const descChanged = nextDesc !== prevDesc;
+    const desc2Changed = nextDesc2 !== prevDesc2;
+    const metaChanged = prefixChanged || descChanged || desc2Changed;
+
+    if (metaChanged) {
+      const msg = prefixChanged
+        ? W.choice.promotePrefix
+        : W.choice.promoteDesc;
+      const choice = await askChoice(msg, { title: W.dialog.promoteScope });
+      if (choice === "cancel") {
+        syncSelectionProps("use");
+        return;
+      }
+      let changed = false;
+      if (nextRef !== curRef) {
+        const res = setInstanceRef(el, nextRef);
+        if (!res.ok) {
+          setStatus(res.reason || status.instanceRefFailed);
+          syncSelectionProps("use");
+          return;
+        }
+        if (res.changed) changed = true;
+      } else if (!state._selPropUndoPushed) {
+        pushUndo();
+      }
+      const refNow = (el.getAttribute("data-ref") || nextRef).trim();
+      ensureInstanceDesigLabel(el, refNow);
+      if (descChanged) {
+        if (nextDesc) {
+          el.setAttribute("data-inst-desc", nextDesc);
+          ensureInstanceDescLabel(el, refNow, nextDesc, { label: "desc", yOff: 18 });
+        } else {
+          el.removeAttribute("data-inst-desc");
+          const d = instanceTextByLabel(el.parentNode, refNow, "desc");
+          if (d) d.remove();
+        }
+        changed = true;
+      }
+      if (desc2Changed) {
+        if (nextDesc2) {
+          el.setAttribute("data-inst-desc2", nextDesc2);
+          ensureInstanceDescLabel(el, refNow, nextDesc2, { label: "desc2", yOff: 30 });
+        } else {
+          el.removeAttribute("data-inst-desc2");
+          const d = instanceTextByLabel(el.parentNode, refNow, "desc2");
+          if (d) d.remove();
+        }
+        changed = true;
+      }
+      if (choice === "library") {
+        if (prefixChanged) await promoteToLibrary("prefix", nextPrefix, el);
+        if (descChanged) await promoteToLibrary("desc", nextDesc, el);
+        if (desc2Changed) await promoteToLibrary("desc2", nextDesc2, el);
+        setStatus(status.instanceRefSet(refNow));
+      } else if (changed || prefixChanged || numChanged) {
+        setStatus(status.instanceRefSet(refNow));
+      }
+      const nextSym = ((symSel && symSel.value) || "").trim();
+      const curSym = (
+        el.getAttribute("data-sym") ||
+        el.getAttribute("href") ||
+        el.getAttributeNS(XLINK, "href") ||
+        ""
+      ).replace(/^#/, "");
+      if (nextSym && nextSym !== curSym) {
+        if (!state.lib || !resolveLibSymbol(state.lib.svg, nextSym)) {
+          setStatus(status.symbolMissing(nextSym));
+          if (symSel) symSel.value = curSym;
+        } else {
+          if (!changed) pushUndo();
+          setUseHref(el, nextSym, XLINK);
+          changed = true;
+          setStatus(status.symbolSwapped(nextSym));
+        }
+      }
+      if (changed || choice === "library") {
+        markActiveDirty();
+        if (el.parentNode) state.selection = expandToInstanceMembers(el.parentNode, [el]);
+        render();
+        buildElementList();
+        syncElementListSelection();
+        syncSelectionProps("use");
+        saveProject();
+      }
+      state._selPropUndoPushed = false;
+      state._selPropOrig = null;
       return;
     }
-    if (res.changed) changed = true;
+
+    let changed = false;
+    if (numChanged || nextRef !== curRef) {
+      const res = setInstanceRef(el, nextRef || curRef);
+      if (!res.ok) {
+        setStatus(res.reason || status.instanceRefFailed);
+        syncSelectionProps("use");
+        return;
+      }
+      if (res.changed) {
+        changed = true;
+        ensureInstanceDesigLabel(el, el.getAttribute("data-ref") || nextRef);
+        setStatus(status.instanceRefSet(el.getAttribute("data-ref") || ""));
+      }
+    }
     const nextSym = ((symSel && symSel.value) || "").trim();
     const curSym = (
       el.getAttribute("data-sym") ||
@@ -1589,19 +1924,23 @@ function commitSelectionProps() {
       setUseHref(el, nextSym, XLINK);
       changed = true;
       setStatus(status.symbolSwapped(nextSym));
-    } else if (res.changed) {
-      setStatus(status.instanceRefSet(el.getAttribute("data-ref") || ""));
     }
     if (changed) {
       markActiveDirty();
+      if (el.parentNode) state.selection = expandToInstanceMembers(el.parentNode, [el]);
       render();
       buildElementList();
       syncElementListSelection();
       syncSelectionProps("use");
       saveProject();
     }
+    state._selPropUndoPushed = false;
+    state._selPropOrig = null;
     return;
   }
+
+  const el = state.selection[0];
+  if (!el) return;
   // conn
   const ref = ((refInp && refInp.value) || "").trim().replace(/^-/, "");
   const pin = ((pinInp && pinInp.value) || "").trim();
@@ -1658,7 +1997,7 @@ function commitSelectionProps() {
   saveProject();
 }
 function initSelectionPropsForm() {
-  const { refInp, pinInp, textInp, lenInp, dirInp, symSel } = selectionPropsEls();
+  const { refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel } = selectionPropsEls();
   const wireCommit = (inp) => {
     if (!inp) return;
     inp.addEventListener("focus", () => {
@@ -1710,7 +2049,10 @@ function initSelectionPropsForm() {
     });
   };
   wireCommit(refInp);
+  wireCommit(numInp);
   wireCommit(pinInp);
+  wireCommit(descInp);
+  wireCommit(desc2Inp);
   wireCommit(textInp);
   wireCommit(lenInp);
   wireCommit(dirInp);
@@ -1986,14 +2328,13 @@ function moveElement(el, dx, dy) {
     setPositionedElement(el, g("x") + dx, g("y") + dy);
   } else if (t === "use") {
     setPositionedElement(el, g("x") + dx, g("y") + dy);
+    // Złącza jedź z symbolem; etykiety (desig/desc) przesuwaj osobno w ramach grupy.
     const ref = el.getAttribute("data-ref"),
       node = currentSymNode();
     if (ref && node) {
       collectInstanceMembers(node, ref).forEach((m) => {
         if (m === el || state.selection.indexOf(m) >= 0) return;
-        if (m.tagName && m.tagName.toLowerCase() === "text")
-          setPositionedElement(m, num(m, "x") + dx, num(m, "y") + dy);
-        else if (isConnGroup(m)) moveConn(m, dx, dy);
+        if (isConnGroup(m)) moveConn(m, dx, dy);
       });
     }
   } else if (t === "polyline" || t === "polygon") {
@@ -2042,12 +2383,11 @@ function startBodyDrag(ev, cel, i) {
     highlightActive();
     return; // Ctrl = tylko przełącz zaznaczenie, bez przesuwania
   }
-  // jeśli kliknięty element należy do istniejącego zaznaczenia wielokrotnego - przeciągamy całą grupę
+  // Klik w członka instancji zaznacza tylko jego (symbol i tekst da się przesuwać osobno).
+  // Jeśli już jest w multi-select — przeciągamy aktualne zaznaczenie bez rozszerzania.
   const inMulti = state.selection.length > 1 && state.selection.indexOf(el) >= 0;
   if (!inMulti) {
-    state.selection = expandToInstanceMembers(node, [el]);
-  } else {
-    state.selection = expandToInstanceMembers(node, state.selection);
+    state.selection = [el];
   }
   state.activeEl = el;
   state.selHandle = null;
@@ -2057,8 +2397,7 @@ function startBodyDrag(ev, cel, i) {
   const start = toWorld(ev);
   const root = scene.hostRoot;
   const els = state.selection.slice();
-  const previewSources = expandToInstanceMembers(node, els);
-  const previews = previewSources
+  const previews = els
     .map((se) => {
       const idx = Array.prototype.indexOf.call(node.children, se);
       const cel = root ? root.children[idx] : null;
@@ -2257,16 +2596,8 @@ function startDrag(ev, h, rectEl) {
   if (h.kind === "lbl" && h.el) selectConnLabel(h.el);
   else clearConnLabelSel();
   pushUndo();
-  const node = currentSymNode();
   let groupMove = state.selection.length > 1 && h.el && state.selection.indexOf(h.el) >= 0;
-  if (h.el && node && instanceRefOf(h.el)) {
-    if (groupMove) state.selection = expandToInstanceMembers(node, state.selection);
-    else {
-      state.selection = expandToInstanceMembers(node, [h.el]);
-      state.activeEl = h.el;
-      groupMove = state.selection.length > 1;
-    }
-  } else if (!groupMove) {
+  if (!groupMove) {
     state.activeEl = h.el || null;
     state.selection = h.el ? [h.el] : [];
   }
@@ -2954,15 +3285,13 @@ function syncSelectionToolbar() {
     if (btn) btn.disabled = !has;
   });
   const nodeAlign = currentSymNode();
-  const alignUnits = nodeAlign
-    ? buildAlignUnits(
-        expandToInstanceMembers(
-          nodeAlign,
-          selEls().filter((el) => el.parentNode === nodeAlign)
-        ),
-        instanceRefOf
+  const alignEls = nodeAlign
+    ? resolveAlignElements(
+        selEls().filter((el) => el.parentNode === nodeAlign),
+        { expandToInstanceMembers, instanceRefOf, node: nodeAlign }
       )
     : [];
+  const alignUnits = buildAlignUnits(alignEls, instanceRefOf);
   const canAlign = alignUnits.length >= 2;
   alignIds.forEach((id) => {
     const btn = document.getElementById(id);
@@ -3537,7 +3866,7 @@ function alignSelection(mode) {
     setStatus(W.align.needTwo);
     return;
   }
-  els = expandToInstanceMembers(node, els);
+  els = resolveAlignElements(els, { expandToInstanceMembers, instanceRefOf, node });
   state.selection = els.slice();
   state.activeEl = els[0] || null;
   const units = buildAlignUnits(els, instanceRefOf);
@@ -3830,13 +4159,19 @@ function insertUse(idOverride, fromSidebar) {
   u.style.setProperty("--object-stroke", state.strokeColor);
   pushUndo();
   node.appendChild(u);
-  if (!node.querySelector('text[data-owner-ref="' + ref + '"]')) {
-    const lbl = mkEl("text", { x: c.x + 5, y: c.y - 5, class: "did", "data-owner-ref": ref });
-    lbl.textContent = "-" + ref;
-    styleText(lbl);
-    node.appendChild(lbl);
+  ensureInstanceDesigLabel(u, ref);
+  const libNode = resolveLibSymbol(state.lib?.svg, id);
+  const desc = libNode ? symbolDescription(libNode) : "";
+  const desc2 = libNode ? symbolDescription2(libNode) : "";
+  if (desc) {
+    u.setAttribute("data-inst-desc", desc);
+    ensureInstanceDescLabel(u, ref, desc, { label: "desc", yOff: 18 });
   }
-  state.selection = [u];
+  if (desc2) {
+    u.setAttribute("data-inst-desc2", desc2);
+    ensureInstanceDescLabel(u, ref, desc2, { label: "desc2", yOff: 30 });
+  }
+  state.selection = expandToInstanceMembers(node, [u]);
   state.activeEl = u;
   render();
   syncNameFields();
@@ -3932,14 +4267,16 @@ document.getElementById("btnSaveSymbol").onclick = saveSymbol;
 document.getElementById("btnSaveResource").onclick = () => {
   saveResourceName();
 };
-const instPrefixEl = document.getElementById("instPrefix");
-if (instPrefixEl)
-  instPrefixEl.addEventListener("keydown", (e) => {
+["instPrefix", "symName", "symDesc", "symDesc2", "instStart"].forEach((id) => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener("keydown", (e) => {
     if (e.key === "Enter") {
       e.preventDefault();
       saveSymbol();
     }
   });
+});
 initSelectionPropsForm();
 document.addEventListener("keydown", (e) => {
   if (e.key !== "F2" || e.ctrlKey || e.metaKey || e.altKey) return;

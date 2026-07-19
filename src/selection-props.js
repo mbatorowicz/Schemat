@@ -3,18 +3,56 @@
  * use | conn | text | null
  */
 
+import { splitInstanceRef } from "./instance-refs.js";
+
+/** Oznaczenie instancji z elementu (use / text / conn). */
+export function selectionElRef(el) {
+  if (!el?.getAttribute) return "";
+  if (el.getAttribute("data-role") === "conn") return (el.getAttribute("data-ref") || "").trim();
+  const t = el.tagName ? el.tagName.toLowerCase() : "";
+  if (t === "use") return (el.getAttribute("data-ref") || "").trim();
+  if (t === "text") return (el.getAttribute("data-owner-ref") || "").trim();
+  return "";
+}
+
+/**
+ * Gdy zaznaczenie to jedna instancja (wspólny ref + dokładnie jeden use) — zwraca ten use.
+ */
+export function selectionInstanceUse(selection) {
+  if (!selection || !selection.length) return null;
+  let useEl = null;
+  let ref = "";
+  for (const el of selection) {
+    if (!el?.tagName) return null;
+    const r = selectionElRef(el);
+    if (!r) return null;
+    if (!ref) ref = r;
+    else if (r !== ref) return null;
+    if (el.tagName.toLowerCase() === "use") {
+      if (useEl) return null;
+      useEl = el;
+    }
+  }
+  return useEl;
+}
+
 /** @param {{ onSheet: boolean, selection?: Element[], connLabelSel?: Element|null }} ctx */
 export function resolveSelectionPropsMode({ onSheet, selection, connLabelSel }) {
   if (!onSheet) return null;
   if (connLabelSel) return "text";
-  if (!selection || selection.length !== 1) return null;
-  const el = selection[0];
-  if (!el || !el.tagName) return null;
-  if (el.getAttribute && el.getAttribute("data-role") === "conn") return "conn";
-  const t = el.tagName.toLowerCase();
-  if (t === "use") return "use";
-  if (t === "text") return "text";
-  return null;
+  if (!selection || !selection.length) return null;
+
+  if (selection.length === 1) {
+    const el = selection[0];
+    if (!el || !el.tagName) return null;
+    if (el.getAttribute && el.getAttribute("data-role") === "conn") return "conn";
+    const t = el.tagName.toLowerCase();
+    if (t === "use") return "use";
+    if (t === "text") return "text";
+    return null;
+  }
+
+  return selectionInstanceUse(selection) ? "use" : null;
 }
 
 /**
@@ -22,34 +60,41 @@ export function resolveSelectionPropsMode({ onSheet, selection, connLabelSel }) 
  *   mode: string|null,
  *   el?: Element|null,
  *   connLabelEl?: Element|null,
+ *   descText?: string,
+ *   desc2Text?: string,
  *   getHref?: (el: Element) => string,
  *   lead?: { len: string, dir: string }|null,
  * }} ctx
  */
-export function readSelectionPropsState({ mode, el, connLabelEl, getHref, lead = null }) {
-  if (!mode) {
-    return { ref: "", pin: "", text: "", symId: "", len: "", dir: "", isLead: false };
-  }
+export function readSelectionPropsState({ mode, el, connLabelEl, descText = "", desc2Text = "", getHref, lead = null }) {
+  const empty = {
+    ref: "",
+    prefix: "",
+    num: "",
+    pin: "",
+    text: "",
+    desc: "",
+    desc2: "",
+    symId: "",
+    len: "",
+    dir: "",
+    isLead: false,
+  };
+  if (!mode) return empty;
   if (mode === "text") {
     const textEl = connLabelEl || el;
     return {
-      ref: "",
-      pin: "",
+      ...empty,
       text: textEl ? String(textEl.textContent || "") : "",
-      symId: "",
-      len: "",
-      dir: "",
-      isLead: false,
     };
   }
-  if (!el) return { ref: "", pin: "", text: "", symId: "", len: "", dir: "", isLead: false };
+  if (!el) return empty;
   const ref = (el.getAttribute("data-ref") || "").trim();
   if (mode === "conn") {
     return {
+      ...empty,
       ref,
       pin: (el.getAttribute("data-pin") || "").trim(),
-      text: "",
-      symId: "",
       len: lead?.len != null ? String(lead.len) : "",
       dir: lead?.dir || "",
       isLead: !!lead,
@@ -64,12 +109,27 @@ export function readSelectionPropsState({ mode, el, connLabelEl, getHref, lead =
     const href = el.getAttribute("href") || "";
     symId = href.replace(/^#/, "").trim();
   }
-  return { ref, pin: "", text: "", symId, len: "", dir: "", isLead: false };
+  const parts = splitInstanceRef(ref);
+  const localDesc = (el.getAttribute("data-inst-desc") || "").trim();
+  const localDesc2 = (el.getAttribute("data-inst-desc2") || "").trim();
+  return {
+    ref,
+    prefix: parts.prefix,
+    num: parts.num,
+    pin: "",
+    text: "",
+    desc: localDesc || String(descText || ""),
+    desc2: localDesc2 || String(desc2Text || ""),
+    symId,
+    len: "",
+    dir: "",
+    isLead: false,
+  };
 }
 
 /** Które pole belki fokusować po dblclick / editElement. */
 export function selectionPropsFocusField(mode, { isLead = false } = {}) {
-  if (mode === "use") return "selPropSym";
+  if (mode === "use") return "selPropRef";
   if (mode === "conn") return isLead ? "selPropLen" : "selPropPin";
   if (mode === "text") return "selPropText";
   return null;

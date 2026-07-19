@@ -19,6 +19,9 @@ export const W = {
   field: {
     name: "Nazwa",
     designation: "Oznaczenie",
+    description: "Opis",
+    description2: "Opis 2",
+    elementNum: "Nr",
     pin: "Pin",
     text: "Tre\u015b\u0107",
     length: "D\u0142ugo\u015b\u0107",
@@ -31,9 +34,16 @@ export const W = {
     projectName: "Nazwa folderu projektu",
   },
   fieldTip: {
-    symbolName: "Nazwa czytelna w listach i nag\u0142\u00f3wku. Nie jest oznaczeniem instancji na rysunku.",
+    symbolName: "Nazwa czytelna w listach. Edycja tylko w bibliotece \u2014 nie jest oznaczeniem na rysunku.",
     symbolDesignation:
-      "Typ elementu na schemacie. Wiele symboli w bibliotece mo\u017ce mie\u0107 to samo oznaczenie; numeracja instancji jest wsp\u00f3lna.",
+      "Prefix typu elementu bez numeru (np. SB, K). Numer instancji nadawany jest na schemacie.",
+    symbolDescription: "Pierwsza linia opisu katalogowego. Przy wstawianiu trafia na etykiet\u0119 pod symbolem.",
+    symbolDescription2: "Druga linia opisu katalogowego pod pierwsz\u0105.",
+    instancePrefix:
+      "Prefix oznaczenia na schemacie (bez numeru). Przy zapisie do biblioteki numer nie jest przenoszony.",
+    instanceNum: "Numer elementu na tym schemacie (lokalny). Nie trafia do biblioteki.",
+    instanceDescription: "Pierwsza linia opisu przy symbolu. Lokalnie albo w bibliotece.",
+    instanceDescription2: "Druga linia opisu przy symbolu. Lokalnie albo w bibliotece.",
     instanceRef:
       "Oznaczenie instancji na schemacie (np. K1). Musi by\u0107 unikalne w\u015br\u00f3d symboli na arkuszu. Enter zatwierdza, Esc cofa.",
     connPin: "Numer lub nazwa styku z\u0142\u0105cza. Enter zatwierdza, Esc cofa.",
@@ -50,6 +60,16 @@ export const W = {
     openProject: "Otw\u00f3rz projekt",
     deleteSymbol: "Usu\u0144 symbol",
     newSheet: "Nowy schemat",
+    promoteScope: "Zakres zmiany",
+  },
+  choice: {
+    cancel: "Anuluj",
+    local: "Tylko ten schemat",
+    library: "Zaktualizuj bibliotek\u0119",
+    promotePrefix:
+      "Zmieniono oznaczenie (prefix). Zaktualizowa\u0107 szablon w bibliotece (bez numeru elementu), czy tylko t\u0119 instancj\u0119 na schemacie?",
+    promoteDesc:
+      "Zmieniono opis. Zaktualizowa\u0107 szablon w bibliotece, czy tylko t\u0119 instancj\u0119 na schemacie?",
   },
   group: {
     symbol: "Symbol",
@@ -70,7 +90,7 @@ export const W = {
     unifiedProject: "Zapisz aktywny plik i ca\u0142y projekt (biblioteka, schematy, ustawienia)",
     file: "Zapisz zawarto\u015b\u0107 pliku na dysk",
     project: "Zapisz bibliotek\u0119, zmienione schematy i ustawienia projektu",
-    symbol: "Zapisz oznaczenie i domy\u015bln\u0105 numeracj\u0119",
+    symbol: "Zapisz nazw\u0119, oznaczenie, opis i numeracj\u0119",
     sheet: "Zapisz nazw\u0119 wy\u015bwietlan\u0105 schematu",
     library: "Zmie\u0144 nazw\u0119 pliku biblioteki",
     projectRename: "Zmie\u0144 nazw\u0119 folderu projektu",
@@ -79,6 +99,8 @@ export const W = {
   placeholder: {
     symbolName: "",
     designation: "",
+    description: "",
+    description2: "",
     sheet: "",
     library: "",
     project: "",
@@ -286,6 +308,7 @@ export function collectWordingStrings() {
     W.confirm.sheetNoProject,
     W.confirm.replaceManualRoute,
     ...Object.values(W.dialog),
+    ...Object.values(W.choice),
     W.field.length,
     W.field.direction,
     W.field.symbol,

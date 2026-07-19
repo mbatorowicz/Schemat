@@ -3,6 +3,8 @@ import {
   resolveSelectionPropsMode,
   readSelectionPropsState,
   selectionPropsFocusField,
+  selectionInstanceUse,
+  selectionElRef,
   leadPropsFromConn,
 } from "../src/selection-props.js";
 import { num, fmt } from "../src/svg-utils.js";
@@ -17,23 +19,75 @@ describe("resolveSelectionPropsMode", () => {
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [connEl] })).toBe("conn");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [textEl] })).toBe("text");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [connEl], connLabelSel: connEl })).toBe("text");
-    expect(resolveSelectionPropsMode({ onSheet: true, selection: [useEl, textEl] })).toBe(null);
     expect(resolveSelectionPropsMode({ onSheet: false, selection: [useEl] })).toBe(null);
+  });
+
+  it("dla grupy instancji (use + etykieta) zwraca use", () => {
+    const useEl = {
+      tagName: "use",
+      getAttribute: (n) => (n === "data-ref" ? "SB1" : null),
+    };
+    const textEl = {
+      tagName: "text",
+      getAttribute: (n) => (n === "data-owner-ref" ? "SB1" : null),
+    };
+    expect(resolveSelectionPropsMode({ onSheet: true, selection: [useEl, textEl] })).toBe("use");
+    expect(selectionInstanceUse([useEl, textEl])).toBe(useEl);
+  });
+
+  it("dla mieszanego zaznaczenia różnych ref zwraca null", () => {
+    const useA = { tagName: "use", getAttribute: (n) => (n === "data-ref" ? "SB1" : null) };
+    const useB = { tagName: "use", getAttribute: (n) => (n === "data-ref" ? "SB2" : null) };
+    expect(resolveSelectionPropsMode({ onSheet: true, selection: [useA, useB] })).toBe(null);
+    expect(selectionInstanceUse([useA, useB])).toBe(null);
+  });
+});
+
+describe("selectionElRef", () => {
+  it("czyta ref z use / text / conn", () => {
+    expect(selectionElRef({ tagName: "use", getAttribute: (n) => (n === "data-ref" ? "K1" : null) })).toBe("K1");
+    expect(
+      selectionElRef({ tagName: "text", getAttribute: (n) => (n === "data-owner-ref" ? "K1" : null) })
+    ).toBe("K1");
+    expect(
+      selectionElRef({
+        tagName: "g",
+        getAttribute: (n) => (n === "data-role" ? "conn" : n === "data-ref" ? "X1" : null),
+      })
+    ).toBe("X1");
   });
 });
 
 describe("readSelectionPropsState", () => {
-  it("czyta ref/pin/text/sym/lead", () => {
+  it("czyta prefix/nr/opis dla use", () => {
     const use = {
       tagName: "use",
-      getAttribute: (n) => ({ "data-ref": "K1", "data-sym": "SK-33-34", href: "#SK-33-34" })[n] ?? null,
+      getAttribute: (n) =>
+        ({ "data-ref": "SB1", "data-sym": "SK-33-34", href: "#SK-33-34", "data-inst-desc": "Schneider XAL" })[n] ??
+        null,
     };
     expect(readSelectionPropsState({ mode: "use", el: use })).toMatchObject({
-      ref: "K1",
+      ref: "SB1",
+      prefix: "SB",
+      num: "1",
+      desc: "Schneider XAL",
+      desc2: "",
       symId: "SK-33-34",
       isLead: false,
     });
 
+    const use2 = {
+      tagName: "use",
+      getAttribute: (n) =>
+        ({ "data-ref": "K1", "data-sym": "K", "data-inst-desc": "linia1", "data-inst-desc2": "linia2" })[n] ?? null,
+    };
+    expect(readSelectionPropsState({ mode: "use", el: use2 })).toMatchObject({
+      desc: "linia1",
+      desc2: "linia2",
+    });
+  });
+
+  it("czyta ref/pin/lead dla conn", () => {
     const conn = {
       tagName: "g",
       getAttribute: (n) => ({ "data-ref": "X2", "data-pin": "2", "data-role": "conn" })[n] ?? null,
@@ -46,8 +100,12 @@ describe("readSelectionPropsState", () => {
       })
     ).toEqual({
       ref: "X2",
+      prefix: "",
+      num: "",
       pin: "2",
       text: "",
+      desc: "",
+      desc2: "",
       symId: "",
       len: "12",
       dir: "E",
@@ -58,7 +116,7 @@ describe("readSelectionPropsState", () => {
 
 describe("selectionPropsFocusField", () => {
   it("mapuje tryb na id pola", () => {
-    expect(selectionPropsFocusField("use")).toBe("selPropSym");
+    expect(selectionPropsFocusField("use")).toBe("selPropRef");
     expect(selectionPropsFocusField("conn")).toBe("selPropPin");
     expect(selectionPropsFocusField("conn", { isLead: true })).toBe("selPropLen");
     expect(selectionPropsFocusField("text")).toBe("selPropText");

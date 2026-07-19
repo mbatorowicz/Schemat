@@ -1,17 +1,37 @@
-/** Zapis parametrów symbolu — nazwa wyświetlana + oznaczenie (id SVG) + domyślna numeracja na schemacie. */
+/** Zapis parametrów symbolu — nazwa wyświetlana + oznaczenie (prefix) + opis + numeracja. */
 
 import { libSymbolGroups } from "./symbol-resolver.js";
 import { symbolEffectiveDisplayName, symbolListSubtitle } from "./symbol-display.js";
 import { status as Wstatus } from "./ui-wording.js";
 
 /** Nazwa widoczna w UI (listy). Osobno od oznaczenia technicznego. */
-
 export const SYMBOL_NAME_ATTR = "data-symbol-name";
+
+/** Opis katalogowy linia 1 — szablon dla etykiet na schemacie. */
+export const SYMBOL_DESC_ATTR = "data-symbol-desc";
+/** Opis katalogowy linia 2. */
+export const SYMBOL_DESC2_ATTR = "data-symbol-desc2";
 
 export function symbolDisplayName(node) {
   if (!node?.getAttribute) return "";
-
   return (node.getAttribute(SYMBOL_NAME_ATTR) || "").trim();
+}
+
+export function symbolDescription(node) {
+  if (!node?.getAttribute) return "";
+  return (node.getAttribute(SYMBOL_DESC_ATTR) || "").trim();
+}
+
+export function symbolDescription2(node) {
+  if (!node?.getAttribute) return "";
+  return (node.getAttribute(SYMBOL_DESC2_ATTR) || "").trim();
+}
+
+function setOptionalAttr(node, attr, value) {
+  const v = String(value || "").trim();
+  if (v) node.setAttribute(attr, v);
+  else if (typeof node.removeAttribute === "function") node.removeAttribute(attr);
+  else node.setAttribute(attr, "");
 }
 
 /** Etykieta główna w listach i nagłówku zaznaczenia. Nazwa > oznaczenie > id. */
@@ -40,41 +60,18 @@ export function symbolDesignation(node, fallbackId = "") {
 
 export function isValidSymbolDisplayName(v) {
   const s = (v || "").trim();
-
   return s.length >= 1 && s.length <= 120;
 }
 
 /** Id techniczne / oznaczenie (href SVG) — litery, cyfry, _, - */
-
 export function isValidSymbolName(v) {
   return !!v && /^[\p{L}_][\p{L}\p{N}_\-]*$/u.test(v);
 }
 
 export function libSymbolIdExists(libSvg, id, exceptId) {
   if (!libSvg || !id) return false;
-
   return libSymbolGroups(libSvg).some((g) => g.id === id && g.id !== exceptId);
 }
-
-/**
-
- * @param {{
-
- *   sym: { node: Element },
-
- *   libSvg: Element,
-
- *   sheets: { svg: Element }[],
-
- *   form: { name: string, prefix: string, numbered: boolean, start: number },
-
- *   rewriteSymbolIdRefs: Function,
-
- *   XLINK: string,
-
- * }} ctx
-
- */
 
 /** Zmiana samej nazwy wyświetlanej (lista symboli). */
 export function applySymbolDisplayName(sym, title) {
@@ -103,27 +100,32 @@ export function applySymbolDisplayName(sym, title) {
   };
 }
 
+/**
+ * @param {{
+ *   sym: { node: Element, id?: string },
+ *   libSvg: Element,
+ *   sheets: { svg: Element }[],
+ *   form: { name: string, prefix: string, desc?: string, desc2?: string, numbered: boolean, start: number },
+ *   rewriteSymbolIdRefs: Function,
+ *   XLINK: string,
+ * }} ctx
+ */
 export function applySymbolForm(ctx) {
   const { sym, libSvg, sheets, form, rewriteSymbolIdRefs, XLINK } = ctx;
-
   const node = sym.node;
-
   const name = (form.name || "").trim();
-
   const designation = (form.prefix || "").trim();
-
+  const desc = (form.desc != null ? String(form.desc) : "").trim();
+  const desc2 = (form.desc2 != null ? String(form.desc2) : "").trim();
   const oldId = node.id;
-
   const prevDisplay = symbolDisplayName(node);
 
   if (!isValidSymbolDisplayName(name)) {
     return { ok: false, message: Wstatus.symbolInvalidName };
   }
-
   if (!designation) {
     return { ok: false, message: Wstatus.symbolEmptyDesignation };
   }
-
   if (!isValidSymbolName(designation)) {
     return { ok: false, message: Wstatus.symbolInvalidDesignation };
   }
@@ -143,6 +145,8 @@ export function applySymbolForm(ctx) {
 
   node.setAttribute(SYMBOL_NAME_ATTR, name);
   node.setAttribute("data-inst-prefix", designation);
+  setOptionalAttr(node, SYMBOL_DESC_ATTR, desc);
+  setOptionalAttr(node, SYMBOL_DESC2_ATTR, desc2);
   node.setAttribute("data-inst-numbered", form.numbered ? "1" : "0");
   node.setAttribute("data-inst-start", String(form.start || 1));
 
@@ -154,6 +158,8 @@ export function applySymbolForm(ctx) {
     newId: node.id,
     displayName: name,
     ozn: designation,
+    desc,
+    desc2,
     idChanged,
     displayChanged,
     message,
@@ -161,18 +167,21 @@ export function applySymbolForm(ctx) {
 }
 
 /**
- * Formularz oznaczenia/numeracji z toolbara.
- * Nazwa wyświetlana jest na liście — przekaż `fallbackName` (z atrybutu symbolu).
+ * Formularz nazwa / oznaczenie / opis ×2 / numeracja z toolbara biblioteki.
  */
 export function readSymbolFormFromDom(doc = document, { fallbackName = "" } = {}) {
   const nameEl = doc.getElementById("symName");
   const prefixEl = doc.getElementById("instPrefix");
+  const descEl = doc.getElementById("symDesc");
+  const desc2El = doc.getElementById("symDesc2");
   const numEl = doc.getElementById("instNumbered");
   const startEl = doc.getElementById("instStart");
   const fromInput = (nameEl?.value || "").trim();
   return {
     name: fromInput || String(fallbackName || "").trim(),
     prefix: (prefixEl?.value || "").trim(),
+    desc: (descEl?.value || "").trim(),
+    desc2: (desc2El?.value || "").trim(),
     numbered: numEl ? numEl.checked : true,
     start: parseInt(startEl?.value, 10) || 1,
   };

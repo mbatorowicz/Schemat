@@ -61,6 +61,11 @@
   width: 160px;
 }
 
+#toolbar .toolbar-form__input--desc {
+  width: 180px;
+  max-width: 220px;
+}
+
 #toolbar .toolbar-form__input--number {
   width: 44px;
 }

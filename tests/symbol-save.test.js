@@ -13,6 +13,10 @@ import {
   symbolCatalogLabel,
   symbolCatalogSubtitle,
   SYMBOL_NAME_ATTR,
+  SYMBOL_DESC_ATTR,
+  SYMBOL_DESC2_ATTR,
+  symbolDescription,
+  symbolDescription2,
 } from "../src/symbol-save.js";
 
 import { normalizeLibLayout } from "../src/library-loader.js";
@@ -64,7 +68,14 @@ describe("applySymbolForm", () => {
 
       sheets: [],
 
-      form: { name: "Czujnik fotooptyczny", prefix: "B", numbered: true, start: 2 },
+      form: {
+        name: "Czujnik fotooptyczny",
+        prefix: "B",
+        desc: "Siemens 3SK1111",
+        desc2: "AC 24V",
+        numbered: true,
+        start: 2,
+      },
 
       rewriteSymbolIdRefs: (svg, a, b) => rewrites.push([a, b]),
 
@@ -78,6 +89,14 @@ describe("applySymbolForm", () => {
     expect(sym.node.getAttribute(SYMBOL_NAME_ATTR)).toBe("Czujnik fotooptyczny");
 
     expect(sym.node.getAttribute("data-inst-prefix")).toBe("B");
+
+    expect(sym.node.getAttribute(SYMBOL_DESC_ATTR)).toBe("Siemens 3SK1111");
+
+    expect(sym.node.getAttribute(SYMBOL_DESC2_ATTR)).toBe("AC 24V");
+
+    expect(symbolDescription(sym.node)).toBe("Siemens 3SK1111");
+
+    expect(symbolDescription2(sym.node)).toBe("AC 24V");
 
     expect(sym.node.getAttribute("data-inst-numbered")).toBe("1");
 

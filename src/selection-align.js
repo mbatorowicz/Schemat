@@ -1,5 +1,6 @@
 /**
- * Wyrównywanie zaznaczenia — jednostki to instancje (wspólny ref) albo pojedyncze elementy.
+ * Wyrównywanie zaznaczenia — jednostki to instancje (gdy ≥2 różne ref)
+ * albo pojedyncze elementy (gdy jeden wspólny ref, np. kilka etykiet).
  */
 
 export const ALIGN_MODES = ["left", "centerH", "right", "top", "centerV", "bottom"];
@@ -7,6 +8,22 @@ export const ALIGN_MODES = ["left", "centerH", "right", "top", "centerV", "botto
 /** Grupuje elementy w jednostki ruchu (instancja / singleton). */
 export function buildAlignUnits(els, instanceRefOf) {
   const list = (els || []).filter(Boolean);
+  const refs = new Set();
+  list.forEach((el) => {
+    const ref = typeof instanceRefOf === "function" ? instanceRefOf(el) : "";
+    if (ref) refs.add(ref);
+  });
+
+  // Jeden wspólny ref (3 etykiety tej samej instancji) → wyrównuj elementy osobno.
+  // Wiele różnych refów → wyrównuj całe instancje.
+  if (refs.size < 2) {
+    return list.map((el, i) => ({
+      id: "solo:" + i,
+      ref: (typeof instanceRefOf === "function" ? instanceRefOf(el) : "") || "",
+      members: [el],
+    }));
+  }
+
   const units = [];
   const byRef = new Map();
   const solo = [];
@@ -28,6 +45,19 @@ export function buildAlignUnits(els, instanceRefOf) {
     units.push({ id: "solo:" + i, ref: "", members: [el] });
   });
   return units;
+}
+
+/** Elementy do wyrównania: expand do instancji tylko gdy zaznaczone ≥2 różne ref. */
+export function resolveAlignElements(els, { expandToInstanceMembers, instanceRefOf, node } = {}) {
+  const list = (els || []).filter(Boolean);
+  if (!node || typeof expandToInstanceMembers !== "function") return list;
+  const refs = new Set();
+  list.forEach((el) => {
+    const ref = typeof instanceRefOf === "function" ? instanceRefOf(el) : "";
+    if (ref) refs.add(ref);
+  });
+  if (refs.size >= 2) return expandToInstanceMembers(node, list);
+  return list;
 }
 
 export function unionBox(boxes) {

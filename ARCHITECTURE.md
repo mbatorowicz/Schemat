@@ -18,9 +18,9 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Zapis arkusza        | `sheet-persistence.js`                               | `dirty`, `inlineSheetDefsSafe`                                                                      |
 | Formularze toolbara  | `toolbar-form.css` + `toolbar-context.js`            | layout pól nazw, widoczność grup                                                                    |
 | Shell UI             | `index.html` `#toolbarMode` + `#toolbarContext`      | 2 linie: tryb + kontekst                                                                            |
-| Wording UI           | `ui-wording.js`                                      | etykiety, tooltips, statusy, breadcrumb                                                             |
+| Wording UI           | `ui-wording.js`                                      | etykiety, tooltips, statusy                                                                         |
 | Badge zapisu         | `save-badge.js` + `project-perm-ui.js`               | dirty / perm / ok                                                                                   |
-| Dialogi / toasty     | `ui-dialog.js`                                       | confirm, toast, a11y modal                                                                          |
+| Dialogi / toasty     | `ui-dialog.js`                                       | confirm, choice (schemat/biblioteka), toast, a11y modal                                             |
 | Baner rysowania      | `draw-mode-ui.js`                                    | DRAW_HINT / DRAW_LABELS / syncDrawBanner                                                            |
 | Tryb rysowania       | `draw-mode.js`                                       | startDraw / preview / finishShape / joint snap                                                      |
 | Listy sidebara       | `sidebar-lists.js` / `sidebar-empty.js`              | symbole, arkusze, elementy + empty states                                                           |

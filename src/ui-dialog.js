@@ -78,6 +78,88 @@ export function createConfirmDialog(opts = {}) {
 }
 
 /**
+ * Dialog 3-wyborowy: anuluj / lokalnie / biblioteka.
+ * @param {{ id?: string, titleId?: string }} [opts]
+ */
+export function createChoiceDialog(opts = {}) {
+  const bgId = opts.id || "choiceDialog";
+  const titleId = opts.titleId || "choiceDialogTitle";
+  let resolveFn = null;
+
+  function el() {
+    return document.getElementById(bgId);
+  }
+
+  /** @param {"cancel"|"local"|"library"} result */
+  function close(result) {
+    const bg = el();
+    if (bg) bg.classList.remove("open");
+    if (resolveFn) {
+      const r = resolveFn;
+      resolveFn = null;
+      r(result);
+    }
+  }
+
+  /**
+   * @param {string} message
+   * @param {{
+   *   title?: string,
+   *   cancelLabel?: string,
+   *   localLabel?: string,
+   *   libraryLabel?: string,
+   * }} [cfg]
+   * @returns {Promise<"cancel"|"local"|"library">}
+   */
+  function ask(message, cfg = {}) {
+    const bg = el();
+    if (!bg) {
+      const ok = window.confirm(message);
+      return Promise.resolve(ok ? "library" : "cancel");
+    }
+    const title = document.getElementById(titleId);
+    const body = document.getElementById("choiceDialogBody");
+    const cancel = document.getElementById("choiceDialogCancel");
+    const local = document.getElementById("choiceDialogLocal");
+    const lib = document.getElementById("choiceDialogLib");
+    if (title) title.textContent = cfg.title || "Zakres zmiany";
+    if (body) body.textContent = message;
+    if (cancel) cancel.textContent = cfg.cancelLabel || "Anuluj";
+    if (local) local.textContent = cfg.localLabel || "Tylko ten schemat";
+    if (lib) lib.textContent = cfg.libraryLabel || "Zaktualizuj bibliotekę";
+    bg.classList.add("open");
+    if (lib) lib.focus();
+    return new Promise((resolve) => {
+      resolveFn = resolve;
+    });
+  }
+
+  function init() {
+    const bg = el();
+    const cancel = document.getElementById("choiceDialogCancel");
+    const local = document.getElementById("choiceDialogLocal");
+    const lib = document.getElementById("choiceDialogLib");
+    if (cancel) cancel.onclick = () => close("cancel");
+    if (local) local.onclick = () => close("local");
+    if (lib) lib.onclick = () => close("library");
+    if (bg) {
+      bg.addEventListener("pointerdown", (e) => {
+        if (e.target === bg) close("cancel");
+      });
+    }
+    document.addEventListener("keydown", (e) => {
+      if (!el()?.classList.contains("open")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close("cancel");
+      }
+    });
+  }
+
+  return { ask, close, init };
+}
+
+/**
  * @param {{ hostId?: string, ttlMs?: number }} [opts]
  */
 export function createToastHost(opts = {}) {

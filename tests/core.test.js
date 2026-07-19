@@ -7,7 +7,7 @@ import {
   netlistsForSheet,
   librarySearchRelPaths,
 } from "../src/project-files.js";
-import { refBaseForSymbol, isValidInstanceRef } from "../src/instance-refs.js";
+import { refBaseForSymbol, isValidInstanceRef, splitInstanceRef, joinInstanceRef } from "../src/instance-refs.js";
 import { pickPointContactByToward } from "../src/conn-contact-pick.js";
 
 describe("netlist-model", () => {
@@ -127,6 +127,14 @@ describe("instance-refs", () => {
   it("używa id symbolu jako base gdy brak atrybutów numeracji", () => {
     const node = { id: "B", getAttribute: () => null };
     expect(refBaseForSymbol("B", node)).toEqual({ base: "B", numbered: true, start: 1 });
+  });
+
+  it("rozdziela i składa prefix + numer", () => {
+    expect(splitInstanceRef("SB1")).toEqual({ prefix: "SB", num: "1" });
+    expect(splitInstanceRef("-K12")).toEqual({ prefix: "K", num: "12" });
+    expect(splitInstanceRef("Q")).toEqual({ prefix: "Q", num: "" });
+    expect(joinInstanceRef("SB", "1")).toBe("SB1");
+    expect(joinInstanceRef("Q", "")).toBe("Q");
   });
 });
 
