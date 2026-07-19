@@ -19,6 +19,12 @@
   white-space: nowrap;
 }
 
+/* Nadpisuje display:inline-flex powyżej — inaczej Pin zostaje widoczny przy symbolu. */
+#toolbar .toolbar-form__field.context-hidden,
+#toolbar .selection-info.context-hidden {
+  display: none;
+}
+
 #toolbar .toolbar-form__label {
   font: 600 11px Arial, Helvetica, sans-serif;
   color: #475569;
