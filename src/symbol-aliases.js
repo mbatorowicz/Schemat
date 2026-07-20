@@ -11,6 +11,7 @@ export const SYMBOL_ID_ALIASES = {
   sk1: "SK",
   SK1: "SK",
   NO: "SK",
+  PSU: "G",
   drv: "DRV",
   motor: "MOTOR",
   a1: "A1",
@@ -19,6 +20,27 @@ export const SYMBOL_ID_ALIASES = {
   y1: "Y1",
   cyl: "CYL",
 };
+
+/** Historia id na węźle biblioteki — po ręcznej/migracyjnej zmianie `id`. */
+export const SYMBOL_ID_ALIASES_ATTR = "data-id-aliases";
+
+export function parseSymbolIdAliases(node) {
+  if (!node?.getAttribute) return [];
+  return (node.getAttribute(SYMBOL_ID_ALIASES_ATTR) || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Zapamiętaj poprzednie id, żeby arkusze ze starym href/#data-sym znalazły symbol w bibliotece. */
+export function rememberSymbolIdAlias(node, oldId) {
+  if (!node || !oldId) return;
+  const currentId = node.id || "";
+  if (!currentId || oldId === currentId) return;
+  const aliases = parseSymbolIdAliases(node).filter((a) => a !== oldId && a !== currentId);
+  aliases.push(oldId);
+  node.setAttribute(SYMBOL_ID_ALIASES_ATTR, aliases.join(" "));
+}
 
 /** Stare oznaczenie instancji (data-ref) → kanoniczne */
 export const INSTANCE_REF_ALIASES = {

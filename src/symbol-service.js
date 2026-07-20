@@ -6,6 +6,7 @@ import { canonicalSymbolId, canonicalInstanceRef } from "./symbol-aliases.js";
 import {
   libSymbolGroups,
   resolveLibSymbol,
+  resolveLibSymbolId,
   resolveSheetSymbol,
   resolveSymbol,
   libSymbolIds,
@@ -17,6 +18,7 @@ import {
 export {
   libSymbolGroups,
   resolveLibSymbol,
+  resolveLibSymbolId,
   resolveSheetSymbol,
   resolveSymbol,
   libSymbolIds,
@@ -32,11 +34,11 @@ export function parseUseHref(useEl, xlinkNs = XLINK_NS) {
   return (useEl.getAttribute("href") || useEl.getAttributeNS(xlinkNs, "href") || "").replace(/^#/, "");
 }
 
-export function setUseHref(useEl, id, xlinkNs = XLINK_NS) {
-  const canon = canonicalSymbolId(id);
-  useEl.setAttribute("href", "#" + canon);
-  useEl.setAttributeNS(xlinkNs, "xlink:href", "#" + canon);
-  useEl.setAttribute("data-sym", canon);
+export function setUseHref(useEl, id, xlinkNs = XLINK_NS, libSvg = null) {
+  const target = (libSvg && resolveLibSymbolId(libSvg, id)) || canonicalSymbolId(id);
+  useEl.setAttribute("href", "#" + target);
+  useEl.setAttributeNS(xlinkNs, "xlink:href", "#" + target);
+  useEl.setAttribute("data-sym", target);
 }
 
 export function resolveSymbolDef(libSvg, sheetSvg, id) {
@@ -51,20 +53,23 @@ export function definitionForUseElement(useEl, libSvg, sheetSvg, xlinkNs = XLINK
   return resolveSymbolDef(libSvg, sheetSvg, symId || href);
 }
 
-export function syncUseSymbolHrefs(root, xlinkNs = XLINK_NS) {
+/** Ujednolica href/data-sym do aktualnego id z biblioteki (aliasy + data-id-aliases). */
+export function syncUseSymbolHrefs(root, xlinkNs = XLINK_NS, libSvg = null) {
   if (!root) return false;
   let changed = false;
   root.querySelectorAll("use").forEach((use) => {
-    const raw = parseUseHref(use, xlinkNs);
+    const raw = parseUseHref(use, xlinkNs) || (use.getAttribute("data-sym") || "").trim();
     if (!raw) return;
-    const canon = canonicalSymbolId(raw);
-    if (canon !== raw) {
-      use.setAttribute("href", "#" + canon);
-      use.setAttributeNS(xlinkNs, "xlink:href", "#" + canon);
+    const target = (libSvg && resolveLibSymbolId(libSvg, raw)) || canonicalSymbolId(raw);
+    if (!target) return;
+    const href = parseUseHref(use, xlinkNs);
+    if (href !== target) {
+      use.setAttribute("href", "#" + target);
+      use.setAttributeNS(xlinkNs, "xlink:href", "#" + target);
       changed = true;
     }
-    if (use.getAttribute("data-sym") !== canon) {
-      use.setAttribute("data-sym", canon);
+    if (use.getAttribute("data-sym") !== target) {
+      use.setAttribute("data-sym", target);
       changed = true;
     }
   });
@@ -75,18 +80,19 @@ export function auditSymbolsOnSheet(sheetNode, libSvg, sheetSvg, xlinkNs = XLINK
   const missing = [];
   if (!sheetNode) return { missing, ok: true };
   sheetNode.querySelectorAll("use").forEach((u) => {
-    const id = canonicalSymbolId(parseUseHref(u, xlinkNs));
-    if (!id) return;
+    const raw = parseUseHref(u, xlinkNs);
+    if (!raw) return;
+    const id = resolveLibSymbolId(libSvg, raw) || canonicalSymbolId(raw);
     if (!resolveSymbolDef(libSvg, sheetSvg, id)) missing.push(id);
   });
   const uniq = [...new Set(missing)];
   return { missing: uniq, ok: uniq.length === 0 };
 }
 
-export function migrateInstanceRefsOnRoot(root, xlinkNs = XLINK_NS) {
+export function migrateInstanceRefsOnRoot(root, xlinkNs = XLINK_NS, libSvg = null) {
   let changed = false;
   if (!root) return false;
-  if (syncUseSymbolHrefs(root, xlinkNs)) changed = true;
+  if (syncUseSymbolHrefs(root, xlinkNs, libSvg)) changed = true;
   root.querySelectorAll("use").forEach((use) => {
     const sym = parseUseHref(use, xlinkNs);
     let ref = use.getAttribute("data-ref");

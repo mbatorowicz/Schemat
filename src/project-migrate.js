@@ -1,7 +1,7 @@
 /**
  * Migracje projektu — jedna kolejność, idempotentne, bez rozproszonej logiki w main.js.
  */
-import { symbolAliasMigrations, SYMBOL_ID_ALIASES } from "./symbol-aliases.js";
+import { symbolAliasMigrations, SYMBOL_ID_ALIASES, rememberSymbolIdAlias } from "./symbol-aliases.js";
 import { stripSheetEmbeddedSymbols, resolveLibSymbol, libSymbolGroups } from "./symbol-resolver.js";
 import { migrateInstanceRefsOnRoot } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
@@ -32,11 +32,13 @@ export function createProjectMigrator(deps) {
       const existing = resolveLibSymbol(state.lib.svg, newId);
       if (existing && existing !== oldNode) {
         rewriteSymbolIdRefs(state.lib.svg, oldId, newId, XLINK);
+        rememberSymbolIdAlias(existing, oldId);
         oldNode.remove();
         changed = true;
       } else {
         rewriteSymbolIdRefs(state.lib.svg, oldId, newId, XLINK);
         oldNode.id = newId;
+        rememberSymbolIdAlias(oldNode, oldId);
         changed = true;
       }
     });
@@ -45,6 +47,7 @@ export function createProjectMigrator(deps) {
 
   function migrateSheetEmbeddedSymbolIds() {
     let changed = false;
+    const libSvg = state.lib?.svg || null;
     state.sheets.forEach((sh) => {
       const defs = sh.svg && sh.svg.querySelector("defs");
       if (!defs) return;
@@ -60,14 +63,25 @@ export function createProjectMigrator(deps) {
           changed = true;
         }
       });
+      if (!libSvg) return;
+      [...defs.children]
+        .filter((n) => n.tagName?.toLowerCase() === "g" && n.id)
+        .forEach((g) => {
+          const libNode = resolveLibSymbol(libSvg, g.id);
+          if (!libNode || libNode.id === g.id) return;
+          if (qsById(defs, libNode.id)) g.remove();
+          else g.id = libNode.id;
+          changed = true;
+        });
     });
     return changed;
   }
 
   function migrateInstanceRefs() {
     let changed = false;
+    const libSvg = state.lib?.svg || null;
     state.sheets.forEach((sh) => {
-      if (migrateInstanceRefsOnRoot(sh.svg, XLINK)) changed = true;
+      if (migrateInstanceRefsOnRoot(sh.svg, XLINK, libSvg)) changed = true;
     });
     return changed;
   }
@@ -109,6 +123,7 @@ export function createProjectMigrator(deps) {
       if (sh.svg) rewriteSymbolIdRefs(sh.svg, oldId, newId, XLINK);
     });
     node.id = newId;
+    rememberSymbolIdAlias(node, oldId);
     if (!node.getAttribute("data-inst-prefix")) node.setAttribute("data-inst-prefix", newId);
     if (node.getAttribute("data-inst-numbered") == null || node.getAttribute("data-inst-numbered") === "") {
       node.setAttribute("data-inst-numbered", "1");

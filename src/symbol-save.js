@@ -1,5 +1,6 @@
 /** Zapis parametrów symbolu — nazwa wyświetlana + oznaczenie (prefix) + opis + numeracja. */
 
+import { rememberSymbolIdAlias } from "./symbol-aliases.js";
 import { libSymbolGroups } from "./symbol-resolver.js";
 import { symbolEffectiveDisplayName, symbolListSubtitle } from "./symbol-display.js";
 import { status as Wstatus } from "./ui-wording.js";
@@ -139,6 +140,7 @@ export function applySymbolForm(ctx) {
       if (sh.svg) rewriteSymbolIdRefs(sh.svg, oldId, designation, XLINK);
     });
     node.id = designation;
+    rememberSymbolIdAlias(node, oldId);
     node.setAttribute("data-alias-lock", "1");
     idChanged = true;
   }

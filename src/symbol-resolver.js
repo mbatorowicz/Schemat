@@ -2,7 +2,7 @@
  * Rozwiązywanie symboli: biblioteka E-00 jest źródłem prawdy.
  * Osadzone <defs> w arkuszu — tylko fallback offline.
  */
-import { canonicalSymbolId } from "./symbol-aliases.js";
+import { canonicalSymbolId, parseSymbolIdAliases } from "./symbol-aliases.js";
 import { qsById } from "./dom-selectors.js";
 
 const XLINK = "http://www.w3.org/1999/xlink";
@@ -16,7 +16,21 @@ export function libSymbolGroups(svg) {
 export function resolveLibSymbol(libSvg, id) {
   if (!libSvg || !id) return null;
   const canon = canonicalSymbolId(id);
-  return libSymbolGroups(libSvg).find((g) => g.id === canon || g.id === id) || null;
+  const groups = libSymbolGroups(libSvg);
+  const direct = groups.find((g) => g.id === canon || g.id === id);
+  if (direct) return direct;
+  return (
+    groups.find((g) => {
+      const aliases = parseSymbolIdAliases(g);
+      return aliases.includes(id) || aliases.includes(canon);
+    }) || null
+  );
+}
+
+/** Aktualne id w bibliotece dla surowego id / aliasu, albo null gdy brak definicji. */
+export function resolveLibSymbolId(libSvg, id) {
+  const node = resolveLibSymbol(libSvg, id);
+  return node?.id || null;
 }
 
 export function resolveSheetSymbol(sheetSvg, id) {

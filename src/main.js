@@ -42,7 +42,7 @@ import {
 } from "./svg-dom.js";
 import { createRenderPipeline } from "./render-pipeline.js";
 import { useColorAwareClone } from "./defs-assembler.js";
-import { definitionForUseElement, setUseHref } from "./symbol-service.js";
+import { definitionForUseElement, setUseHref, syncUseSymbolHrefs } from "./symbol-service.js";
 import { createProjectMigrator } from "./project-migrate.js";
 import { createNetlistRouting } from "./netlist-routing.js";
 import { createSelectionModel, paintVisible } from "./selection-model.js";
@@ -1590,7 +1590,11 @@ function selectionTextTarget() {
 }
 function fillSelPropSymOptions(symSel, currentId) {
   if (!symSel) return;
-  const cur = currentId || "";
+  let cur = currentId || "";
+  if (cur && state.lib?.svg) {
+    const resolved = resolveLibSymbol(state.lib.svg, cur);
+    if (resolved) cur = resolved.id;
+  }
   const ids = state.symbols.map((s) => s.id);
   if (cur && !ids.includes(cur)) ids.unshift(cur);
   const prev = symSel.value;
@@ -3964,6 +3968,7 @@ function collectUsedSymbols(rootNode, sheetSvg) {
   return collectUsedSymbolIds(rootNode, state.lib?.svg, sheetSvg);
 }
 function inlineSheetDefs(sheet) {
+  if (sheet?.svg) syncUseSymbolHrefs(sheet.svg, XLINK, state.lib?.svg);
   return inlineSheetDefsSafe(sheet, {
     svgNs: SVGNS,
     libSvg: state.lib?.svg,

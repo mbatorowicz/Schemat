@@ -171,6 +171,7 @@ describe("symbol-aliases", () => {
     expect(canonicalSymbolId("Xx-3")).toBe("X-3");
     expect(canonicalSymbolId("sk1")).toBe("SK");
     expect(canonicalSymbolId("SK1")).toBe("SK");
+    expect(canonicalSymbolId("PSU")).toBe("G");
     expect(canonicalSymbolId("Q")).toBe("Q");
   });
 

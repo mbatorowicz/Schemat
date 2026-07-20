@@ -104,6 +104,8 @@ describe("applySymbolForm", () => {
 
     expect(sym.node.getAttribute("data-alias-lock")).toBe("1");
 
+    expect(sym.node.getAttribute("data-id-aliases")).toBe("B1");
+
     expect(rewrites).toEqual([["B1", "B"]]);
 
     expect(result.newId).toBe("B");

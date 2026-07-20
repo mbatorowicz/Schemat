@@ -72,8 +72,8 @@ function appendSymbolAlias(aliasId, canonId, editDefs, added, xlinkNs) {
 function resolveSymbolForEdit(id, libSvg, sheetSvg) {
   const canon = canonicalSymbolId(id);
   return (
-    resolveLibSymbol(libSvg, canon) ||
     resolveLibSymbol(libSvg, id) ||
+    resolveLibSymbol(libSvg, canon) ||
     resolveSheetSymbol(sheetSvg, canon) ||
     resolveSheetSymbol(sheetSvg, id)
   );
@@ -82,21 +82,21 @@ function resolveSymbolForEdit(id, libSvg, sheetSvg) {
 export function appendEditDefSymbol(id, editDefs, added, { libSvg, sheetSvg, xlinkNs }) {
   const raw = String(id || "").replace(/^#/, "");
   if (!raw) return;
-  const canon = canonicalSymbolId(raw);
+  const sym = resolveSymbolForEdit(raw, libSvg, sheetSvg);
+  const targetId = sym?.id || canonicalSymbolId(raw);
 
-  if (!added.has(canon)) {
-    const sym = resolveSymbolForEdit(raw, libSvg, sheetSvg);
+  if (!added.has(targetId)) {
     if (!sym) {
-      console.warn("Brak symbolu (bibl./arkusz):", raw, "→", canon);
+      console.warn("Brak symbolu (bibl./arkusz):", raw, "→", targetId);
     } else {
       const clone = useColorAwareClone(sym);
-      clone.id = canon;
+      clone.id = targetId;
       editDefs.appendChild(clone);
-      added.add(canon);
+      added.add(targetId);
     }
   }
 
-  if (raw !== canon) appendSymbolAlias(raw, canon, editDefs, added, xlinkNs);
+  if (raw !== targetId) appendSymbolAlias(raw, targetId, editDefs, added, xlinkNs);
 }
 
 /**
@@ -119,14 +119,15 @@ export function assembleEditDefs(editDefs, opts) {
 
   if (!sheetNode) return { missing };
 
-  syncUseSymbolHrefs(sheetNode, xlinkNs);
+  syncUseSymbolHrefs(sheetNode, xlinkNs, libSvg);
   sheetNode.querySelectorAll("use").forEach((u) => {
     const href = parseUseHref(u, xlinkNs);
     if (!href) return;
     const before = added.size;
     appendEditDefSymbol(href, editDefs, added, { libSvg, sheetSvg, xlinkNs });
-    const canon = canonicalSymbolId(href);
-    if (!added.has(canon) && before === added.size) missing.push(canon);
+    const sym = resolveSymbolForEdit(href, libSvg, sheetSvg);
+    const targetId = sym?.id || canonicalSymbolId(href);
+    if (!added.has(targetId) && before === added.size) missing.push(targetId);
   });
 
   return { missing: [...new Set(missing)] };

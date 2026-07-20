@@ -55,17 +55,18 @@ export function inlineSheetDefsSafe(sheet, deps) {
     const canon = canonicalSymbolId(id);
     const libSym = resolveLibSymbol(libSvg, id);
     if (!libSym) {
-      if (!resolveSheetSymbol(svg, id)) missing.push(canon);
+      if (!resolveSheetSymbol(svg, id) && !resolveSheetSymbol(svg, canon)) missing.push(canon);
       continue;
     }
+    const targetId = libSym.id || canon;
     const topLevel = [...defs.children].find(
-      (n) => n.tagName?.toLowerCase() === "g" && (n.id === canon || n.id === id)
+      (n) => n.tagName?.toLowerCase() === "g" && (n.id === targetId || n.id === canon || n.id === id)
     );
     if (topLevel) topLevel.remove();
     const clone = useColorAwareClone(libSym);
-    clone.id = canon;
+    clone.id = targetId;
     defs.appendChild(clone);
-    updated.push(canon);
+    updated.push(targetId);
   }
 
   if (libSvg) {
