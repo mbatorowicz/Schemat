@@ -66,7 +66,15 @@ export function resolveSelectionPropsMode({ onSheet, selection, connLabelSel }) 
  *   lead?: { len: string, dir: string }|null,
  * }} ctx
  */
-export function readSelectionPropsState({ mode, el, connLabelEl, descText = "", desc2Text = "", getHref, lead = null }) {
+export function readSelectionPropsState({
+  mode,
+  el,
+  connLabelEl,
+  descText = "",
+  desc2Text = "",
+  getHref,
+  lead = null,
+}) {
   const empty = {
     ref: "",
     prefix: "",

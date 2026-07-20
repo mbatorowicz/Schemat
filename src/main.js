@@ -1813,9 +1813,7 @@ async function commitSelectionProps() {
     const metaChanged = prefixChanged || descChanged || desc2Changed;
 
     if (metaChanged) {
-      const msg = prefixChanged
-        ? W.choice.promotePrefix
-        : W.choice.promoteDesc;
+      const msg = prefixChanged ? W.choice.promotePrefix : W.choice.promoteDesc;
       const choice = await askChoice(msg, { title: W.dialog.promoteScope });
       if (choice === "cancel") {
         syncSelectionProps("use");

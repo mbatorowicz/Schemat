@@ -26,10 +26,7 @@ export const SYMBOL_ID_ALIASES_ATTR = "data-id-aliases";
 
 export function parseSymbolIdAliases(node) {
   if (!node?.getAttribute) return [];
-  return (node.getAttribute(SYMBOL_ID_ALIASES_ATTR) || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  return (node.getAttribute(SYMBOL_ID_ALIASES_ATTR) || "").trim().split(/\s+/).filter(Boolean);
 }
 
 /** Zapamiętaj poprzednie id, żeby arkusze ze starym href/#data-sym znalazły symbol w bibliotece. */

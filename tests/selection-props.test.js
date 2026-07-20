@@ -46,9 +46,7 @@ describe("resolveSelectionPropsMode", () => {
 describe("selectionElRef", () => {
   it("czyta ref z use / text / conn", () => {
     expect(selectionElRef({ tagName: "use", getAttribute: (n) => (n === "data-ref" ? "K1" : null) })).toBe("K1");
-    expect(
-      selectionElRef({ tagName: "text", getAttribute: (n) => (n === "data-owner-ref" ? "K1" : null) })
-    ).toBe("K1");
+    expect(selectionElRef({ tagName: "text", getAttribute: (n) => (n === "data-owner-ref" ? "K1" : null) })).toBe("K1");
     expect(
       selectionElRef({
         tagName: "g",

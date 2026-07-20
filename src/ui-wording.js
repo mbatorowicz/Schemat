@@ -35,8 +35,7 @@ export const W = {
   },
   fieldTip: {
     symbolName: "Nazwa czytelna w listach. Edycja tylko w bibliotece \u2014 nie jest oznaczeniem na rysunku.",
-    symbolDesignation:
-      "Prefix typu elementu bez numeru (np. SB, K). Numer instancji nadawany jest na schemacie.",
+    symbolDesignation: "Prefix typu elementu bez numeru (np. SB, K). Numer instancji nadawany jest na schemacie.",
     symbolDescription: "Pierwsza linia opisu katalogowego. Przy wstawianiu trafia na etykiet\u0119 pod symbolem.",
     symbolDescription2: "Druga linia opisu katalogowego pod pierwsz\u0105.",
     instancePrefix:
