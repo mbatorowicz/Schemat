@@ -141,6 +141,14 @@ import { createDrawMode } from "./draw-mode.js";
 import { bindShortcutsHelp } from "./shortcuts-help.js";
 import { summarizeNetlistHealth } from "./netlist-validate.js";
 import { resolveBootStatusMessage } from "./project-boot.js";
+import {
+  pointsOfWire,
+  hitWireSegment,
+  insertVertex,
+  removeBreakVertex,
+  canRemoveBreakVertex,
+  applyWirePoints,
+} from "./polyline-edit.js";
 import "./toolbar-form.css";
 
 ("use strict");
@@ -148,10 +156,12 @@ import "./toolbar-form.css";
 // ---- ikony belki narzędzi (inline SVG, viewBox 0 0 24 24) ----
 const ICONS = {
   btnOpen: '<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  btnMenuOpen: '<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
   btnNewProject: '<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6M9 13h6"/>',
   btnGrant:
     '<path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><circle cx="15" cy="14" r="2.2"/><path d="M15 16v3M15 19h2"/>',
   btnSave: '<path d="M4 4h11l5 5v11H4z"/><path d="M8 4v5h7"/><rect x="8" y="13" width="8" height="7"/>',
+  btnMenuSave: '<path d="M4 4h11l5 5v11H4z"/><path d="M8 4v5h7"/><rect x="8" y="13" width="8" height="7"/>',
   btnSaveAs: '<path d="M4 4h10l4 4v5"/><path d="M8 4v5h7"/><path d="M13.5 20.5l6-6 2 2-6 6h-2z"/>',
   btnNewSheet:
     '<rect x="4" y="3" width="16" height="18" rx="1"/><rect x="7" y="15" width="10" height="4"/><path d="M7 7h10"/>',
@@ -175,6 +185,9 @@ const ICONS = {
   btnAddText: '<path d="M6 6h12M12 6v13M9 19h6"/>',
   btnAddPoint: '<circle cx="12" cy="12" r="5"/>',
   btnAddNode: '<circle cx="12" cy="12" r="5" class="fillnode"/>',
+  btnBranchOblique:
+    '<path d="M6 4v16"/><path d="M6 12l4 4h8" fill="none"/><path d="M6 12l3.2 3.2" stroke-width="2.2"/>',
+  btnObliqueStub: '<path d="M4 18V6"/><path d="M4 12l5 5h9" fill="none"/>',
   btnAddPin: '<path d="M7 18L12 6l5 12M9 14h6"/>',
   btnAddLead: '<path d="M4 12h16"/>',
   btnAlignLeft: '<path d="M4 4v16"/><path d="M8 7h8v3H8z"/><path d="M8 14h12v3H8z"/>',
@@ -206,9 +219,10 @@ function injectIcons() {
     if (!b) continue;
     const ico = b.querySelector(".btn-ico");
     if (ico) ico.innerHTML = svgFor(id);
-    else if (b.classList.contains("btn-labeled")) {
+    else if (b.classList.contains("btn-labeled") || b.classList.contains("file-menu-item")) {
       const span = document.createElement("span");
       span.className = "btn-ico";
+      span.setAttribute("aria-hidden", "true");
       span.innerHTML = svgFor(id);
       b.insertBefore(span, b.firstChild);
     } else b.innerHTML = svgFor(id);
@@ -305,11 +319,14 @@ let childPair, bboxInRoot, rebuildEditDefs, rebuildHost;
 let targetSheet = () => null,
   connectionDiagnostics = () => ({ ok: true, reason: "" }),
   routeSelectedConnection = () => {},
+  promoteSelectionToConnection = async () => null,
+  sheetWireHealth = () => ({ orphans: [], bare: [], missing: [] }),
   collectNetlistProposals = () => [],
   nextProposalId = () => "NEW1";
 let refreshNetlistUI = () => {},
   loadNetlistText = async () => false,
-  autoLoadNetlistForSheet = async () => false;
+  autoLoadNetlistForSheet = async () => false,
+  selectConnectionFromElement = () => false;
 let scheduleNetlistRefresh = () => {};
 let buildSymbolList = () => {},
   buildElementList = () => {},
@@ -326,6 +343,7 @@ let startDraw = () => {},
 let finishShape = async () => {},
   finishLineDraw = () => {},
   exitDraw = () => {},
+  applyObliqueStubToSelection = () => false,
   jointCandidates = () => [],
   nearestJoint = () => null;
 let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm;
@@ -361,8 +379,21 @@ function wireNetlistRouting() {
     selectSheet,
     getHost: () => scene.host,
     askConfirm,
+    askChoice,
+    getSettingsCfg: () => settingsCfg,
+    persistConnections: () => saveProjectSettings(),
+    nearestJoint: (...a) => nearestJoint(...a),
+    wireColor,
   });
-  ({ targetSheet, connectionDiagnostics, routeSelectedConnection, collectNetlistProposals, nextProposalId } = n);
+  ({
+    targetSheet,
+    connectionDiagnostics,
+    routeSelectedConnection,
+    promoteSelectionToConnection,
+    sheetWireHealth,
+    collectNetlistProposals,
+    nextProposalId,
+  } = n);
   const ui = createNetlistUi({
     getState: () => state,
     setStatus,
@@ -370,8 +401,14 @@ function wireNetlistRouting() {
     collectNetlistProposals,
     saveProject,
     getSettingsCfg: () => settingsCfg,
+    saveProjectSettings,
+    getTargetSheet: () => (typeof targetSheet === "function" ? targetSheet() : null),
+    sheetWireHealth,
+    promoteSelectionToConnection,
+    currentSymNode,
+    selectSheetElement,
   });
-  ({ refreshNetlistUI, loadNetlistText, autoLoadNetlistForSheet } = ui);
+  ({ refreshNetlistUI, loadNetlistText, autoLoadNetlistForSheet, selectConnectionFromElement } = ui);
   const live = createNetlistLiveValidator({ refreshNetlistUI, debounceMs: 180 });
   scheduleNetlistRefresh = live.scheduleRefresh;
   ui.wireNetlistDom();
@@ -418,6 +455,7 @@ function wireDrawMode() {
     finishShape,
     finishLineDraw,
     exitDraw,
+    applyObliqueStubToSelection,
     jointCandidates,
     nearestJoint,
   } = d);
@@ -650,6 +688,10 @@ function line(parent, x1, y1, x2, y2, stroke, w) {
 
 // ---- projekt: biblioteka + pliki schematów ----
 document.getElementById("btnOpen").onclick = openProject;
+const btnMenuOpen = document.getElementById("btnMenuOpen");
+if (btnMenuOpen) btnMenuOpen.onclick = () => document.getElementById("btnOpen")?.click();
+const btnMenuSave = document.getElementById("btnMenuSave");
+if (btnMenuSave) btnMenuSave.onclick = () => document.getElementById("btnSave")?.click();
 document.getElementById("btnNewProject").onclick = () => {
   newProject();
 };
@@ -803,6 +845,13 @@ function applyStaticWording() {
   setBtnText("btnFileMenu", W.chrome.fileMenu);
   setBtnText("btnShortcuts", W.chrome.shortcuts);
   setBtnText("btnEmptyOpenProject", W.empty.openProjectCta);
+  setBtnText("btnNewProject", W.dialog.newProject);
+  setBtnText("btnNewSheet", W.dialog.newSheet);
+  setBtnText("btnNewLibrary", W.dialog.newLibrary);
+  setBtnText("btnMenuOpen", W.dialog.openProject + "\u2026");
+  setBtnText("btnLib", W.chrome.openLibrary);
+  setBtnText("btnMenuSave", W.chrome.save);
+  setBtnText("btnSaveAs", W.chrome.saveAs);
 }
 function syncResourceNameFields(mode) {
   const lbl = document.getElementById("lblResourceName");
@@ -2152,17 +2201,11 @@ function selectSheet(sheet, keepView) {
     autoLoadNetlistForSheet(sheet, state.dir, { silent: true }).then((ok) => {
       if (state.active !== sheet) return;
       const title = sheetDisplayTitle(sheet);
-      if (ok)
+      if (ok && state.netlist)
         setStatus(
-          "Schemat " +
-            title +
-            ", spis: " +
-            state.netlist.name +
-            " (" +
-            state.netlist.connections.length +
-            " po\u0142\u0105cze\u0144)."
+          "Schemat " + title + ", spis: " + (state.netlist.connections?.length || 0) + " po\u0142\u0105cze\u0144."
         );
-      else setStatus("Schemat " + title + " \u2014 brak pliku polaczenia_<arkusz>.md.");
+      else setStatus("Schemat " + title + " \u2014 brak połączeń (dodaj w edytorze spisu).");
     });
   }
 }
@@ -2238,7 +2281,14 @@ function attachBodyHandlers() {
       ev.stopPropagation();
       ev.preventDefault();
       const n = currentSymNode();
-      if (n) editElement(n.children[i]);
+      if (!n) return;
+      const el = n.children[i];
+      const tag = el?.tagName?.toLowerCase?.() || "";
+      if (tag === "line" || tag === "polyline") {
+        const world = toWorld(ev);
+        if (insertBreakPointAt(el, world.x, world.y)) return;
+      }
+      editElement(el);
     });
   });
 }
@@ -2293,6 +2343,8 @@ function editElement(el) {
     state.selHandle = null;
     highlightActive();
     focusSelectionPropsField("use");
+  } else if (t === "line" || t === "polyline") {
+    setStatus("Trasa: przeciągaj uchwyty · podwójny klik = dodaj punkt · Delete/Alt+klik = usuń punkt łamania.");
   } else {
     setStatus(status.editWithHandles);
   }
@@ -2403,6 +2455,8 @@ function startBodyDrag(ev, cel, i) {
   state.selHandle = null;
   clearSelInfo();
   highlightActive();
+  if (typeof selectConnectionFromElement === "function") selectConnectionFromElement(el);
+  if (typeof refreshNetlistUI === "function") refreshNetlistUI();
   pushUndo();
   const start = toWorld(ev);
   const root = scene.hostRoot;
@@ -2520,20 +2574,22 @@ function buildHandles(sym) {
       );
     } else if (t === "polyline" || t === "polygon") {
       const pts = parsePoints(el);
-      pts.forEach((p, i) =>
-        state.handles.push(
-          mkHandle(
-            () => parsePoints(el)[i],
-            (x, y) => {
-              const a = parsePoints(el);
-              a[i] = [x, y];
-              el.setAttribute("points", a.map((q) => q.join(",")).join(" "));
-            },
-            "pt",
-            el
-          )
-        )
-      );
+      pts.forEach((p, i) => {
+        const h = mkHandle(
+          () => parsePoints(el)[i],
+          (x, y) => {
+            const a = parsePoints(el);
+            a[i] = [x, y];
+            el.setAttribute("points", a.map((q) => q.join(",")).join(" "));
+            if (el.getAttribute("data-conn-id")) el.setAttribute("data-route", "manual");
+          },
+          "pt",
+          el
+        );
+        h.pointIndex = i;
+        h.breakVertex = i > 0 && i < pts.length - 1;
+        state.handles.push(h);
+      });
     } else if (t === "path") {
       const segs = parsePathAbs(el.getAttribute("d") || "");
       state.pathSegs.set(el, segs);
@@ -2575,8 +2631,15 @@ function drawHandles() {
     s.setAttribute("y", y - sz / 2);
     s.setAttribute("width", sz);
     s.setAttribute("height", sz);
-    s.setAttribute("class", "hnd" + (h.kind === "ctrl" ? " ctrl" : "") + (state.selHandle === h ? " sel" : ""));
+    s.setAttribute(
+      "class",
+      "hnd" +
+        (h.kind === "ctrl" ? " ctrl" : "") +
+        (h.breakVertex ? " break" : "") +
+        (state.selHandle === h ? " sel" : "")
+    );
     s.setAttribute("vector-effect", "non-scaling-stroke");
+    if (h.breakVertex) s.setAttribute("title", "Punkt łamania · Delete / Alt+klik = usuń");
     s.dataset.idx = idx;
     s.addEventListener("pointerdown", (ev) => startDrag(ev, h, s));
     scene.handles.appendChild(s);
@@ -2605,6 +2668,10 @@ function startDrag(ev, h, rectEl) {
   ev.preventDefault();
   if (h.kind === "lbl" && h.el) selectConnLabel(h.el);
   else clearConnLabelSel();
+  // Alt+klik w punkt łamania → usuń
+  if (ev.altKey && h.breakVertex && h.el) {
+    if (removeBreakPointFrom(h.el, h.pointIndex)) return;
+  }
   pushUndo();
   let groupMove = state.selection.length > 1 && h.el && state.selection.indexOf(h.el) >= 0;
   if (!groupMove) {
@@ -2617,6 +2684,66 @@ function startDrag(ev, h, rectEl) {
   showSel(h);
   highlightActive();
   captureStagePointer(ev);
+}
+
+/** Dodaj punkt łamania w miejscu kliknięcia na segmencie. */
+function insertBreakPointAt(el, x, y) {
+  const maxDist = Math.max(10 / (state.zoom || 1), (state.step || 5) * 1.2);
+  const hit = hitWireSegment(el, x, y, maxDist);
+  if (!hit) return false;
+  // unikaj wstawiania zbyt blisko istniejących wierzchołków
+  const nearVert = hit.pts.some((p) => Math.hypot(p[0] - hit.x, p[1] - hit.y) < (state.step || 5) * 0.35);
+  if (nearVert) return false;
+  let nx = hit.x,
+    ny = hit.y;
+  if (state.snap) {
+    nx = snap(nx);
+    ny = snap(ny);
+  }
+  const next = insertVertex(hit.pts, hit.segmentIndex, nx, ny);
+  if (!next) return false;
+  pushUndo();
+  const out = applyWirePoints(el, next, mkEl);
+  state.selection = [out];
+  state.activeEl = out;
+  state.selHandle = null;
+  clearSelInfo();
+  render();
+  // zaznacz nowy uchwyt
+  const newIdx = hit.segmentIndex + 1;
+  const h = state.handles.find((hh) => hh.el === out && hh.pointIndex === newIdx);
+  if (h) {
+    state.selHandle = h;
+    drawHandles();
+  }
+  setStatus("Dodano punkt łamania.", { toast: true, tone: "success" });
+  return true;
+}
+
+/** Usuń punkt łamania (wierzchołek pośredni). */
+function removeBreakPointFrom(el, index) {
+  const pts = pointsOfWire(el);
+  if (!canRemoveBreakVertex(pts, index)) {
+    setStatus("Można usuwać tylko punkty łamania (nie końce trasy).", { toast: true, tone: "warning" });
+    return false;
+  }
+  const next = removeBreakVertex(pts, index);
+  if (!next) return false;
+  pushUndo();
+  const out = applyWirePoints(el, next, mkEl);
+  state.selection = [out];
+  state.activeEl = out;
+  state.selHandle = null;
+  clearSelInfo();
+  render();
+  setStatus("Usunięto punkt łamania.", { toast: true, tone: "success" });
+  return true;
+}
+
+function tryRemoveSelectedBreakVertex() {
+  const h = state.selHandle;
+  if (!h?.el || h.pointIndex == null || !h.breakVertex) return false;
+  return removeBreakPointFrom(h.el, h.pointIndex);
 }
 stage.addEventListener("pointermove", (ev) => {
   const p = toWorld(ev);
@@ -3274,6 +3401,12 @@ function selectionTypeLabel(records) {
 function syncSelectionToolbar() {
   const records = selectedRecords(),
     has = records.length > 0;
+  const promoteBtn = document.getElementById("btnPromoteConn");
+  if (promoteBtn) {
+    const el = state.activeEl || state.selection?.[0];
+    const tag = el?.tagName?.toLowerCase?.() || "";
+    promoteBtn.disabled = !(tag === "line" || tag === "polyline");
+  }
   const info = document.getElementById("selectionInfo");
   if (state.active === state.lib) {
     syncLibrarySelectionInfo();
@@ -4023,6 +4156,8 @@ function viewCenterLocal() {
 }
 document.getElementById("btnAddPoint").onclick = () => startDraw("point");
 document.getElementById("btnAddNode").onclick = () => startDraw("node");
+document.getElementById("btnBranchOblique").onclick = () => startDraw("branch");
+document.getElementById("btnObliqueStub").onclick = () => applyObliqueStubToSelection();
 document.getElementById("btnAddPin").onclick = () => startDraw("pin");
 document.getElementById("btnAddLead").onclick = () => startDraw("lead");
 function deleteActiveEl() {
@@ -4413,6 +4548,8 @@ const SETTINGS_DEFAULT = {
   norm: "",
   date: "",
   library: "",
+  /** SSOT połączeń: { [sheetKey]: ConnectionJson[] } */
+  sheetConnections: {},
 };
 let settingsCfg = Object.assign({}, SETTINGS_DEFAULT);
 async function loadSettings() {
@@ -4573,6 +4710,18 @@ function sheetsFromProjectSnapshot(proj) {
 async function applyCachedProjectMeta(proj) {
   if (!proj) return;
   if (proj.settings) settingsCfg = Object.assign({}, SETTINGS_DEFAULT, proj.settings);
+  const sheet =
+    typeof targetSheet === "function"
+      ? targetSheet()
+      : state.lastSheet && state.sheets.includes(state.lastSheet)
+        ? state.lastSheet
+        : state.sheets[0] || null;
+  if (sheet && settingsCfg.sheetConnections && Object.keys(settingsCfg.sheetConnections).length) {
+    if (typeof autoLoadNetlistForSheet === "function") {
+      await autoLoadNetlistForSheet(sheet, null, { silent: true });
+      return;
+    }
+  }
   if (proj.netlist?.text) await loadNetlistText(proj.netlist.text, proj.netlist.name, null, { silent: true });
 }
 async function restoreProject() {
@@ -4721,6 +4870,7 @@ window.addEventListener("keydown", (e) => {
   }
   if (e.key === "Delete" || e.key === "Backspace") {
     e.preventDefault();
+    if (tryRemoveSelectedBreakVertex()) return;
     deleteActiveEl();
   }
   if ((e.ctrlKey || e.metaKey) && (e.key === "d" || e.key === "D")) {
@@ -4931,10 +5081,16 @@ bindShortcutsHelp();
 (function wireMoreMenu() {
   const btn = document.getElementById("btnFileMenu");
   const panel = document.getElementById("fileMenu");
+  const group = document.getElementById("fileGroup");
   if (!btn || !panel) return;
   const setOpen = (open) => {
     panel.classList.toggle("open", open);
     btn.setAttribute("aria-expanded", open ? "true" : "false");
+    if (open && group) {
+      const gRect = group.getBoundingClientRect();
+      const bRect = btn.getBoundingClientRect();
+      panel.style.left = Math.max(0, bRect.left - gRect.left) + "px";
+    }
   };
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -4944,6 +5100,9 @@ bindShortcutsHelp();
     if (!panel.classList.contains("open")) return;
     if (panel.contains(e.target) || btn.contains(e.target)) return;
     setOpen(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && panel.classList.contains("open")) setOpen(false);
   });
   panel.addEventListener("click", (e) => {
     if (e.target.closest("button")) setOpen(false);

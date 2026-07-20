@@ -121,6 +121,7 @@ const KIND_LABELS = {
   path: "Ścieżka",
   text: "Tekst",
   node: "Węzeł",
+  junction: "Rozgałęzienie",
   connLead: "Złącze · kreska",
   connPoint: "Złącze · punkt",
   other: "Element",
@@ -142,6 +143,7 @@ export function connKindEl(el) {
 export function sheetElementKind(el) {
   if (!el || !el.tagName) return "other";
   if (isConnGroupEl(el)) return connKindEl(el) || "other";
+  if (el.getAttribute && el.getAttribute("data-role") === "junction") return "junction";
   const t = el.tagName.toLowerCase();
   if (el.classList && el.classList.contains("node")) return "node";
   return KIND_LABELS[t] ? t : "other";
@@ -186,7 +188,14 @@ export function sheetElementListLabel(el, index) {
     if (cid) return `Połączenie ${cid}`;
     return kind === "line" ? `Linia ${index + 1}` : `Łamana ${index + 1}`;
   }
-  if (kind === "node") return `Węzeł ${index + 1}`;
+  if (kind === "node") {
+    const ref = (el.getAttribute("data-ref") || "").trim();
+    return ref ? `Węzeł ${ref}` : `Węzeł ${index + 1}`;
+  }
+  if (kind === "junction") {
+    const ref = (el.getAttribute("data-ref") || "").trim();
+    return ref ? `Rozgałęzienie ${ref}` : `Rozgałęzienie ${index + 1}`;
+  }
   return `${kindDisplay(kind)} ${index + 1}`;
 }
 

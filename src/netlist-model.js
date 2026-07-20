@@ -130,5 +130,99 @@ export function proposalPreview(records) {
   ].join("\n");
 }
 
+export function endpointRaw(ep) {
+  if (ep == null || ep === "") return "";
+  if (typeof ep === "string") return cleanCell(ep);
+  if (ep.raw) return String(ep.raw).trim();
+  const ref = normalizeRef(ep.ref);
+  const pin = cleanCell(ep.pin);
+  return pin ? ref + ":" + pin : ref;
+}
+
+export function normalizeConnection(record) {
+  const from = parseEndpoint(endpointRaw(record?.from) || endpointRaw(record?.fromRaw) || "");
+  const to = parseEndpoint(endpointRaw(record?.to) || endpointRaw(record?.toRaw) || "");
+  return {
+    id: String(record?.id || "").trim() || "1",
+    section: Number(record?.section) || 1,
+    from,
+    to,
+    signal: cleanCell(record?.signal),
+    net: cleanCell(record?.net) || "—",
+    wire: cleanCell(record?.wire) || "do ustalenia",
+    notes: cleanCell(record?.notes),
+  };
+}
+
+export function connectionsToJson(list) {
+  return (list || []).map((r) => {
+    const n = normalizeConnection(r);
+    return {
+      id: n.id,
+      section: n.section,
+      from: endpointRaw(n.from),
+      to: endpointRaw(n.to),
+      signal: n.signal,
+      net: n.net,
+      wire: n.wire,
+      notes: n.notes,
+    };
+  });
+}
+
+export function connectionsFromJson(list) {
+  return (list || []).map((r) =>
+    normalizeConnection({
+      ...r,
+      from: typeof r.from === "string" ? parseEndpoint(r.from) : r.from,
+      to: typeof r.to === "string" ? parseEndpoint(r.to) : r.to,
+    })
+  );
+}
+
+export function nextConnectionId(connections) {
+  let max = 0;
+  for (const c of connections || []) {
+    const n = parseInt(String(c.id).replace(/\D/g, ""), 10);
+    if (n > max) max = n;
+  }
+  return String(max + 1);
+}
+
+/** Serializacja do markdown (legacy / opcjonalny eksport). */
+export function serialize(netlist) {
+  const meta = netlist?.meta || {};
+  const rows = (netlist?.connections || []).map(markdownRow);
+  const sheet = meta.sheet || "";
+  const version = meta.version || "1.0";
+  const date = meta.date || "";
+  return [
+    "# Spis połączeń",
+    "",
+    `| **Wersja** | ${sheet} · ${version} · ${date} |`,
+    "",
+    "## 1. Połączenia",
+    "",
+    "| Nr | Od | Do | Sygnał | Oznacznik | Przewód | Uwagi |",
+    "|----|----|----|--------|-----------|---------|-------|",
+    ...rows,
+    "",
+  ].join("\n");
+}
+
 /** Kompatybilność z kodem oczekującym global.NetlistModel */
-export const NetlistModel = { parse, parseEndpoint, normalizeRef, compareIds, wireClass, markdownRow, proposalPreview };
+export const NetlistModel = {
+  parse,
+  serialize,
+  parseEndpoint,
+  normalizeRef,
+  compareIds,
+  wireClass,
+  markdownRow,
+  proposalPreview,
+  normalizeConnection,
+  connectionsToJson,
+  connectionsFromJson,
+  nextConnectionId,
+  endpointRaw,
+};

@@ -70,8 +70,8 @@ cd Schemat && npm test
 Kluczowe scenariusze ręczne:
 
 1. Otwórz CS-TB-48 → arkusze Zasilanie/Bezpieczenstwo/Enable/Naped/Zator; symbole G1, F1, SK1, Q widoczne na Zasilaniu
-2. Przełącz arkusz → netlista `polaczenia_<arkusz>.md` ładuje się automatycznie
-3. Przycisk **Trasuj** — trasuje wybrane połączenie (nie `undefined` onclick)
+2. Przełącz arkusz → spis z `projekt.json` → `sheetConnections` (jednorazowa migracja z `polaczenia_*.md` jeśli brak SSOT)
+3. Przycisk **Trasuj** — zachowuje/adoptuje ręczną trasę; auto tylko przy braku geometrii lub świadomym „Zastąp”
 4. Zmień font etykiety złącza → Zapisz → F5 → font zostaje
 5. Zapisz arkusz → otwórz SVG w przeglądarce → symbole w `<defs>`
 6. Przeciąganie elementów myszką działa po init sceny

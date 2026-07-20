@@ -569,6 +569,46 @@
       #netlistConn option[data-ok="0"] {
         color: #b91c1c;
       }
+      .conn-route-hl {
+        stroke-width: 2.4 !important;
+        filter: drop-shadow(0 0 1.5px #2563eb);
+      }
+      #netlistEditor .modal {
+        width: min(920px, 96vw);
+        max-height: 90vh;
+        overflow: auto;
+      }
+      #netlistEditorTable {
+        width: 100%;
+        border-collapse: collapse;
+        font: 12px/1.35 Arial, sans-serif;
+        margin: 8px 0 12px;
+      }
+      #netlistEditorTable th,
+      #netlistEditorTable td {
+        border: 1px solid #d1d5db;
+        padding: 4px 6px;
+        text-align: left;
+      }
+      #netlistEditorTable tr {
+        cursor: pointer;
+      }
+      #netlistEditorTable tr.selected {
+        background: #dbeafe;
+      }
+      #netlistEditorForm {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 6px 12px;
+      }
+      #netlistEditorForm .frow {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      #netlistEditorForm .frow.full {
+        grid-column: 1 / -1;
+      }
       #drawBanner {
         position: absolute;
         left: 50%;
@@ -598,36 +638,81 @@
       #fileMenu {
         display: none;
         position: absolute;
-        top: 100%;
+        top: calc(100% + 2px);
         left: 0;
         z-index: 40;
-        min-width: 200px;
-        margin-top: 2px;
-        padding: 8px;
+        min-width: 220px;
+        padding: 4px 0;
         background: #fff;
         border: 1px solid #94a3b8;
         border-radius: 6px;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
       }
       #fileMenu.open {
         display: flex;
         flex-direction: column;
-        gap: 8px;
       }
-      #fileMenu .file-menu-row {
+      #fileMenu .file-menu-item {
         display: flex;
-        flex-wrap: wrap;
-        gap: 4px;
         align-items: center;
-      }
-      #fileMenu .file-menu-lbl {
-        font: 600 9px Arial;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        color: #64748b;
+        gap: 8px;
         width: 100%;
+        height: 32px;
+        margin: 0;
+        padding: 0 12px;
+        border: none;
+        border-radius: 0;
+        background: transparent;
+        font: 13px Arial;
+        color: #0f172a;
+        text-align: left;
+        cursor: pointer;
+      }
+      #fileMenu .file-menu-item:hover,
+      #fileMenu .file-menu-item:focus-visible {
+        background: #eff6ff;
+        outline: none;
+      }
+      #fileMenu .file-menu-item .btn-ico,
+      #fileMenu .file-menu-item .file-menu-ico {
+        display: inline-flex;
+        width: 18px;
+        height: 18px;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: center;
+      }
+      #fileMenu .file-menu-item .btn-ico svg,
+      #fileMenu .file-menu-item .file-menu-ico svg {
+        width: 16px;
+        height: 16px;
+        stroke: currentColor;
+        fill: none;
+        stroke-width: 1.8;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      #fileMenu .file-menu-item .btn-text,
+      #fileMenu .file-menu-item .file-menu-text {
+        flex: 1;
+        line-height: 1.2;
+        white-space: nowrap;
+      }
+      #fileMenu .file-menu-sep {
+        height: 1px;
+        margin: 4px 0;
+        background: #e2e8f0;
       }
       #viewGroup .grp-row {
         flex-wrap: wrap;
+      }
+      #viewGroup .view-check {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font: 12px Arial;
+        color: #334155;
+        white-space: nowrap;
       }
       .list-empty {
         list-style: none;
@@ -811,6 +896,13 @@
         fill: #fde047;
         stroke: #a16207;
       }
+      .hnd.break {
+        fill: #dbeafe;
+        stroke: #1d4ed8;
+      }
+      .hnd.break.sel {
+        fill: #1d4ed8;
+      }
       .ctrlline {
         stroke: #a16207;
         stroke-width: 0.6;
@@ -827,6 +919,16 @@
         <div id="toolbarMode" class="toolbar-line">
           <div class="grp" id="fileGroup">
             <div class="grp-row">
+              <button
+                type="button"
+                id="btnFileMenu"
+                class="btn-labeled tbtn"
+                title="Plik"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <span class="btn-text">Plik</span>
+              </button>
               <button id="btnOpen" class="btn-labeled tbtn primary" title="Otwórz projekt">
                 <span class="btn-text">Otwórz</span>
               </button>
@@ -842,25 +944,39 @@
               <button type="button" id="saveBadge" data-kind="idle" title="Status zapisu">
                 <span class="save-badge-dot" aria-hidden="true"></span><span id="saveBadgeLabel">Brak projektu</span>
               </button>
-              <button
-                type="button"
-                id="btnFileMenu"
-                class="btn-labeled tbtn"
-                title="Plik"
-                aria-haspopup="menu"
-                aria-expanded="false"
-              >
-                <span class="btn-text">Plik</span>
-              </button>
             </div>
-            <div id="fileMenu" role="menu" aria-label="Akcje pliku">
-              <div class="file-menu-lbl">Utwórz</div>
-              <div class="file-menu-row" id="createGroup">
-                <button id="btnNewProject" class="tbtn" title="Nowy projekt"></button>
-                <button id="btnNewSheet" class="tbtn" title="Nowy schemat"></button>
-                <button id="btnNewLibrary" class="tbtn" title="Nowa biblioteka"></button>
-                <button id="btnLib" class="tbtn" title="Otwórz bibliotekę"></button>
-                <button id="btnSaveAs" class="tbtn" title="Zapisz jako…"></button>
+            <div id="fileMenu" role="menu" aria-label="Menu Plik">
+              <div id="createGroup">
+                <button type="button" role="menuitem" id="btnNewProject" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Nowy projekt</span>
+                </button>
+                <button type="button" role="menuitem" id="btnNewSheet" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Nowy schemat</span>
+                </button>
+                <button type="button" role="menuitem" id="btnNewLibrary" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Nowa biblioteka</span>
+                </button>
+                <div class="file-menu-sep" role="separator"></div>
+                <button type="button" role="menuitem" id="btnMenuOpen" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Otwórz projekt…</span>
+                </button>
+                <button type="button" role="menuitem" id="btnLib" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Otwórz bibliotekę…</span>
+                </button>
+                <div class="file-menu-sep" role="separator"></div>
+                <button type="button" role="menuitem" id="btnMenuSave" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Zapisz</span>
+                </button>
+                <button type="button" role="menuitem" id="btnSaveAs" class="file-menu-item">
+                  <span class="btn-ico" aria-hidden="true"></span>
+                  <span class="btn-text">Zapisz jako…</span>
+                </button>
               </div>
             </div>
           </div>
@@ -891,6 +1007,8 @@
               <button id="btnAddLead" class="tbtn" title="Kreska"></button>
               <button id="btnAddPoint" class="tbtn" title="Punkt"></button>
               <button id="btnAddNode" class="tbtn" title="Węzeł"></button>
+              <button id="btnBranchOblique" class="tbtn" title="Odgałęź (ukos 45°)"></button>
+              <button id="btnObliqueStub" class="tbtn" title="Ukos przy końcu trasy"></button>
               <button id="btnAddPin" class="tbtn" title="Pin"></button>
             </div>
           </div>
@@ -906,12 +1024,15 @@
 
           <div class="grp" id="netlistGroup">
             <div class="grp-row">
-              <button id="btnNetlistOpen" class="tbtn" title="Spis">&#8801;</button>
+              <button id="btnNetlistOpen" class="tbtn" title="Edytuj spis połączeń">&#8801;</button>
               <select id="netlistConn" title="Wybierz połączenie" style="width: 130px">
                 <option value="">spis</option>
               </select>
               <button id="btnRouteConn" class="btn-labeled tbtn" title="Trasuj" disabled>
                 <span class="btn-text">Trasuj</span>
+              </button>
+              <button id="btnPromoteConn" class="btn-labeled tbtn" title="Promuj kreskę do połączenia" disabled>
+                <span class="btn-text">Połączenie</span>
               </button>
               <button id="btnExportNetlist" class="tbtn" title="Propozycje">&#8644;</button>
               <span id="netlistHealth" title="Spójność spisu ze schematem"></span>
@@ -926,9 +1047,9 @@
                 <option value="2.5">2.5</option>
                 <option value="5" selected>5</option>
               </select>
-              <label class="mini"><input type="checkbox" id="snap" checked /> snap</label>
-              <label class="mini"><input type="checkbox" id="showHandles" checked /> uchwyty</label>
-              <label class="mini"><input type="checkbox" id="rotateOwnedLabels" checked /> obracaj napisy</label>
+              <label class="view-check"><input type="checkbox" id="snap" checked /> Snap</label>
+              <label class="view-check"><input type="checkbox" id="showHandles" checked /> Uchwyty</label>
+              <label class="view-check"><input type="checkbox" id="rotateOwnedLabels" checked /> Obracaj napisy</label>
               <span class="sep"></span>
               <button id="btnZoomOut" class="tbtn" title="Oddal"></button>
               <button id="btnZoomIn" class="tbtn" title="Przybliż"></button>
@@ -1295,6 +1416,65 @@
         <div class="actions">
           <button id="netlistReviewClose">Zamknij</button>
           <button id="netlistReviewDownload" class="primary">Pobierz propozycje .md</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="netlistEditor" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="netlistEditorTitle">
+      <div class="modal">
+        <h2 id="netlistEditorTitle">Spis połączeń</h2>
+        <p style="margin: 0 0 8px; font-size: 12px; color: #4b5563">
+          Źródło prawdy: <code>projekt.json</code> → <code>sheetConnections</code>. Pliki
+          <code>polaczenia_*.md</code> służą tylko do migracji / eksportu.
+        </p>
+        <div style="overflow: auto; max-height: 280px">
+          <table id="netlistEditorTable">
+            <thead>
+              <tr>
+                <th>Nr</th>
+                <th>Od</th>
+                <th>Do</th>
+                <th>Sygnał</th>
+                <th>Net</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="netlistEditorBody"></tbody>
+          </table>
+        </div>
+        <div id="netlistEditorForm">
+          <div class="frow"><label for="neId">Nr</label><input type="text" id="neId" /></div>
+          <div class="frow"><label for="neSignal">Sygnał</label><input type="text" id="neSignal" /></div>
+          <div class="frow"><label for="neFrom">Od (ref:pin)</label><input type="text" id="neFrom" /></div>
+          <div class="frow"><label for="neTo">Do (ref:pin)</label><input type="text" id="neTo" /></div>
+          <div class="frow"><label for="neNet">Oznacznik</label><input type="text" id="neNet" /></div>
+          <div class="frow"><label for="neWire">Przewód</label><input type="text" id="neWire" /></div>
+          <div class="frow full"><label for="neNotes">Uwagi</label><input type="text" id="neNotes" /></div>
+        </div>
+        <div class="actions" style="flex-wrap: wrap; gap: 8px">
+          <button type="button" id="neAdd">Dodaj</button>
+          <button type="button" id="neSaveRow" class="primary">Zapisz wiersz</button>
+          <button type="button" id="neDelete" class="danger-btn">Usuń</button>
+          <button type="button" id="btnNetlistImport">Importuj .md…</button>
+          <button type="button" id="neExportMd">Eksport .md</button>
+          <button type="button" id="netlistEditorClose">Zamknij</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="promoteConn" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="promoteConnTitle">
+      <div class="modal" style="width: 420px">
+        <h2 id="promoteConnTitle">Promuj do połączenia</h2>
+        <div class="frow"><label for="pcId">Nr</label><input type="text" id="pcId" /></div>
+        <div class="frow"><label for="pcFrom">Od</label><input type="text" id="pcFrom" /></div>
+        <div class="frow"><label for="pcTo">Do</label><input type="text" id="pcTo" /></div>
+        <div class="frow"><label for="pcSignal">Sygnał</label><input type="text" id="pcSignal" /></div>
+        <div class="frow"><label for="pcNet">Oznacznik</label><input type="text" id="pcNet" /></div>
+        <div class="frow"><label for="pcWire">Przewód</label><input type="text" id="pcWire" /></div>
+        <div class="frow"><label for="pcNotes">Uwagi</label><input type="text" id="pcNotes" /></div>
+        <div class="actions">
+          <button type="button" id="pcCancel">Anuluj</button>
+          <button type="button" id="pcOk" class="primary">Promuj</button>
         </div>
       </div>
     </div>

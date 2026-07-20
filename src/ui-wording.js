@@ -162,6 +162,9 @@ export const W = {
     deleteSymbol: (id) => `Usunąć symbol ${id} z biblioteki?`,
     sheetNoProject: "Brak otwartego projektu — schemat zostanie utworzony tylko w pamięci. Kontynuować?",
     replaceManualRoute: "Trasa jest ręczna. Zastąpić ją trasą automatyczną?",
+    keepOrReplaceRoute: "Istnieje ręczna trasa dla tego połączenia. Zachować ją czy zastąpić automatyczną?",
+    adoptOrReroute:
+      "Znaleziono kreskę między pinami tego połączenia. Adoptować geometrię czy wytrasować automatycznie?",
   },
   toast: {
     saved: "Zapisano.",
@@ -171,6 +174,8 @@ export const W = {
   chrome: {
     open: "Otwórz",
     save: "Zapisz",
+    saveAs: "Zapisz jako\u2026",
+    openLibrary: "Otw\u00f3rz bibliotek\u0119\u2026",
     route: "Trasuj",
     fileMenu: "Plik",
     shortcuts: "Skróty",
@@ -306,6 +311,8 @@ export function collectWordingStrings() {
     W.confirm.dirtyLibrary,
     W.confirm.sheetNoProject,
     W.confirm.replaceManualRoute,
+    W.confirm.keepOrReplaceRoute,
+    W.confirm.adoptOrReroute,
     ...Object.values(W.dialog),
     ...Object.values(W.choice),
     W.field.length,

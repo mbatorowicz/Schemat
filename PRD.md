@@ -32,14 +32,14 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 ### W zakresie (MVP+)
 
-- Otwieranie folderu projektu (`projekt.json`, `*.svg`, `polaczenia_*.md`)
+- Otwieranie folderu projektu (`projekt.json`, `*.svg`; legacy `polaczenia_*.md` tylko migracja)
 - Biblioteka symboli wspólna (`lib/E-00_symbole.svg`)
 - Edycja arkuszy schematów (ramka A4, tabelka dokumentu)
 - Rysowanie kształtów geometrycznych (linia, prostokąt, koło, łuk, tekst)
 - Złącza elektryczne: **punkt** (zacisk na schemacie) i **kreska** (przyłącze w symbolu)
 - Oznaczenia pomocnicze: węzeł topologii, etykieta pinu
 - Instancje symboli (`<use data-ref>`) z auto-numeracją
-- Spis połączeń (Markdown), trasowanie ortogonalne, propozycje nowych połączeń
+- Spis połączeń (SSOT w `projekt.json` → `sheetConnections`), edytor CRUD, trasowanie ortogonalne, promocja kresek
 - Styl zaznaczenia (obrys, wypełnienie, tekst), undo/redo, schowek
 - Zapis na dysk (File System Access API) + kopia robocza (IndexedDB)
 
@@ -62,7 +62,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 | **Złącze — kreska** | Przyłącze kierunkowe w symbolu                  | `<g data-role="conn" data-kind="lead">` — widoczna linia          |
 | **Pin**             | Nazwa przyłącza w netliście                     | `data-pin` na złączu, np. `L`, `N`, `1`                           |
 | **Punkt styku**     | Geometryczny punkt łączenia przewodu ze złączem | `<circle data-part="contact" data-contact="…">` — czerwony marker |
-| **Węzeł**           | Punkt pomocniczy do łamania linii               | `<circle class="node">`                                           |
+| **Węzeł**           | Punkt topologii / łamania; może być końcem połączenia | `<circle class="node" data-ref="N1">` (adres `N1` w spisie)  |
 | **Etykieta pinu**   | Sam tekst bez semantyki złącza                  | `<text class="pin">`                                              |
 | **Spis połączeń**   | Tabela połączeń elektrycznych                   | `polaczenia_E-01.md`                                              |
 | **Endpoint**        | Adres w netliście                               | `WD1:L`, `X1:3`                                                   |
@@ -132,10 +132,10 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ### 6.1 Projekt i pliki
 
 - FR-01: Otwarcie folderu projektu z `showDirectoryPicker` lub fallback `<input type=file>`.
-- FR-02: Rekurencyjne skanowanie folderu: arkusze `sch-*` (np. `project/CS-TB-48/E-01.svg`), biblioteka `lib/E-00_symbole.svg`, spisy `polaczenia_<arkusz>.md`.
-- FR-03: Wczytanie `projekt.json` (orientacja A4, metadane dokumentu, pole `library` ze ścieżką względną do biblioteki).
-- FR-03a: Konwencja nazw: `E-01.svg` ↔ `polaczenia_E-01.md`; biblioteka domyślnie `lib/E-00_symbole.svg`.
-- FR-03b: Po otwarciu projektu automatyczne wczytanie biblioteki i spisu połączeń powiązanego z aktywnym arkuszem (preferowany plik w tym samym podfolderze co arkusz).
+- FR-02: Rekurencyjne skanowanie folderu: arkusze `sch-*` (np. `project/CS-TB-48/E-01.svg`), biblioteka `lib/E-00_symbole.svg`; opcjonalnie legacy `polaczenia_<arkusz>.md`.
+- FR-03: Wczytanie `projekt.json` (orientacja A4, metadane, `library`, **`sheetConnections`** — SSOT spisu połączeń per arkusz).
+- FR-03a: Konwencja: klucz arkusza = `relPath`/`name`; legacy `E-01.svg` ↔ `polaczenia_E-01.md` (migracja); biblioteka domyślnie `lib/E-00_symbole.svg`.
+- FR-03b: Po otwarciu projektu: biblioteka + spis z `sheetConnections` (gdy brak — jednorazowa migracja z md).
 - FR-04: Zapis nadpisujący i „zapisz jako” dla aktywnego pliku SVG.
 - FR-05: Przywracanie dostępu do folderu (IndexedDB) po restarcie przeglądarki.
 
@@ -195,13 +195,14 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 | `pickPointContactByToward(contacts, towardXY)` | Wybór styku N/E/S/W najbliższego kierunkowi do drugiego końca |
 | `bestPointContact(g, mapXY, towardXY)`         | Wrapper na `conn-model.js` — współrzędne wybranego styku      |
 
-### 6.6 Netlista
+### 6.6 Netlista / połączenia
 
-- FR-50: Auto-wczytanie `polaczenia_<arkusz>.md` przy otwarciu projektu.
-- FR-51: Parsowanie tabeli (`src/netlist-model.js`, ESM).
-- FR-52: Trasowanie ortogonalne (`src/orthogonal-router.js`); SSOT kolorów przewodów w `src/wire-theme.js`.
-- FR-53: Eksport propozycji zmian spisu po ręcznym rysowaniu przewodów.
-- FR-54: `syncRoutedPointDir()` — po trasowaniu ustawia `data-dir` punktów na arkuszu (nie w definicji symbolu w bibliotece).
+- FR-50: SSOT połączeń w `projekt.json` (`sheetConnections`); edytor CRUD w UI; migracja z `polaczenia_*.md` przy pierwszym otwarciu arkusza bez SSOT.
+- FR-51: Model (`src/netlist-model.js`, `src/sheet-connections.js`); opcjonalny eksport md (`scripts/export-connections-for-dtr.mjs` dla DTR).
+- FR-52: Trasowanie ortogonalne z zachowaniem/adopcją trasy ręcznej; SSOT kolorów w `src/wire-theme.js`.
+- FR-53: Promocja `line`/`polyline` → wpis w spisie + `data-conn-id`; eksport propozycji NEW*.
+- FR-54: `syncRoutedPointDir()` — po trasowaniu ustawia `data-dir` punktów na arkuszu.
+- FR-55: Dwukierunkowy link spis↔trasa; health: orphan `data-conn-id`, bare lines do promocji.
 
 ### 6.7 Styl i edycja
 

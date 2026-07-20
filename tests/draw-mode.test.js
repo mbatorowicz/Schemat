@@ -8,6 +8,8 @@ describe("draw-mode constants", () => {
     expect(DRAW_NEED.line).toBe(Infinity);
     expect(DRAW_BTN.lead).toBe("btnAddLead");
     expect(DRAW_BTN.text).toBe("btnAddText");
+    expect(DRAW_BTN.branch).toBe("btnBranchOblique");
+    expect(DRAW_NEED.branch).toBe(2);
   });
 });
 

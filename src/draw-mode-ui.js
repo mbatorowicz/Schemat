@@ -10,6 +10,7 @@ export const DRAW_LABELS = {
   point: "Punkt",
   node: "Węzeł",
   lead: "Kreska",
+  branch: "Odgałęź",
 };
 
 export const DRAW_HINT = {
@@ -22,6 +23,7 @@ export const DRAW_HINT = {
   point: "Punkt: kliknij miejsce · Esc = anuluj.",
   node: "Węzeł: kliknij miejsce · Esc = anuluj.",
   lead: "Kreska: klik = początek, klik = koniec · Esc = anuluj.",
+  branch: "Odgałęź: klik szynę (wspólny odcinek), potem cel · Esc = anuluj.",
 };
 
 /**

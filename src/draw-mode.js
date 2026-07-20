@@ -3,6 +3,18 @@
  */
 import { DRAW_HINT } from "./draw-mode-ui.js";
 import { NetlistModel } from "./netlist-model.js";
+import { collectTopoNodeSnapCandidates, endpointRawFromSnap, ensureNodeRef } from "./topo-nodes.js";
+import { collectJunctionSnapCandidates, createJunctionEl } from "./junctions.js";
+import {
+  hitNearestWireOnSheet,
+  buildObliqueBranchPoints,
+  formatPointsAttr,
+  prependObliqueStub,
+  hitWireSegment,
+  segmentAxis,
+  pointsOfWire,
+} from "./polyline-edit.js";
+import { OrthogonalRouter } from "./orthogonal-router.js";
 
 export const DRAW_NEED = {
   line: Infinity,
@@ -14,6 +26,7 @@ export const DRAW_NEED = {
   point: 1,
   node: 1,
   lead: 2,
+  branch: 2,
 };
 
 export const DRAW_BTN = {
@@ -26,6 +39,7 @@ export const DRAW_BTN = {
   point: "btnAddPoint",
   node: "btnAddNode",
   lead: "btnAddLead",
+  branch: "btnBranchOblique",
 };
 
 /**
@@ -133,6 +147,8 @@ export function createDrawMode(deps) {
         );
       });
     });
+    collectTopoNodeSnapCandidates(node).forEach((c) => out.push(c));
+    collectJunctionSnapCandidates(node).forEach((c) => out.push(c));
     return out;
   }
 
@@ -152,6 +168,37 @@ export function createDrawMode(deps) {
 
   function addDrawPoint(x, y) {
     if (!state.drawing) return;
+    const node = currentSymNode();
+
+    if (state.drawing.kind === "branch") {
+      if (!state.drawing.trunk) {
+        const maxDist = Math.max(12 / (state.zoom || 1), (state.step || 5) * 1.5);
+        const hit = hitNearestWireOnSheet(node, x, y, maxDist);
+        if (!hit) {
+          setStatus("Odgałęź: kliknij istniejącą szynę (przewód).", { toast: true, tone: "warning" });
+          return;
+        }
+        state.drawing.trunk = hit;
+        state.drawing.pts = [[hit.x, hit.y]];
+        state.drawing.snaps = [{ kind: "trunk", x: hit.x, y: hit.y, element: hit.el }];
+        drawPreview();
+        setStatus("Odgałęź: kliknij cel (pin / punkt).");
+        return;
+      }
+      let snapped = nearestJoint(x, y);
+      if (snapped) {
+        x = snapped.x;
+        y = snapped.y;
+      } else if (state.snap) {
+        x = snap(x);
+        y = snap(y);
+      }
+      state.drawing.pts.push([x, y]);
+      state.drawing.snaps.push(snapped);
+      finishBranchDraw();
+      return;
+    }
+
     let snapped = null;
     if (state.drawing.kind === "line") snapped = nearestJoint(x, y);
     if (snapped) {
@@ -181,10 +228,22 @@ export function createDrawMode(deps) {
     const k = d.kind;
     const pts = d.pts;
     const cur = d.cursor;
-    if (k === "line") {
+    if (k === "line" || k === "branch") {
       const a = pts.slice();
       if (cur) a.push(cur);
-      if (a.length >= 2) scene.sel.appendChild(mkPrev("polyline", { points: a.map((p) => p.join(",")).join(" ") }));
+      if (k === "branch" && d.trunk && cur) {
+        const preview = buildObliqueBranchPoints(
+          { x: d.trunk.x, y: d.trunk.y },
+          d.trunk.trunkAxis,
+          { x: cur[0], y: cur[1] },
+          state.step || 5,
+          (opts) => OrthogonalRouter.route(opts)
+        );
+        if (preview.length >= 2)
+          scene.sel.appendChild(mkPrev("polyline", { points: preview.map((p) => p.join(",")).join(" ") }));
+      } else if (a.length >= 2) {
+        scene.sel.appendChild(mkPrev("polyline", { points: a.map((p) => p.join(",")).join(" ") }));
+      }
     } else if (k === "rect" && pts.length >= 1 && cur) {
       scene.sel.appendChild(
         mkPrev("rect", {
@@ -223,6 +282,143 @@ export function createDrawMode(deps) {
     });
   }
 
+  function finishBranchDraw() {
+    if (!state.drawing?.trunk || (state.drawing.pts || []).length < 2) {
+      exitDraw();
+      render();
+      setStatus("Anulowano odgałęzienie.");
+      return;
+    }
+    const trunk = state.drawing.trunk;
+    const endPt = state.drawing.pts[state.drawing.pts.length - 1];
+    const endSnap = state.drawing.snaps[state.drawing.snaps.length - 1];
+    const node = currentSymNode();
+    captureToolStyleFromToolbar();
+    exitDraw();
+    if (!node) {
+      render();
+      return;
+    }
+    const pts = buildObliqueBranchPoints(
+      { x: trunk.x, y: trunk.y },
+      trunk.trunkAxis,
+      { x: endPt[0], y: endPt[1] },
+      state.step || 5,
+      (opts) => OrthogonalRouter.route(opts)
+    );
+    if (pts.length < 2) {
+      render();
+      setStatus("Nie udało się zbudować odgałęzienia.");
+      return;
+    }
+    pushUndo();
+    const junc = createJunctionEl(mkEl, trunk.x, trunk.y, node);
+    node.appendChild(junc);
+    const el = mkEl("polyline", { points: formatPointsAttr(pts), class: "sym" });
+    styleLine(el);
+    const fromSnap = { ref: junc.getAttribute("data-ref"), pin: "", kind: "junction" };
+    const toSnap = endSnap?.ref ? endSnap : { ref: "", pin: "", kind: "free", x: endPt[0], y: endPt[1] };
+    if (fromSnap.ref && toSnap.ref && fromSnap.ref !== toSnap.ref) {
+      const net = (promptFn("Oznacznik/potencjał połączenia:", "—") || "—").trim();
+      const id = nextProposalId();
+      const proposal = {
+        id,
+        from: NetlistModel.parseEndpoint(endpointRawFromSnap(fromSnap)),
+        to: NetlistModel.parseEndpoint(endpointRawFromSnap(toSnap)),
+        signal: "",
+        net,
+        wire: "do ustalenia",
+        notes: "odgałęzienie ukośne",
+      };
+      const cls = NetlistModel.wireClass(proposal);
+      el.setAttribute("class", cls);
+      el.style.stroke = wireColor(cls);
+      el.setAttribute("data-conn-id", id);
+      el.setAttribute("data-route", "manual");
+      el.setAttribute("data-from", proposal.from.raw);
+      el.setAttribute("data-to", proposal.to.raw);
+      el.setAttribute("data-net", net);
+      el.setAttribute("data-wire", proposal.wire);
+      el.setAttribute("data-notes", proposal.notes);
+      el.setAttribute("data-branch", "oblique");
+    } else {
+      el.setAttribute("data-route", "manual");
+      el.setAttribute("data-branch", "oblique");
+      el.setAttribute("data-from", fromSnap.ref || "");
+    }
+    node.appendChild(el);
+    state.selection = [el];
+    state.activeEl = el;
+    render();
+    setStatus("Dodano odgałęzienie ukośne" + (fromSnap.ref ? " z " + fromSnap.ref : "") + ".", {
+      toast: true,
+      tone: "success",
+    });
+  }
+
+  /** Dopnij ukos 45° na początku zaznaczonej trasy, jeśli leży przy szynie. */
+  function applyObliqueStubToSelection() {
+    const node = currentSymNode();
+    const el = state.activeEl || state.selection?.[0];
+    if (!node || !el) {
+      setStatus("Zaznacz odgałęzienie (line/polyline).", { toast: true, tone: "warning" });
+      return false;
+    }
+    const tag = el.tagName?.toLowerCase?.();
+    if (tag !== "line" && tag !== "polyline") {
+      setStatus("Zaznacz przewód do ukosu.", { toast: true, tone: "warning" });
+      return false;
+    }
+    const pts = pointsOfWire(el);
+    if (pts.length < 2) return false;
+    const start = pts[0];
+    const maxDist = Math.max(10 / (state.zoom || 1), (state.step || 5) * 1.2);
+    let trunkHit = null;
+    [...node.children].forEach((other) => {
+      if (other === el) return;
+      const t = other.tagName?.toLowerCase?.();
+      if (t !== "line" && t !== "polyline") return;
+      const hit = hitWireSegment(other, start[0], start[1], maxDist);
+      if (hit && (!trunkHit || hit.dist < trunkHit.dist)) {
+        const a = hit.pts[hit.segmentIndex];
+        const b = hit.pts[hit.segmentIndex + 1];
+        trunkHit = { ...hit, el: other, trunkAxis: segmentAxis(a, b) };
+      }
+    });
+    if (!trunkHit) {
+      setStatus("Początek trasy nie leży przy innej szynie.", { toast: true, tone: "warning" });
+      return false;
+    }
+    const toward = pts[1] || [trunkHit.x + 10, trunkHit.y];
+    const next = prependObliqueStub(
+      pts,
+      trunkHit.trunkAxis,
+      { x: toward[0], y: toward[1] },
+      Math.max((state.step || 5) * 2, 5)
+    );
+    if (!next) return false;
+    pushUndo();
+    if (el.tagName.toLowerCase() === "line") {
+      const poly = mkEl("polyline", { points: formatPointsAttr(next) });
+      for (const a of [...el.attributes]) {
+        if (a.name === "x1" || a.name === "y1" || a.name === "x2" || a.name === "y2" || a.name === "points") continue;
+        poly.setAttribute(a.name, a.value);
+      }
+      poly.setAttribute("data-branch", "oblique");
+      poly.setAttribute("data-route", "manual");
+      el.parentNode?.replaceChild(poly, el);
+      state.selection = [poly];
+      state.activeEl = poly;
+    } else {
+      el.setAttribute("points", formatPointsAttr(next));
+      el.setAttribute("data-branch", "oblique");
+      el.setAttribute("data-route", "manual");
+    }
+    render();
+    setStatus("Dodano ukos 45° przy szynie.", { toast: true, tone: "success" });
+    return true;
+  }
+
   async function finishShape() {
     if (!state.drawMode || !state.drawing) {
       exitDraw();
@@ -231,6 +427,15 @@ export function createDrawMode(deps) {
     const k = state.drawing.kind;
     if (k === "line") {
       finishLineDraw();
+      return;
+    }
+    if (k === "branch") {
+      if (state.drawing.trunk && state.drawing.pts.length >= 2) finishBranchDraw();
+      else {
+        exitDraw();
+        render();
+        setStatus("Anulowano odgałęzienie.");
+      }
       return;
     }
     captureToolStyleFromToolbar();
@@ -337,6 +542,7 @@ export function createDrawMode(deps) {
     } else if (k === "node") {
       const el = mkEl("circle", { cx: pts[0][0], cy: pts[0][1], r: 4, class: "node" });
       styleNode(el);
+      ensureNodeRef(el, node);
       added.push(el);
     }
     if (!added.length) {
@@ -370,13 +576,15 @@ export function createDrawMode(deps) {
         styleLine(el);
         const a = snaps[0];
         const b = snaps[snaps.length - 1];
-        if (a && b && !(a.ref === b.ref && a.pin === b.pin)) {
+        if (a && b && a.ref && b.ref && !(a.ref === b.ref && (a.pin || "") === (b.pin || ""))) {
           const net = (promptFn("Oznacznik/potencjał połączenia:", "—") || "—").trim();
           const id = nextProposalId();
+          const fromRaw = endpointRawFromSnap(a);
+          const toRaw = endpointRawFromSnap(b);
           const proposal = {
             id,
-            from: { ref: a.ref, pin: a.pin, raw: a.ref + ":" + a.pin },
-            to: { ref: b.ref, pin: b.pin, raw: b.ref + ":" + b.pin },
+            from: NetlistModel.parseEndpoint(fromRaw),
+            to: NetlistModel.parseEndpoint(toRaw),
             signal: "",
             net,
             wire: "do ustalenia",
@@ -424,6 +632,8 @@ export function createDrawMode(deps) {
     drawPreview,
     finishShape,
     finishLineDraw,
+    finishBranchDraw,
+    applyObliqueStubToSelection,
     exitDraw,
     jointCandidates,
     nearestJoint,
