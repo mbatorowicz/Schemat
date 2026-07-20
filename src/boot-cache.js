@@ -1,5 +1,7 @@
 /** Decyzje boot/reload — czysta logika bez DOM (testowalna regresja persystencji). */
 
+import { findSheetByKey, sheetKey } from "./sheet-persistence.js";
+
 /** Im wyższy wynik, tym pełniejszy snapshot projektu. */
 export function projectCacheScore(snap) {
   if (!snap) return 0;
@@ -52,4 +54,38 @@ export function resolveReloadSheetsOutcome({ diskSheets, prevSheets, keepExistin
     return { sheets: prevSheets, count: prevSheets.length, action: "keep-prev" };
   }
   return { sheets: [], count: 0, action: "empty" };
+}
+
+/**
+ * Co otworzyć po boocie: ostatni schemat (sheetKey), potem symbol z selId, potem pierwszy arkusz.
+ * `sch-*` id bywa wspólne dla wielu arkuszy — dlatego sheetKey (relPath/name) ma pierwszeństwo.
+ * @returns {{ kind: "sheet"|"symbol"|"none", sheet?: object, symbolId?: string }}
+ */
+export function resolveBootActiveTarget({
+  sheets = [],
+  symbols = [],
+  prefs = null,
+  projectSheetKey = null,
+  projectActiveId = null,
+} = {}) {
+  const sheetFromKey = findSheetByKey(sheets, prefs?.sheetKey) || findSheetByKey(sheets, projectSheetKey);
+  if (sheetFromKey) return { kind: "sheet", sheet: sheetFromKey };
+
+  const want = prefs?.selId || null;
+  if (want && symbols.some((s) => s.id === want)) {
+    return { kind: "symbol", symbolId: want };
+  }
+  const sheetFromSel = findSheetByKey(sheets, want) || findSheetByKey(sheets, projectActiveId);
+  if (sheetFromSel) return { kind: "sheet", sheet: sheetFromSel };
+
+  if (sheets[0]) return { kind: "sheet", sheet: sheets[0] };
+  if (symbols[0]) return { kind: "symbol", symbolId: symbols[0].id };
+  return { kind: "none" };
+}
+
+/** Klucz ostatniego arkusza do preferencji (aktywny arkusz albo lastSheet). */
+export function prefsSheetKey({ active, lib, lastSheet } = {}) {
+  if (active && active !== lib) return sheetKey(active) || null;
+  if (lastSheet) return sheetKey(lastSheet) || null;
+  return null;
 }

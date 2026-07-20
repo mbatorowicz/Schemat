@@ -74,7 +74,7 @@ describe("resolveToolbarGroups", () => {
     expect(g.resourceNameMode).toBe("project");
   });
 
-  it("zawsze pokazuje menu Więcej", () => {
+  it("zawsze pokazuje plik, widok i ustawienia", () => {
     const g = resolveToolbarGroups({
       onLib: false,
       onSheet: false,
@@ -82,7 +82,9 @@ describe("resolveToolbarGroups", () => {
       hasSelection: false,
       hasDir: false,
     });
-    expect(g.moreGroup).toBe(true);
+    expect(g.fileGroup).toBe(true);
     expect(g.createGroup).toBe(true);
+    expect(g.viewGroup).toBe(true);
+    expect(g.settingsGroup).toBe(true);
   });
 });

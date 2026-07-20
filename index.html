@@ -592,39 +592,42 @@
       #toolbar.draw-mode #arrangeGroup {
         display: none;
       }
-      #moreGroup {
+      #fileGroup {
         position: relative;
       }
-      #morePanel {
+      #fileMenu {
         display: none;
         position: absolute;
         top: 100%;
         left: 0;
         z-index: 40;
-        min-width: 220px;
+        min-width: 200px;
         margin-top: 2px;
         padding: 8px;
         background: #fff;
         border: 1px solid #94a3b8;
         border-radius: 6px;
       }
-      #morePanel.open {
+      #fileMenu.open {
         display: flex;
         flex-direction: column;
         gap: 8px;
       }
-      #morePanel .more-row {
+      #fileMenu .file-menu-row {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
         align-items: center;
       }
-      #morePanel .more-lbl {
+      #fileMenu .file-menu-lbl {
         font: 600 9px Arial;
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: #64748b;
         width: 100%;
+      }
+      #viewGroup .grp-row {
+        flex-wrap: wrap;
       }
       .list-empty {
         list-style: none;
@@ -822,7 +825,7 @@
     <div id="app">
       <div id="toolbar">
         <div id="toolbarMode" class="toolbar-line">
-          <div class="grp">
+          <div class="grp" id="fileGroup">
             <div class="grp-row">
               <button id="btnOpen" class="btn-labeled tbtn primary" title="Otwórz projekt">
                 <span class="btn-text">Otwórz</span>
@@ -839,6 +842,26 @@
               <button type="button" id="saveBadge" data-kind="idle" title="Status zapisu">
                 <span class="save-badge-dot" aria-hidden="true"></span><span id="saveBadgeLabel">Brak projektu</span>
               </button>
+              <button
+                type="button"
+                id="btnFileMenu"
+                class="btn-labeled tbtn"
+                title="Plik"
+                aria-haspopup="menu"
+                aria-expanded="false"
+              >
+                <span class="btn-text">Plik</span>
+              </button>
+            </div>
+            <div id="fileMenu" role="menu" aria-label="Akcje pliku">
+              <div class="file-menu-lbl">Utwórz</div>
+              <div class="file-menu-row" id="createGroup">
+                <button id="btnNewProject" class="tbtn" title="Nowy projekt"></button>
+                <button id="btnNewSheet" class="tbtn" title="Nowy schemat"></button>
+                <button id="btnNewLibrary" class="tbtn" title="Nowa biblioteka"></button>
+                <button id="btnLib" class="tbtn" title="Otwórz bibliotekę"></button>
+                <button id="btnSaveAs" class="tbtn" title="Zapisz jako…"></button>
+              </div>
             </div>
           </div>
 
@@ -895,43 +918,32 @@
             </div>
           </div>
 
-          <div class="grp" id="moreGroup">
+          <div class="grp" id="viewGroup">
             <div class="grp-row">
-              <button type="button" id="btnMore" class="btn-labeled tbtn" title="Więcej">
-                <span class="btn-text">Więcej</span>
-              </button>
+              <label class="mini" for="grid">Siatka</label>
+              <select id="grid" title="Siatka">
+                <option value="1">1</option>
+                <option value="2.5">2.5</option>
+                <option value="5" selected>5</option>
+              </select>
+              <label class="mini"><input type="checkbox" id="snap" checked /> snap</label>
+              <label class="mini"><input type="checkbox" id="showHandles" checked /> uchwyty</label>
+              <label class="mini"><input type="checkbox" id="rotateOwnedLabels" checked /> obracaj napisy</label>
+              <span class="sep"></span>
               <button id="btnZoomOut" class="tbtn" title="Oddal"></button>
               <button id="btnZoomIn" class="tbtn" title="Przybliż"></button>
               <button id="btnFit" class="tbtn" title="Dopasuj"></button>
-              <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
-            </div>
-            <div id="morePanel" role="menu" aria-label="Więcej akcji">
-              <div class="more-lbl">Utwórz / plik</div>
-              <div class="more-row" id="createGroup">
-                <button id="btnNewProject" class="tbtn" title="Nowy projekt"></button>
-                <button id="btnNewSheet" class="tbtn" title="Nowy schemat"></button>
-                <button id="btnNewLibrary" class="tbtn" title="Nowa biblioteka"></button>
-                <button id="btnLib" class="tbtn" title="Otwórz bibliotekę"></button>
-                <button id="btnSaveAs" class="tbtn" title="Zapisz jako…"></button>
-              </div>
-              <div class="more-lbl">Widok</div>
-              <div class="more-row" id="viewExtras">
-                <label class="mini">Siatka</label>
-                <select id="grid">
-                  <option value="1">1</option>
-                  <option value="2.5">2.5</option>
-                  <option value="5" selected>5</option>
-                </select>
-                <label class="mini"><input type="checkbox" id="snap" checked /> snap</label>
-                <label class="mini"><input type="checkbox" id="showHandles" checked /> uchwyty</label>
-                <label class="mini"><input type="checkbox" id="rotateOwnedLabels" checked /> obracaj napisy</label>
-                <button type="button" id="btnShortcuts" class="btn-labeled tbtn" title="Skróty">
-                  <span class="btn-text">Skróty</span>
-                </button>
-              </div>
+              <button type="button" id="btnShortcuts" class="btn-labeled tbtn" title="Skróty">
+                <span class="btn-text">Skróty</span>
+              </button>
             </div>
           </div>
-          <div class="grp context-hidden" id="viewGroup" aria-hidden="true"></div>
+
+          <div class="grp" id="settingsGroup">
+            <div class="grp-row">
+              <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
+            </div>
+          </div>
         </div>
 
         <div id="toolbarContext" class="toolbar-line">

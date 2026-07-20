@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import {
   resolveBootCachePlan,
   resolveReloadSheetsOutcome,
+  resolveBootActiveTarget,
+  prefsSheetKey,
   shouldWriteProjectCache,
   projectCacheScore,
   libraryCacheScore,
@@ -99,5 +101,73 @@ describe("resolveReloadSheetsOutcome", () => {
       count: 0,
       action: "empty",
     });
+  });
+});
+
+describe("resolveBootActiveTarget", () => {
+  const sheets = [
+    { id: "sch-1", name: "Bezpieczenstwo.svg", relPath: "Bezpieczenstwo.svg" },
+    { id: "sch-1", name: "Enable.svg", relPath: "Enable.svg" },
+    { id: "sch-1", name: "Zasilanie.svg", relPath: "Zasilanie.svg" },
+  ];
+  const symbols = [{ id: "G" }, { id: "SK" }];
+
+  it("przywraca arkusz po sheetKey mimo kolizji sch-id", () => {
+    const r = resolveBootActiveTarget({
+      sheets,
+      symbols,
+      prefs: { sheetKey: "Zasilanie.svg", selId: "sch-1" },
+    });
+    expect(r).toEqual({ kind: "sheet", sheet: sheets[2] });
+  });
+
+  it("nie bierze pierwszego arkusza gdy selId jest współdzielone", () => {
+    const r = resolveBootActiveTarget({
+      sheets,
+      symbols,
+      prefs: { selId: "sch-1" },
+    });
+    expect(r.kind).toBe("sheet");
+    expect(r.sheet).toBe(sheets[0]);
+  });
+
+  it("przywraca symbol gdy brak sheetKey a selId to symbol", () => {
+    const r = resolveBootActiveTarget({
+      sheets,
+      symbols,
+      prefs: { selId: "SK" },
+    });
+    expect(r).toEqual({ kind: "symbol", symbolId: "SK" });
+  });
+
+  it("używa activeSheetKey z cache projektu", () => {
+    const r = resolveBootActiveTarget({
+      sheets,
+      symbols,
+      prefs: null,
+      projectSheetKey: "Enable.svg",
+    });
+    expect(r).toEqual({ kind: "sheet", sheet: sheets[1] });
+  });
+
+  it("sheetKey z prefs wygrywa ze współdzielonym selId", () => {
+    const r = resolveBootActiveTarget({
+      sheets,
+      symbols,
+      prefs: { sheetKey: "Enable.svg", selId: "sch-1" },
+      projectSheetKey: "Zasilanie.svg",
+    });
+    expect(r).toEqual({ kind: "sheet", sheet: sheets[1] });
+  });
+});
+
+describe("prefsSheetKey", () => {
+  it("bierze aktywny arkusz, inaczej lastSheet", () => {
+    const lib = { name: "lib" };
+    const zasilanie = { relPath: "Zasilanie.svg" };
+    const enable = { relPath: "Enable.svg" };
+    expect(prefsSheetKey({ active: zasilanie, lib, lastSheet: enable })).toBe("Zasilanie.svg");
+    expect(prefsSheetKey({ active: lib, lib, lastSheet: enable })).toBe("Enable.svg");
+    expect(prefsSheetKey({ active: lib, lib, lastSheet: null })).toBe(null);
   });
 });

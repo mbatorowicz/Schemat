@@ -172,7 +172,7 @@ export const W = {
     open: "Otwórz",
     save: "Zapisz",
     route: "Trasuj",
-    more: "Więcej",
+    fileMenu: "Plik",
     shortcuts: "Skróty",
   },
 };

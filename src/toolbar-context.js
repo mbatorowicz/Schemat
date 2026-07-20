@@ -23,7 +23,9 @@ export function resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection
     selectionPropsMode: showProps ? propsMode : null,
     netlistGroup: onSheet,
     arrangeGroup: onSheet && hasSelection,
-    moreGroup: true,
+    fileGroup: true,
     createGroup: true,
+    viewGroup: true,
+    settingsGroup: true,
   };
 }

@@ -7,6 +7,18 @@ export function sheetKey(sheet) {
   return sheet?.relPath || sheet?.name || sheet?.id || "";
 }
 
+/** Znajdź arkusz po stabilnym kluczu (relPath/name), z fallbackiem na unikalne id grupy SVG. */
+export function findSheetByKey(sheets, key) {
+  const k = String(key || "").trim();
+  if (!k || !sheets?.length) return null;
+  const byKey = sheets.find((s) => sheetKey(s) === k);
+  if (byKey) return byKey;
+  const byRel = sheets.find((s) => (s.relPath || "") === k || (s.name || "") === k);
+  if (byRel) return byRel;
+  const byId = sheets.filter((s) => s.id === k);
+  return byId.length === 1 ? byId[0] : null;
+}
+
 export function markSheetDirty(sheet) {
   if (sheet) sheet.dirty = true;
 }

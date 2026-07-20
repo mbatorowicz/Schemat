@@ -18,7 +18,13 @@ import {
 } from "./instance-refs.js";
 import { createHistory } from "./history.js";
 import { resolveLibSymbol, resolveSheetSymbol, resolveSymbol, collectUsedSymbolIds } from "./symbol-resolver.js";
-import { markSheetDirty, countDirtySheets, inlineSheetDefsSafe, sheetKey } from "./sheet-persistence.js";
+import {
+  markSheetDirty,
+  countDirtySheets,
+  inlineSheetDefsSafe,
+  sheetKey,
+  findSheetByKey,
+} from "./sheet-persistence.js";
 import {
   readFontSizePx,
   applyTextStyle,
@@ -72,6 +78,8 @@ import { createFileIo } from "./file-io.js";
 import {
   resolveBootCachePlan,
   resolveReloadSheetsOutcome,
+  resolveBootActiveTarget,
+  prefsSheetKey,
   projectCacheScore,
   libraryCacheScore,
   shouldWriteLibraryCache,
@@ -792,7 +800,7 @@ function applyStaticWording() {
   setBtnText("btnOpen", W.chrome.open);
   setBtnText("btnSave", W.chrome.save);
   setBtnText("btnRouteConn", W.chrome.route);
-  setBtnText("btnMore", W.chrome.more);
+  setBtnText("btnFileMenu", W.chrome.fileMenu);
   setBtnText("btnShortcuts", W.chrome.shortcuts);
   setBtnText("btnEmptyOpenProject", W.empty.openProjectCta);
 }
@@ -2165,7 +2173,7 @@ function selectSymbol(id, keepView) {
     activateTarget(state.lib, id, keepView);
     return;
   }
-  const sheet = state.sheets.find((s) => s.id === id);
+  const sheet = findSheetByKey(state.sheets, id) || state.sheets.find((s) => s.id === id);
   if (sheet) {
     selectSheet(sheet, keepView);
     return;
@@ -4497,6 +4505,7 @@ function projectSnapshot() {
     })),
     settings: settingsCfg,
     activeId: state.selId,
+    activeSheetKey: prefsSheetKey({ active: state.active, lib: state.lib, lastSheet: state.lastSheet }),
     netlist: state.netlistRaw
       ? { name: (state.netlist && state.netlist.name) || "spis.md", text: state.netlistRaw }
       : null,
@@ -4569,34 +4578,41 @@ async function applyCachedProjectMeta(proj) {
 async function restoreProject() {
   return restoreProjectSnapshot();
 }
+function prefsPayload() {
+  const rot = parseFloat((document.getElementById("rotAng") || {}).value);
+  return {
+    step: state.step,
+    snap: state.snap,
+    showHandles: state.showHandles,
+    rotateOwnedLabels: state.rotateOwnedLabels,
+    strokeW: state.strokeW,
+    strokeColor: state.strokeColor,
+    fillColor: state.fillColor,
+    fillOn: state.fillOn,
+    dashOn: state.dashOn,
+    fontSize: state.fontSize,
+    fontWeight: state.fontWeight,
+    rotAng: isNaN(rot) ? 90 : rot,
+    zoom: state.zoom,
+    panX: state.panX,
+    panY: state.panY,
+    selId: state.selId,
+    sheetKey: prefsSheetKey({ active: state.active, lib: state.lib, lastSheet: state.lastSheet }),
+    activeIsLib: !!(state.active && state.active === state.lib),
+  };
+}
+function writePrefsNow() {
+  if (_noSave) return;
+  const p = prefsPayload();
+  try {
+    localStorage.setItem("edytor.prefs", JSON.stringify(p));
+  } catch (e) {}
+  idbSet("prefs", p).catch(() => {});
+}
 function savePrefs() {
   if (_noSave) return;
   clearTimeout(_prefsT);
-  _prefsT = setTimeout(() => {
-    const rot = parseFloat((document.getElementById("rotAng") || {}).value);
-    const p = {
-      step: state.step,
-      snap: state.snap,
-      showHandles: state.showHandles,
-      rotateOwnedLabels: state.rotateOwnedLabels,
-      strokeW: state.strokeW,
-      strokeColor: state.strokeColor,
-      fillColor: state.fillColor,
-      fillOn: state.fillOn,
-      dashOn: state.dashOn,
-      fontSize: state.fontSize,
-      fontWeight: state.fontWeight,
-      rotAng: isNaN(rot) ? 90 : rot,
-      zoom: state.zoom,
-      panX: state.panX,
-      panY: state.panY,
-      selId: state.selId,
-    };
-    try {
-      localStorage.setItem("edytor.prefs", JSON.stringify(p));
-    } catch (e) {}
-    idbSet("prefs", p).catch(() => {});
-  }, 400);
+  _prefsT = setTimeout(writePrefsNow, 400);
 }
 async function loadPrefs() {
   let p = await restorePrefsSnapshot();
@@ -4662,8 +4678,14 @@ async function loadPrefs() {
   if (p.panY != null) state.panY = p.panY;
   return p;
 }
-window.addEventListener("pagehide", persistNow);
+window.addEventListener("pagehide", () => {
+  clearTimeout(_prefsT);
+  writePrefsNow();
+  persistNow();
+});
 window.addEventListener("beforeunload", (e) => {
+  clearTimeout(_prefsT);
+  writePrefsNow();
   persistNow();
   if (countDirtySheets(state.sheets)) {
     e.preventDefault();
@@ -4671,7 +4693,11 @@ window.addEventListener("beforeunload", (e) => {
   }
 });
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") persistNow();
+  if (document.visibilityState === "hidden") {
+    clearTimeout(_prefsT);
+    writePrefsNow();
+    persistNow();
+  }
 });
 window.addEventListener("keydown", (e) => {
   const tag = (e.target.tagName || "").toLowerCase();
@@ -4813,8 +4839,12 @@ async function reloadSheetsFromDir(dir, opts = {}) {
   if (!opts.skipLib) await reloadLibraryFromHandle();
   migrateProjectSymbolNames();
   buildSymbolList();
-  const keep = state.selId;
-  if (keep && (state.sheets.find((s) => s.id === keep) || state.symbols.find((s) => s.id === keep))) selectSymbol(keep);
+  const keepSheet = findSheetByKey(
+    state.sheets,
+    prefsSheetKey({ active: state.active, lib: state.lib, lastSheet: state.lastSheet })
+  );
+  if (keepSheet) selectSheet(keepSheet, true);
+  else if (state.selId && state.symbols.some((s) => s.id === state.selId)) selectSymbol(state.selId, true);
   else if (state.sheets[0]) selectSheet(state.sheets[0], true);
   else render();
   saveProject();
@@ -4899,17 +4929,24 @@ syncDrawBanner = createDrawBannerSync({
 });
 bindShortcutsHelp();
 (function wireMoreMenu() {
-  const btn = document.getElementById("btnMore");
-  const panel = document.getElementById("morePanel");
+  const btn = document.getElementById("btnFileMenu");
+  const panel = document.getElementById("fileMenu");
   if (!btn || !panel) return;
+  const setOpen = (open) => {
+    panel.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
-    panel.classList.toggle("open");
+    setOpen(!panel.classList.contains("open"));
   });
   document.addEventListener("pointerdown", (e) => {
     if (!panel.classList.contains("open")) return;
     if (panel.contains(e.target) || btn.contains(e.target)) return;
-    panel.classList.remove("open");
+    setOpen(false);
+  });
+  panel.addEventListener("click", (e) => {
+    if (e.target.closest("button")) setOpen(false);
   });
 })();
 const emptyOpen = document.getElementById("btnEmptyOpenProject");
@@ -5000,11 +5037,19 @@ try {
     ensureLib();
     migrateProjectSymbolNames();
     buildSymbolList();
-    const want = (prefs && prefs.selId) || null;
-    const ok = want && (state.sheets.find((s) => s.id === want) || state.symbols.find((s) => s.id === want));
-    const target = ok ? want : state.sheets[0] ? state.sheets[0].id : state.symbols[0] ? state.symbols[0].id : null;
-    if (target) selectSymbol(target, !!(prefs && prefs.zoom != null));
-    else {
+    const keepView = !!(prefs && prefs.zoom != null);
+    const bootTarget = resolveBootActiveTarget({
+      sheets: state.sheets,
+      symbols: state.symbols,
+      prefs,
+      projectSheetKey: cachedProj?.activeSheetKey || null,
+      projectActiveId: cachedProj?.activeId || null,
+    });
+    if (bootTarget.kind === "sheet" && bootTarget.sheet) {
+      selectSheet(bootTarget.sheet, keepView);
+    } else if (bootTarget.kind === "symbol" && bootTarget.symbolId) {
+      selectSymbol(bootTarget.symbolId, keepView);
+    } else {
       state.active = state.lib;
       state.srcSvg = state.lib.svg;
       state.srcDoc = state.lib.doc;
