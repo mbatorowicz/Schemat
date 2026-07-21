@@ -261,3 +261,89 @@ export function bindModalA11y(cfg) {
 
   return { open, close, isOpen: () => bg.classList.contains("open") };
 }
+
+/**
+ * Wrapper nad choice dialog dla trasowania (unika mylenia z schemat/biblioteka).
+ * @returns {Promise<"cancel"|"local"|"library">}
+ */
+export function askRouteChoice(askChoiceFn, message, cfg = {}) {
+  if (typeof askChoiceFn !== "function") return Promise.resolve("cancel");
+  return askChoiceFn(message, {
+    title: cfg.title || "Trasowanie",
+    cancelLabel: cfg.cancelLabel || "Anuluj",
+    localLabel: cfg.localLabel || "Zastąp",
+    libraryLabel: cfg.libraryLabel || "Zachowaj",
+  });
+}
+
+/**
+ * Modal tekstowy (zamiast window.prompt).
+ * HTML: #askTextDialog, #askTextDialogTitle, #askTextDialogLabel, #askTextDialogInput, #askTextDialogOk, #askTextDialogCancel
+ */
+export function createAskTextDialog(opts = {}) {
+  const bgId = opts.id || "askTextDialog";
+  let resolveFn = null;
+  let a11y = null;
+
+  /**
+   * @param {string} title
+   * @param {{ defaultValue?: string, label?: string }} [cfg]
+   * @returns {Promise<string|null>}
+   */
+  function ask(title, cfg = {}) {
+    const bg = document.getElementById(bgId);
+    const titleEl = document.getElementById("askTextDialogTitle");
+    const labelEl = document.getElementById("askTextDialogLabel");
+    const input = document.getElementById("askTextDialogInput");
+    if (!bg || !input) {
+      const v = typeof window !== "undefined" ? window.prompt(title, cfg.defaultValue || "") : null;
+      return Promise.resolve(v);
+    }
+    if (titleEl) titleEl.textContent = title || "Wartość";
+    if (labelEl) labelEl.textContent = cfg.label || title || "Wartość";
+    input.value = cfg.defaultValue != null ? String(cfg.defaultValue) : "";
+    if (a11y) a11y.open();
+    else bg.classList.add("open");
+    return new Promise((resolve) => {
+      resolveFn = resolve;
+    });
+  }
+
+  function finish(ok) {
+    const input = document.getElementById("askTextDialogInput");
+    const val = ok && input ? input.value : null;
+    const r = resolveFn;
+    resolveFn = null;
+    if (a11y) a11y.close();
+    else {
+      const bg = document.getElementById(bgId);
+      if (bg) bg.classList.remove("open");
+    }
+    if (r) r(val);
+  }
+
+  function init() {
+    a11y = bindModalA11y({
+      id: bgId,
+      labelledBy: opts.titleId || "askTextDialogTitle",
+      initialFocus: "askTextDialogInput",
+      onClose: () => {
+        if (resolveFn) {
+          const r = resolveFn;
+          resolveFn = null;
+          r(null);
+        }
+      },
+    });
+    document.getElementById("askTextDialogOk")?.addEventListener("click", () => finish(true));
+    document.getElementById("askTextDialogCancel")?.addEventListener("click", () => finish(false));
+    document.getElementById("askTextDialogInput")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(true);
+      }
+    });
+  }
+
+  return { ask, init, close: () => finish(false) };
+}

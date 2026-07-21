@@ -8,7 +8,42 @@ import {
   expandToInstanceMembers,
 } from "./sheet-elements.js";
 import { buildAlignUnits, resolveAlignElements, unionBox, computeAlignDeltas } from "./selection-align.js";
+import { flipPoint, flipAngleDeg, normalizeAngleDeg, collectFlipTargets } from "./selection-flip.js";
+import {
+  readUseOrient,
+  writeUseOrient,
+  composeSheetFlip,
+} from "./instance-orient.js";
+import {
+  syncInstanceLabelAngles,
+  syncAllInstanceLabelAngles,
+  syncInstancePinLabels,
+  markSheetPinLabelManual,
+  isSheetPinLabel,
+  instanceRefsFromElements,
+  isInstanceOwnedText,
+  findUseByRef,
+} from "./instance-labels.js";
 import { wireColor, wireCssRules } from "./wire-theme.js";
+import { NetlistModel } from "./netlist-model.js";
+import { wireConnId, isWireGeometry, findWireByConnId } from "./wire-geometry.js";
+import {
+  clearWireConnHighlight,
+  authoredStrokeWidth,
+  authoredStrokeColor,
+  appendWireStrokeOverlay,
+} from "./wire-highlight.js";
+import {
+  removeWireMarksForWire,
+  syncWireMarks,
+  resyncAllWireMarks,
+  normalizeWireMarkMode,
+  DEFAULT_WIRE_MARK_MODE,
+} from "./wire-markers.js";
+import { rePinWireEndsFromMeta } from "./wire-ends.js";
+import { endpointRawFromSnap } from "./topo-nodes.js";
+import { createConnectionApply } from "./connection-apply.js";
+import { initRouteOptsUi as bindRouteOptsUi } from "./route-opts-ui.js";
 import { num, fmt, fmtRot, parseSvg, serializeSvg, firstSchId } from "./svg-utils.js";
 import {
   refBaseForSymbol as refBaseForSymbolCore,
@@ -108,6 +143,8 @@ import {
   selectionInstanceUse,
   leadPropsFromConn,
 } from "./selection-props.js";
+import { selectionPropsEls } from "./selection-props-ui.js";
+import { applyConnectionFieldLabels, setConnectionPropsVisible } from "./connection-fields.js";
 import {
   W,
   saveFileLabel,
@@ -133,7 +170,13 @@ import {
 } from "./symbol-save.js";
 import { sheetDisplayTitle, sheetCatalogLabel, applySheetDisplayTitle } from "./sheet-catalog.js";
 import { renameLibraryOnDisk, renameProjectFolderOnDisk } from "./resource-rename.js";
-import { createConfirmDialog, createChoiceDialog, createToastHost, bindModalA11y } from "./ui-dialog.js";
+import {
+  createConfirmDialog,
+  createChoiceDialog,
+  createToastHost,
+  bindModalA11y,
+  createAskTextDialog,
+} from "./ui-dialog.js";
 import { createSavePermBadge } from "./project-perm-ui.js";
 import { createSidebarLists } from "./sidebar-lists.js";
 import { createDrawBannerSync } from "./draw-mode-ui.js";
@@ -185,10 +228,6 @@ const ICONS = {
   btnAddText: '<path d="M6 6h12M12 6v13M9 19h6"/>',
   btnAddPoint: '<circle cx="12" cy="12" r="5"/>',
   btnAddNode: '<circle cx="12" cy="12" r="5" class="fillnode"/>',
-  btnBranchOblique:
-    '<path d="M6 4v16"/><path d="M6 12l4 4h8" fill="none"/><path d="M6 12l3.2 3.2" stroke-width="2.2"/>',
-  btnObliqueStub: '<path d="M4 18V6"/><path d="M4 12l5 5h9" fill="none"/>',
-  btnAddPin: '<path d="M7 18L12 6l5 12M9 14h6"/>',
   btnAddLead: '<path d="M4 12h16"/>',
   btnAlignLeft: '<path d="M4 4v16"/><path d="M8 7h8v3H8z"/><path d="M8 14h12v3H8z"/>',
   btnAlignCenterH: '<path d="M12 4v16"/><path d="M8 7h8v3H8z"/><path d="M6 14h12v3H6z"/>',
@@ -270,8 +309,11 @@ const state = {
   netlistProposals: [],
   selectedConnId: "",
   projectNetlists: [],
+  routeOpts: { strokeWidth: "" },
+  wireMarkMode: DEFAULT_WIRE_MARK_MODE,
   drawMode: null, // "line" gdy rysujemy łamaną
   drawing: null, // {pts:[[x,y]...], cursor:[x,y]}
+  breakEditMode: false, // klik na trasę = dodaj punkt łamania
   undo: [],
   redo: [],
   connLabelSel: null, // <g data-role="conn"> gdy edytowany jest tylko napis pinu
@@ -298,9 +340,12 @@ const confirmDialog = createConfirmDialog();
 confirmDialog.init();
 const choiceDialog = createChoiceDialog();
 choiceDialog.init();
+const askTextDialog = createAskTextDialog();
+askTextDialog.init();
 const toastHost = createToastHost();
 const askConfirm = (message, cfg) => confirmDialog.ask(message, cfg);
 const askChoice = (message, cfg) => choiceDialog.ask(message, cfg);
+const askText = (title, cfg) => askTextDialog.ask(title, cfg);
 let savePermBadge = null;
 let syncDrawBanner = () => {};
 let settingsModal = null;
@@ -311,6 +356,18 @@ let scene;
 function clearHighlight() {
   if (scene?.sel) scene.sel.innerHTML = "";
 }
+
+/** Podświetlenie trasy ze spisu połączeń (niebieska linia) — nie to samo co zaznaczenie. */
+function clearNetlistRouteHighlight() {
+  const root = typeof currentSymNode === "function" ? currentSymNode() : null;
+  if (root) clearWireConnHighlight(root);
+  if (state.selectedConnId) {
+    state.selectedConnId = "";
+    const sel = document.getElementById("netlistConn");
+    if (sel) sel.value = "";
+    if (typeof refreshNetlistUI === "function") refreshNetlistUI();
+  }
+}
 function selEls() {
   return state.selection.length ? state.selection : state.activeEl ? [state.activeEl] : [];
 }
@@ -319,15 +376,49 @@ let childPair, bboxInRoot, rebuildEditDefs, rebuildHost;
 let targetSheet = () => null,
   connectionDiagnostics = () => ({ ok: true, reason: "" }),
   routeSelectedConnection = () => {},
+  routeAllConnections = () => {},
   promoteSelectionToConnection = async () => null,
   sheetWireHealth = () => ({ orphans: [], bare: [], missing: [] }),
   collectNetlistProposals = () => [],
-  nextProposalId = () => "NEW1";
+  nextProposalId = () => "NEW1",
+  resolveEndpoint = () => ({ ok: false });
+let applyConnectionRecord = () => null;
 let refreshNetlistUI = () => {},
   loadNetlistText = async () => false,
   autoLoadNetlistForSheet = async () => false,
   selectConnectionFromElement = () => false;
 let scheduleNetlistRefresh = () => {};
+
+/** Przywróć końce przewodu do pinów z data-from / data-to. */
+function rePinWireToMeta(el) {
+  if (!isWireGeometry(el) || !el.getAttribute("data-conn-id")) return;
+  const sheet = typeof targetSheet === "function" ? targetSheet() : null;
+  if (!sheet) return;
+  rePinWireEndsFromMeta(
+    el,
+    (raw) => {
+      const r = resolveEndpoint(sheet, NetlistModel.parseEndpoint(raw));
+      return r?.ok ? { x: r.x, y: r.y } : null;
+    },
+    state.wireMarkMode
+  );
+}
+
+/** Czy punkt 0 geometrii odpowiada data-from (vs data-to). */
+function wireStartIsFrom(el) {
+  const sheet = typeof targetSheet === "function" ? targetSheet() : null;
+  const fromRaw = (el.getAttribute("data-from") || "").trim();
+  const toRaw = (el.getAttribute("data-to") || "").trim();
+  if (!sheet || !fromRaw || !toRaw) return true;
+  const pts = parsePoints(el);
+  if (!pts.length) return true;
+  const fromEp = resolveEndpoint(sheet, NetlistModel.parseEndpoint(fromRaw));
+  const toEp = resolveEndpoint(sheet, NetlistModel.parseEndpoint(toRaw));
+  if (!fromEp?.ok || !toEp?.ok) return true;
+  const dFrom = Math.hypot(pts[0][0] - fromEp.x, pts[0][1] - fromEp.y);
+  const dTo = Math.hypot(pts[0][0] - toEp.x, pts[0][1] - toEp.y);
+  return dFrom <= dTo;
+}
 let buildSymbolList = () => {},
   buildElementList = () => {},
   syncListSelection = () => {},
@@ -361,6 +452,14 @@ function wireRenderPipeline() {
 }
 
 function wireNetlistRouting() {
+  const applyApi = createConnectionApply({
+    state,
+    getSheet: () => (typeof targetSheet === "function" ? targetSheet() : null),
+    getSettingsCfg: () => settingsCfg,
+    wireColorFn: wireColor,
+    mkEl,
+  });
+  applyConnectionRecord = applyApi.applyConnectionRecord;
   const n = createNetlistRouting({
     state,
     XLINK,
@@ -384,15 +483,18 @@ function wireNetlistRouting() {
     persistConnections: () => saveProjectSettings(),
     nearestJoint: (...a) => nearestJoint(...a),
     wireColor,
+    applyConnectionRecord,
   });
   ({
     targetSheet,
     connectionDiagnostics,
     routeSelectedConnection,
+    routeAllConnections,
     promoteSelectionToConnection,
     sheetWireHealth,
     collectNetlistProposals,
     nextProposalId,
+    resolveEndpoint,
   } = n);
   const ui = createNetlistUi({
     getState: () => state,
@@ -407,6 +509,7 @@ function wireNetlistRouting() {
     promoteSelectionToConnection,
     currentSymNode,
     selectSheetElement,
+    applyConnectionRecord,
   });
   ({ refreshNetlistUI, loadNetlistText, autoLoadNetlistForSheet, selectConnectionFromElement } = ui);
   const live = createNetlistLiveValidator({ refreshNetlistUI, debounceMs: 180 });
@@ -446,6 +549,8 @@ function wireDrawMode() {
     styleLine,
     styleText,
     styleNode,
+    applyConnectionRecord: (...a) => applyConnectionRecord(...a),
+    askText,
   });
   ({
     startDraw,
@@ -578,6 +683,10 @@ function wireSelectionModel() {
   });
   ({ selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue } = s);
 }
+function appendWireSelectionHighlight(cel, active) {
+  appendWireStrokeOverlay(scene.sel, cel, { active, fmt, SVGNS });
+}
+
 function highlightActive() {
   clearHighlight();
   const node = currentSymNode();
@@ -591,9 +700,14 @@ function highlightActive() {
     return;
   }
   const pad = 1;
+  const selected = new Set(selEls());
   selEls().forEach((el) => {
     const { cel } = childPair(node, el, cloneRoot);
     if (!cel) return;
+    if (isWireGeometry(el) || isWireGeometry(cel)) {
+      appendWireSelectionHighlight(cel, el === state.activeEl);
+      return;
+    }
     let bb;
     try {
       if (isConnLabelMode() && el === state.connLabelSel) {
@@ -619,6 +733,15 @@ function highlightActive() {
     r.style.pointerEvents = "none";
     scene.sel.appendChild(r);
   });
+  // Podświetlenie ze spisu — ten sam overlay, bez mutacji stroke na trasie
+  if (state.selectedConnId) {
+    const wire = findWireByConnId(node, state.selectedConnId);
+    if (wire && !selected.has(wire)) {
+      const { cel } = childPair(node, wire, cloneRoot);
+      if (cel) appendWireSelectionHighlight(cel, false);
+    }
+  }
+  clearWireConnHighlight(node);
   syncNameFields();
   syncElementListSelection();
   syncSelectionToolbar();
@@ -842,6 +965,17 @@ function applyStaticWording() {
   setBtnText("btnOpen", W.chrome.open);
   setBtnText("btnSave", W.chrome.save);
   setBtnText("btnRouteConn", W.chrome.route);
+  setBtnText("btnRouteAllConn", W.chrome.routeAll);
+  setBtnText("btnBreakPoint", W.chrome.breakPoint);
+  const wireMarkSel = document.getElementById("wireMarkMode");
+  if (wireMarkSel) {
+    wireMarkSel.title = W.fieldTip.wireMarkMode;
+    const optTip = { local: W.fieldTip.wireMarkLocal, other: W.fieldTip.wireMarkOther, both: W.fieldTip.wireMarkBoth };
+    [...wireMarkSel.options].forEach((o) => {
+      if (W.wireMark[o.value]) o.textContent = W.wireMark[o.value];
+      if (optTip[o.value]) o.title = optTip[o.value];
+    });
+  }
   setBtnText("btnFileMenu", W.chrome.fileMenu);
   setBtnText("btnShortcuts", W.chrome.shortcuts);
   setBtnText("btnEmptyOpenProject", W.empty.openProjectCta);
@@ -1615,28 +1749,6 @@ function setInstanceRef(use, v, opts) {
   );
   return { ok: true, changed: true };
 }
-function selectionPropsEls() {
-  return {
-    refInp: document.getElementById("selPropRef"),
-    numInp: document.getElementById("selPropNum"),
-    pinInp: document.getElementById("selPropPin"),
-    descInp: document.getElementById("selPropDesc"),
-    desc2Inp: document.getElementById("selPropDesc2"),
-    textInp: document.getElementById("selPropText"),
-    lenInp: document.getElementById("selPropLen"),
-    dirInp: document.getElementById("selPropDir"),
-    symSel: document.getElementById("selPropSym"),
-    refField: document.getElementById("selPropRefField"),
-    numField: document.getElementById("selPropNumField"),
-    pinField: document.getElementById("selPropPinField"),
-    descField: document.getElementById("selPropDescField"),
-    desc2Field: document.getElementById("selPropDesc2Field"),
-    textField: document.getElementById("selPropTextField"),
-    lenField: document.getElementById("selPropLenField"),
-    dirField: document.getElementById("selPropDirField"),
-    symField: document.getElementById("selPropSymField"),
-  };
-}
 function selectionTextTarget() {
   return (
     connLabelEl() ||
@@ -1677,6 +1789,10 @@ function syncSelectionProps(mode) {
     lenInp,
     dirInp,
     symSel,
+    netInp,
+    wireInp,
+    lengthInp,
+    notesInp,
     refField,
     numField,
     pinField,
@@ -1686,8 +1802,26 @@ function syncSelectionProps(mode) {
     lenField,
     dirField,
     symField,
+    netField,
+    wireField,
+    lengthField,
+    notesField,
   } = selectionPropsEls();
-  const propsInputs = [refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel].filter(Boolean);
+  const propsInputs = [
+    refInp,
+    numInp,
+    pinInp,
+    descInp,
+    desc2Inp,
+    textInp,
+    lenInp,
+    dirInp,
+    symSel,
+    netInp,
+    wireInp,
+    lengthInp,
+    notesInp,
+  ].filter(Boolean);
   const editing = propsInputs.some((inp) => document.activeElement === inp);
   if (!mode) {
     if (!editing) {
@@ -1698,10 +1832,17 @@ function syncSelectionProps(mode) {
       if (desc2Inp) desc2Inp.value = "";
       if (textInp) textInp.value = "";
       if (lenInp) lenInp.value = "";
+      if (netInp) netInp.value = "";
+      if (wireInp) wireInp.value = "";
+      if (lengthInp) lengthInp.value = "";
+      if (notesInp) notesInp.value = "";
     }
-    [refField, numField, pinField, descField, desc2Field, textField, lenField, dirField, symField].forEach((f) => {
-      if (f) f.classList.add("context-hidden");
-    });
+    [refField, numField, pinField, descField, desc2Field, textField, lenField, dirField, symField].forEach(
+      (f) => {
+        if (f) f.classList.add("context-hidden");
+      }
+    );
+    setConnectionPropsVisible({ netField, wireField, lengthField, notesField }, false);
     state._selPropTextEl = null;
     return;
   }
@@ -1735,6 +1876,12 @@ function syncSelectionProps(mode) {
     if (textInp) textInp.value = st.text;
     if (lenInp) lenInp.value = st.len;
     if (dirInp && st.dir) dirInp.value = st.dir;
+    if (mode === "wire") {
+      if (netInp) netInp.value = st.net;
+      if (wireInp) wireInp.value = st.wire;
+      if (lengthInp) lengthInp.value = st.length;
+      if (notesInp) notesInp.value = st.notes;
+    }
     if (mode === "use") fillSelPropSymOptions(symSel, st.symId);
   } else if (mode === "use" && symSel && !symSel.options.length) {
     fillSelPropSymOptions(symSel, st.symId);
@@ -1748,6 +1895,10 @@ function syncSelectionProps(mode) {
   if (desc2Field) desc2Field.classList.toggle("context-hidden", mode !== "use");
   if (textField) textField.classList.toggle("context-hidden", mode !== "text");
   if (symField) symField.classList.toggle("context-hidden", mode !== "use");
+  setConnectionPropsVisible(
+    { netField, wireField, lengthField, notesField },
+    mode === "wire"
+  );
   if (mode === "text") state._selPropTextEl = selectionTextTarget();
   else state._selPropTextEl = null;
 }
@@ -1810,7 +1961,71 @@ async function commitSelectionProps() {
     connLabelSel: state.connLabelSel,
   });
   if (!mode) return;
-  const { refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel } = selectionPropsEls();
+  const {
+    refInp,
+    numInp,
+    pinInp,
+    descInp,
+    desc2Inp,
+    textInp,
+    lenInp,
+    dirInp,
+    symSel,
+    netInp,
+    wireInp,
+    lengthInp,
+    notesInp,
+  } = selectionPropsEls();
+
+  if (mode === "wire") {
+    const el = state.selection[0];
+    if (!el) return;
+    const connId = wireConnId(el);
+    const nextNet = ((netInp && netInp.value) || "").trim() || "—";
+    const nextWire = ((wireInp && wireInp.value) || "").trim();
+    const nextLength = ((lengthInp && lengthInp.value) || "").trim();
+    const nextNotes = ((notesInp && notesInp.value) || "").trim();
+    const prevNet = (el.getAttribute("data-net") || "").trim();
+    const prevWire = (el.getAttribute("data-wire") || "").trim();
+    const prevLength = (el.getAttribute("data-length") || "").trim();
+    const prevNotes = (el.getAttribute("data-notes") || "").trim();
+    if (
+      nextNet === (prevNet || "—") &&
+      nextWire === prevWire &&
+      nextLength === prevLength &&
+      nextNotes === prevNotes
+    ) {
+      return;
+    }
+    pushUndo();
+    const existing = state.netlist?.connections?.find((c) => c.id === connId);
+    const record = NetlistModel.normalizeConnection({
+      ...(existing || { id: connId, from: el.getAttribute("data-from"), to: el.getAttribute("data-to") }),
+      net: nextNet,
+      wire: nextWire || existing?.wire || "do ustalenia",
+      length: nextLength,
+      notes: nextNotes,
+    });
+    applyConnectionRecord(record, {
+      el,
+      routeKind: el.getAttribute("data-route") || "manual",
+      strokeWidth: state.routeOpts?.strokeWidth || "",
+      persist: true,
+      upsert: !!existing || !!connId,
+    });
+    markActiveDirty();
+    render();
+    buildElementList();
+    syncElementListSelection();
+    syncSelectionProps("wire");
+    if (typeof refreshNetlistUI === "function") refreshNetlistUI();
+    setStatus("Zaktualizowano opis połączenia" + (connId ? " " + connId : "") + ".", {
+      toast: true,
+      tone: "success",
+    });
+    saveProject();
+    return;
+  }
 
   if (mode === "text") {
     const textEl = selectionTextTarget();
@@ -2056,7 +2271,22 @@ async function commitSelectionProps() {
   saveProject();
 }
 function initSelectionPropsForm() {
-  const { refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel } = selectionPropsEls();
+  applyConnectionFieldLabels(document);
+  const {
+    refInp,
+    numInp,
+    pinInp,
+    descInp,
+    desc2Inp,
+    textInp,
+    lenInp,
+    dirInp,
+    symSel,
+    netInp,
+    wireInp,
+    lengthInp,
+    notesInp,
+  } = selectionPropsEls();
   const wireCommit = (inp) => {
     if (!inp) return;
     inp.addEventListener("focus", () => {
@@ -2116,6 +2346,28 @@ function initSelectionPropsForm() {
   wireCommit(lenInp);
   wireCommit(dirInp);
   wireCommit(symSel);
+  wireCommit(netInp);
+  wireCommit(wireInp);
+  wireCommit(lengthInp);
+  wireCommit(notesInp);
+}
+
+function initRouteOptsUi() {
+  bindRouteOptsUi(state);
+}
+
+function initWireMarkModeUi() {
+  const sel = document.getElementById("wireMarkMode");
+  if (!sel) return;
+  sel.value = normalizeWireMarkMode(state.wireMarkMode);
+  sel.onchange = () => {
+    state.wireMarkMode = normalizeWireMarkMode(sel.value);
+    sel.value = state.wireMarkMode;
+    savePrefs();
+    const node = currentSymNode();
+    if (node) ensureSheetWireMarks(node);
+    if (node && scene?.host) rebuildHost(scene.host);
+  };
 }
 /* buildSymbolList / buildElementList / sync* — createSidebarLists (wireSidebarLists) */
 
@@ -2230,6 +2482,32 @@ function currentSymNode() {
   return qsById(state.srcSvg, state.selId);
 }
 
+/** SSOT: nadruki na wszystkich trasach arkusza (przed klonem do hosta). */
+function ensureSheetWireMarks(node) {
+  if (!node || state.active === state.lib) return;
+  const byId = new Map((state.netlist?.connections || []).map((c) => [String(c.id), c]));
+  resyncAllWireMarks(node, state.wireMarkMode, mkEl, {
+    resolveRecord: (id) => byId.get(String(id)) || null,
+    endpointRaw: (ep) => NetlistModel.endpointRaw(ep),
+  });
+}
+
+/** SSOT: opisy instancji (desig/desc/pin) zawsze czytelne (kąt 0°). */
+function ensureInstanceLabelAngles(node) {
+  if (!node || state.active === state.lib) return;
+  syncAllInstanceLabelAngles(node, typeof connParts === "function" ? { connParts } : {});
+}
+
+/** SSOT: numery styków z defs jako osobne napisy na arkuszu (bez rotate/scale use). */
+function ensureInstancePinLabels(node) {
+  if (!node || state.active === state.lib) return;
+  syncInstancePinLabels(node, {
+    definitionForUse: (use) => definitionForUseElement(use, state.lib?.svg, state.srcSvg, XLINK),
+    mkEl,
+    styleText,
+  });
+}
+
 function render() {
   const missing = rebuildEditDefs(scene.defs).missing;
   if (missing.length) console.warn("Brak symboli w podglądzie:", missing.join(", "));
@@ -2242,6 +2520,9 @@ function render() {
     scheduleNetlistRefresh();
     return;
   }
+  ensureSheetWireMarks(node);
+  ensureInstancePinLabels(node);
+  ensureInstanceLabelAngles(node);
   rebuildHost(scene.host);
   buildHandles(node);
   attachBodyHandlers();
@@ -2359,6 +2640,10 @@ function setPositionedElement(el, x, y) {
     ny = fmt(y);
   el.setAttribute("x", nx);
   el.setAttribute("y", ny);
+  if (el.tagName?.toLowerCase() === "use" && dataAng !== null) {
+    writeUseOrient(el, readUseOrient(el), x, y);
+    return;
+  }
   if (dataAng !== null) el.setAttribute("transform", `rotate(${dataAng} ${nx} ${ny})`);
   else if (rot) el.setAttribute("transform", `rotate(${fmt(rot.ang)} ${fmt(rot.cx + x - ox)} ${fmt(rot.cy + y - oy)})`);
 }
@@ -2388,6 +2673,11 @@ function moveElement(el, dx, dy) {
     el.setAttribute("cy", fmt(g("cy") + dy));
   } else if (t === "text") {
     setPositionedElement(el, g("x") + dx, g("y") + dy);
+    if ((dx || dy) && isSheetPinLabel(el)) {
+      const ref = (el.getAttribute("data-owner-ref") || "").trim();
+      const use = findUseByRef(el.parentNode, ref);
+      if (use) markSheetPinLabelManual(el, use);
+    }
   } else if (t === "use") {
     setPositionedElement(el, g("x") + dx, g("y") + dy);
     // Złącza jedź z symbolem; etykiety (desig/desc) przesuwaj osobno w ramach grupy.
@@ -2420,6 +2710,23 @@ function captureStagePointer(ev) {
     stage.setPointerCapture(ev.pointerId);
   } catch (e) {}
 }
+function setBreakEditMode(on) {
+  state.breakEditMode = !!on;
+  const btn = document.getElementById("btnBreakPoint");
+  if (btn) btn.classList.toggle("primary", state.breakEditMode);
+  if (state.breakEditMode) {
+    setStatus("Kliknij na trasę, aby dodać punkt łamania. Esc = anuluj.", {
+      toast: true,
+      tone: "info",
+    });
+  }
+}
+
+function toggleBreakEditMode() {
+  if (state.drawMode) return;
+  setBreakEditMode(!state.breakEditMode);
+}
+
 function startBodyDrag(ev, cel, i) {
   if (state.drawMode) return; // w trybie rysowania klik dodaje punkt (obsługa na scenie)
   resetRotationSession();
@@ -2431,6 +2738,20 @@ function startBodyDrag(ev, cel, i) {
   if (!node) return;
   const el = node.children[i];
   if (!el) return;
+  if (state.breakEditMode) {
+    const tag = el.tagName?.toLowerCase?.() || "";
+    if (tag === "line" || tag === "polyline") {
+      const world = toWorld(ev);
+      if (insertBreakPointAt(el, world.x, world.y)) {
+        setBreakEditMode(false);
+        return;
+      }
+      setStatus("Kliknij bliżej odcinka trasy.", { toast: true, tone: "warning" });
+      return;
+    }
+    setStatus("Zaznacz linię lub łamaną (trasę).", { toast: true, tone: "warning" });
+    return;
+  }
   if (ev.ctrlKey || ev.metaKey) {
     const k = state.selection.indexOf(el);
     if (k >= 0) {
@@ -2543,7 +2864,13 @@ function buildHandles(sym) {
       state.handles.push(
         mkHandle(
           () => [num(el, "x"), num(el, "y")],
-          (x, y) => setPositionedElement(el, x, y),
+          (x, y) => {
+            setPositionedElement(el, x, y);
+            if (isSheetPinLabel(el)) {
+              const use = findUseByRef(el.parentNode, (el.getAttribute("data-owner-ref") || "").trim());
+              if (use) markSheetPinLabelManual(el, use);
+            }
+          },
           "pt",
           el
         )
@@ -2574,20 +2901,44 @@ function buildHandles(sym) {
       );
     } else if (t === "polyline" || t === "polygon") {
       const pts = parsePoints(el);
+      const isConnWire = !!(
+        el.getAttribute("data-conn-id") &&
+        (el.getAttribute("data-from") || el.getAttribute("data-to"))
+      );
       pts.forEach((p, i) => {
+        const isEnd = i === 0 || i === pts.length - 1;
+        const stickyEnd = isConnWire && isEnd ? (i === 0 ? "start" : "end") : null;
         const h = mkHandle(
           () => parsePoints(el)[i],
           (x, y) => {
             const a = parsePoints(el);
+            if (stickyEnd) {
+              const j = typeof nearestJoint === "function" ? nearestJoint(x, y) : null;
+              if (j) {
+                x = j.x;
+                y = j.y;
+                const raw = endpointRawFromSnap(j);
+                if (raw) {
+                  const startIsFrom = wireStartIsFrom(el);
+                  if (stickyEnd === "start") el.setAttribute(startIsFrom ? "data-from" : "data-to", raw);
+                  else el.setAttribute(startIsFrom ? "data-to" : "data-from", raw);
+                }
+              }
+            }
             a[i] = [x, y];
             el.setAttribute("points", a.map((q) => q.join(",")).join(" "));
-            if (el.getAttribute("data-conn-id")) el.setAttribute("data-route", "manual");
+            if (el.getAttribute("data-conn-id")) {
+              el.setAttribute("data-route", "manual");
+              if (!stickyEnd) rePinWireToMeta(el);
+              else if (el.parentNode) syncWireMarks(el.parentNode, el, mkEl, state.wireMarkMode);
+            }
           },
           "pt",
           el
         );
         h.pointIndex = i;
         h.breakVertex = i > 0 && i < pts.length - 1;
+        h.stickyEnd = stickyEnd;
         state.handles.push(h);
       });
     } else if (t === "path") {
@@ -2636,6 +2987,7 @@ function drawHandles() {
       "hnd" +
         (h.kind === "ctrl" ? " ctrl" : "") +
         (h.breakVertex ? " break" : "") +
+        (h.stickyEnd ? " pin-end" : "") +
         (state.selHandle === h ? " sel" : "")
     );
     s.setAttribute("vector-effect", "non-scaling-stroke");
@@ -2703,7 +3055,7 @@ function insertBreakPointAt(el, x, y) {
   const next = insertVertex(hit.pts, hit.segmentIndex, nx, ny);
   if (!next) return false;
   pushUndo();
-  const out = applyWirePoints(el, next, mkEl);
+  const out = applyWirePoints(el, next, mkEl, state.wireMarkMode);
   state.selection = [out];
   state.activeEl = out;
   state.selHandle = null;
@@ -2730,7 +3082,7 @@ function removeBreakPointFrom(el, index) {
   const next = removeBreakVertex(pts, index);
   if (!next) return false;
   pushUndo();
-  const out = applyWirePoints(el, next, mkEl);
+  const out = applyWirePoints(el, next, mkEl, state.wireMarkMode);
   state.selection = [out];
   state.activeEl = out;
   state.selHandle = null;
@@ -2766,7 +3118,16 @@ stage.addEventListener("pointermove", (ev) => {
   if (dragging) {
     let x = p.x,
       y = p.y;
-    if (state.snap) {
+    if (dragging.h?.stickyEnd) {
+      const j = typeof nearestJoint === "function" ? nearestJoint(x, y) : null;
+      if (j) {
+        x = j.x;
+        y = j.y;
+      } else if (state.snap) {
+        x = snap(x);
+        y = snap(y);
+      }
+    } else if (state.snap) {
       x = snap(x);
       y = snap(y);
     }
@@ -2846,6 +3207,7 @@ stage.addEventListener("dblclick", (ev) => {
 // ---- interaktywne rysowanie (createDrawMode / wireDrawMode) ----
 /* syncDrawBanner — tworzony w bootstrap (draw-mode-ui.js) */
 let connMetaResolve = null;
+let connMetaModal = null;
 function openConnMetaModal(node) {
   const bg = document.getElementById("connMeta");
   const refInp = document.getElementById("connMetaRef");
@@ -2856,7 +3218,8 @@ function openConnMetaModal(node) {
   if (refRow) refRow.style.display = onSheet ? "flex" : "none";
   if (refInp) refInp.value = onSheet ? lastConnRefOnSheet(node) : "";
   pinInp.value = onSheet && refInp ? nextConnPinOnSheet(node, refInp.value || lastConnRefOnSheet(node)) : "1";
-  bg.classList.add("open");
+  if (connMetaModal) connMetaModal.open();
+  else bg.classList.add("open");
   if (refInp && onSheet) refInp.focus();
   else pinInp.focus();
   return new Promise((resolve) => {
@@ -2864,18 +3227,30 @@ function openConnMetaModal(node) {
   });
 }
 function closeConnMetaModal(result) {
-  const bg = document.getElementById("connMeta");
-  if (bg) bg.classList.remove("open");
-  if (connMetaResolve) {
-    const r = connMetaResolve;
-    connMetaResolve = null;
-    r(result);
+  const r = connMetaResolve;
+  connMetaResolve = null;
+  if (connMetaModal) connMetaModal.close();
+  else {
+    const bg = document.getElementById("connMeta");
+    if (bg) bg.classList.remove("open");
   }
+  if (r) r(result);
 }
 function initConnMetaModal() {
+  connMetaModal = bindModalA11y({
+    id: "connMeta",
+    labelledBy: "connMetaTitle",
+    initialFocus: "connMetaPin",
+    onClose: () => {
+      if (connMetaResolve) {
+        const r = connMetaResolve;
+        connMetaResolve = null;
+        r(null);
+      }
+    },
+  });
   const ok = document.getElementById("connMetaOk");
   const cancel = document.getElementById("connMetaCancel");
-  const bg = document.getElementById("connMeta");
   const refInp = document.getElementById("connMetaRef");
   const pinInp = document.getElementById("connMetaPin");
   const submit = () => {
@@ -2893,20 +3268,12 @@ function initConnMetaModal() {
   };
   if (ok) ok.onclick = submit;
   if (cancel) cancel.onclick = () => closeConnMetaModal(null);
-  if (bg)
-    bg.addEventListener("pointerdown", (e) => {
-      if (e.target === bg) closeConnMetaModal(null);
-    });
   [refInp, pinInp].forEach((inp) => {
     if (inp)
       inp.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
           submit();
-        }
-        if (e.key === "Escape") {
-          e.preventDefault();
-          closeConnMetaModal(null);
         }
       });
   });
@@ -3138,6 +3505,7 @@ stage.addEventListener("pointerdown", (ev) => {
   state.selection = [];
   clearSelInfo();
   clearHighlight();
+  clearNetlistRouteHighlight();
   syncSelectionToolbar();
   [...scene.handles.children].forEach((c) => c.classList.remove("sel"));
   if (ev.shiftKey || ev.button === 1) {
@@ -3375,6 +3743,11 @@ function setSelectState(sel, value, mixed) {
   sel.value = v;
 }
 function primaryColorOf(r) {
+  const authored = authoredStrokeColor(r?.el);
+  if (authored) {
+    const hex = rgbToHex(authored);
+    if (hex) return hex;
+  }
   return primaryColorFromRecord(r, styleTargetCtx(), { rgbToHex, sceneDefs: scene?.defs });
 }
 function selectionTypeLabel(records) {
@@ -3448,6 +3821,7 @@ function syncSelectionToolbar() {
   const sr = strokeRecords(records),
     fr = fillRecords(records),
     tr = textRecords(records);
+  setGroupVisible("primaryStyleGroup", true);
   setGroupVisible("strokeStyleGroup", !has || sr.length > 0);
   setGroupVisible("fillStyleGroup", !has || fr.length > 0);
   setGroupVisible("textStyleGroup", !has || tr.length > 0);
@@ -3477,6 +3851,8 @@ function syncSelectionToolbar() {
   if (sr.length) {
     const widths = commonValue(
       sr.map((r) => {
+        const authored = authoredStrokeWidth(r.el);
+        if (authored != null) return fmt(authored);
         const n = parseFloat(r.cs.strokeWidth);
         return isNaN(n) ? null : fmt(n);
       })
@@ -3527,7 +3903,7 @@ document.getElementById("strokeColor").onchange = (e) => {
     pushUndo();
     applyPrimaryColor(mergedStyleTargets(records), color);
     render();
-    setStatus("Kolor główny = " + color + " (" + records.length + " elem.)");
+    setStatus("Kolor = " + color + " (" + records.length + " zazn.)");
   } else syncSelectionToolbar();
 };
 document.getElementById("fillColor").onchange = (e) => {
@@ -3562,13 +3938,13 @@ document.getElementById("dashOn").onchange = (e) => {
   c.indeterminate = false;
   state.dashOn = c.checked;
   savePrefs();
-  const t = mergedStyleTargets(strokeRecords());
+  const t = mergedStyleTargets(strokeRecords(selectedRecords()));
   if (t.strokes.length) {
     const on = c.checked;
     pushUndo();
     applyStrokeDash(t, on);
     render();
-    setStatus((on ? "Linia przerywana" : "Linia ciągła") + " (" + t.strokes.length + " elem.)");
+    setStatus((on ? "Linia przerywana" : "Linia ciągła") + " (" + t.strokes.length + " zazn.)");
   }
 };
 document.getElementById("fontSize").onchange = (e) => {
@@ -3746,13 +4122,7 @@ function rotateConn(g, cx, cy, deg) {
   );
   updateConnLabel(g);
   updateConnContacts(g);
-  if (state.rotateOwnedLabels && p.label.getAttribute("data-rotate-with") !== "0") {
-    const ang = parseFloat(p.label.getAttribute("data-ang") || "0") + deg,
-      x = num(p.label, "x"),
-      y = num(p.label, "y");
-    p.label.setAttribute("data-ang", fmtRot(ang));
-    p.label.setAttribute("transform", `rotate(${fmtRot(ang)} ${fmtRot(x)} ${fmtRot(y)})`);
-  }
+  // Pin-label: tylko pozycja (updateConnLabel); kąt zawsze 0 — syncInstanceLabelAngles
   return g;
 }
 function rotateElement(el, cx, cy, deg) {
@@ -3812,6 +4182,17 @@ function rotateElement(el, cx, cy, deg) {
     const [a, b] = rotatePoint(num(el, "x"), num(el, "y"), cx, cy, deg);
     el.setAttribute("x", fmtRot(a));
     el.setAttribute("y", fmtRot(b));
+    // Opisy instancji: przesuwaj pozycję, nie obracaj napisu
+    if (t === "text" && isInstanceOwnedText(el)) {
+      el.setAttribute("data-ang", "0");
+      el.setAttribute("transform", `rotate(0 ${fmtRot(a)} ${fmtRot(b)})`);
+      return el;
+    }
+    if (t === "use") {
+      const o = readUseOrient(el);
+      writeUseOrient(el, { ...o, ang: o.ang + deg }, a, b);
+      return el;
+    }
     const ang = parseFloat(el.getAttribute("data-ang") || "0") + deg;
     el.setAttribute("data-ang", fmtRot(ang));
     el.setAttribute("transform", `rotate(${fmtRot(ang)} ${fmtRot(a)} ${fmtRot(b)})`);
@@ -3822,33 +4203,26 @@ function rotateElement(el, cx, cy, deg) {
 function rotateSelection(deg) {
   const node = currentSymNode();
   if (!node) return;
-  const els = selEls().filter((el) => el.parentNode === node);
-  if (!els.length) {
+  const picked = selEls().filter((el) => el.parentNode === node);
+  if (!picked.length) {
     setStatus("Zaznacz elementy do obrotu.");
     return;
   }
-  const ctr = sameRotationSelection(els) ? rotationSession.center : selectionCenter();
+  const ctr = sameRotationSelection(picked) ? rotationSession.center : selectionCenter();
   if (!ctr) return;
   pushUndo();
-  const selectedSet = new Set(els),
-    refs = els
-      .filter((el) => el.tagName.toLowerCase() === "use")
-      .map((el) => el.getAttribute("data-ref"))
-      .filter(Boolean);
-  const owned = state.rotateOwnedLabels
-    ? [...node.children].filter(
-        (el) =>
-          el.tagName &&
-          el.tagName.toLowerCase() === "text" &&
-          refs.includes(el.getAttribute("data-owner-ref")) &&
-          !selectedSet.has(el)
-      )
-    : [];
+  const els = collectFlipTargets(picked, node, {
+    expandToInstanceMembers,
+    instanceRefOf,
+    rotateOwnedLabels: state.rotateOwnedLabels,
+  });
+  const pickedSet = new Set(picked);
   const ns = els.map((el) => rotateElement(el, ctr[0], ctr[1], deg));
-  owned.forEach((el) => rotateElement(el, ctr[0], ctr[1], deg));
-  state.selection = ns;
-  state.activeEl = ns[ns.length - 1];
-  rotationSession = { els: ns.slice(), center: ctr };
+  instanceRefsFromElements(ns).forEach((ref) => syncInstanceLabelAngles(node, ref, { connParts }));
+  state.selection = ns.filter((el) => pickedSet.has(el));
+  if (!state.selection.length) state.selection = ns.slice();
+  state.activeEl = state.selection[state.selection.length - 1] || ns[ns.length - 1] || null;
+  rotationSession = { els: state.selection.slice(), center: ctr };
   render();
   setStatus("Obrócono o " + deg + "\u00b0 (" + ns.length + " elem.)");
 }
@@ -3862,9 +4236,6 @@ document.getElementById("toolbar").addEventListener("pointerdown", (e) => {
 });
 
 // ---- odbicie lustrzane ----
-function flipPoint(x, y, cx, cy, axis) {
-  return axis === "h" ? [2 * cx - x, y] : [x, 2 * cy - y];
-}
 function flipConn(g, cx, cy, axis) {
   const p = connParts(g);
   if (isConnPoint(g)) {
@@ -3886,11 +4257,22 @@ function flipConn(g, cx, cy, axis) {
     g.setAttribute("data-dir", dirFromDelta(x2 - x1, y2 - y1));
     updateConnGeometry(g);
   }
-  const [lx, ly] = flipPoint(num(p.label, "x"), num(p.label, "y"), cx, cy, axis);
-  setPositionedElement(p.label, lx, ly);
+  if (p.label) {
+    const [lx, ly] = flipPoint(num(p.label, "x"), num(p.label, "y"), cx, cy, axis);
+    p.label.setAttribute("x", fmt(lx));
+    p.label.setAttribute("y", fmt(ly));
+    p.label.setAttribute("data-ang", "0");
+    p.label.setAttribute("transform", `rotate(0 ${fmt(lx)} ${fmt(ly)})`);
+    if (axis === "h") {
+      const cur = p.label.getAttribute("text-anchor") || "start";
+      const nx = cur === "end" ? "start" : cur === "start" ? "end" : "middle";
+      p.label.setAttribute("text-anchor", nx);
+    }
+  }
   return g;
 }
 function flipElement(el, cx, cy, axis) {
+  if (!el || el.getAttribute?.("data-role") === "wire-mark") return el;
   const t = el.tagName.toLowerCase();
   if (isConnGroup(el)) return flipConn(el, cx, cy, axis);
   if (t === "line") {
@@ -3941,7 +4323,31 @@ function flipElement(el, cx, cy, axis) {
     const [a, b] = flipPoint(num(el, "x"), num(el, "y"), cx, cy, axis);
     el.setAttribute("x", fmt(a));
     el.setAttribute("y", fmt(b));
-    if (t === "text" && axis === "h") {
+    if (t === "use") {
+      writeUseOrient(el, composeSheetFlip(readUseOrient(el), axis), a, b);
+      return el;
+    }
+    if (isInstanceOwnedText(el)) {
+      el.setAttribute("data-ang", "0");
+      el.setAttribute("transform", `rotate(0 ${fmt(a)} ${fmt(b)})`);
+      if (axis === "h") {
+        const cur = el.getAttribute("text-anchor") || "start";
+        const nx = cur === "end" ? "start" : cur === "start" ? "end" : "middle";
+        el.setAttribute("text-anchor", nx);
+      }
+      return el;
+    }
+    const hasAng = el.hasAttribute("data-ang");
+    const rot = hasAng ? null : simpleRotation(el);
+    const baseAng = hasAng ? parseFloat(el.getAttribute("data-ang") || "0") : rot ? rot.ang : null;
+    if (baseAng != null && !isNaN(baseAng)) {
+      const ang = normalizeAngleDeg(flipAngleDeg(baseAng, axis));
+      el.setAttribute("data-ang", fmt(ang));
+      el.setAttribute("transform", `rotate(${fmt(ang)} ${fmt(a)} ${fmt(b)})`);
+    } else {
+      el.removeAttribute("transform");
+    }
+    if (axis === "h") {
       const cur = el.getAttribute("text-anchor") || "start";
       const nx = cur === "end" ? "start" : cur === "start" ? "end" : "middle";
       el.setAttribute("text-anchor", nx);
@@ -3953,18 +4359,29 @@ function flipElement(el, cx, cy, axis) {
 function flipSelection(axis) {
   const node = currentSymNode();
   if (!node) return;
-  const els = selEls().filter((el) => el.parentNode === node);
-  if (!els.length) {
+  const picked = selEls().filter((el) => el.parentNode === node);
+  if (!picked.length) {
     setStatus("Zaznacz elementy do odbicia.");
     return;
   }
   resetRotationSession();
   const ctr = selectionCenter();
   if (!ctr) return;
+  const els = collectFlipTargets(picked, node, {
+    expandToInstanceMembers,
+    instanceRefOf,
+    rotateOwnedLabels: state.rotateOwnedLabels,
+  });
   pushUndo();
+  const pickedSet = new Set(picked);
   const ns = els.map((el) => flipElement(el, ctr[0], ctr[1], axis));
-  state.selection = ns;
-  state.activeEl = ns[ns.length - 1];
+  ns.forEach((el) => {
+    if (isWireGeometry(el) && el.getAttribute("data-conn-id")) rePinWireToMeta(el);
+  });
+  instanceRefsFromElements(ns).forEach((ref) => syncInstanceLabelAngles(node, ref, { connParts }));
+  state.selection = ns.filter((el) => pickedSet.has(el));
+  if (!state.selection.length) state.selection = ns.slice();
+  state.activeEl = state.selection[state.selection.length - 1] || ns[ns.length - 1] || null;
   render();
   setStatus("Odbito " + (axis === "h" ? "w poziomie" : "w pionie") + " (" + ns.length + " elem.)");
 }
@@ -4055,7 +4472,7 @@ document.getElementById("strokeW").onchange = (e) => {
   if (isNaN(v) || v <= 0) return;
   state.strokeW = v;
   savePrefs();
-  const records = strokeRecords();
+  const records = strokeRecords(selectedRecords());
   if (records.length) {
     pushUndo();
     applyStrokeWidth(mergedStyleTargets(records), v, fmt);
@@ -4063,7 +4480,9 @@ document.getElementById("strokeW").onchange = (e) => {
       if (isConnGroup(r.el)) applyConnStyle(r.el);
     });
     render();
-    setStatus("Grubość = " + v + " (" + records.length + " elem.)");
+    setStatus("Grubość = " + v + " (" + records.length + " zazn.)");
+  } else {
+    setStatus("Zaznacz linie / przewody, aby zmienić grubość.", { toast: true, tone: "info" });
   }
 };
 document.getElementById("btnZoomIn").onclick = () => {
@@ -4156,9 +4575,6 @@ function viewCenterLocal() {
 }
 document.getElementById("btnAddPoint").onclick = () => startDraw("point");
 document.getElementById("btnAddNode").onclick = () => startDraw("node");
-document.getElementById("btnBranchOblique").onclick = () => startDraw("branch");
-document.getElementById("btnObliqueStub").onclick = () => applyObliqueStubToSelection();
-document.getElementById("btnAddPin").onclick = () => startDraw("pin");
 document.getElementById("btnAddLead").onclick = () => startDraw("lead");
 function deleteActiveEl() {
   const node = currentSymNode();
@@ -4169,7 +4585,10 @@ function deleteActiveEl() {
     return;
   }
   pushUndo();
-  targets.forEach((el) => el.remove());
+  targets.forEach((el) => {
+    if (isWireGeometry(el)) removeWireMarksForWire(node, el);
+    el.remove();
+  });
   state.selection = [];
   state.activeEl = null;
   state.selHandle = null;
@@ -4317,6 +4736,7 @@ function insertUse(idOverride, fromSidebar) {
     u.setAttribute("data-inst-desc2", desc2);
     ensureInstanceDescLabel(u, ref, desc2, { label: "desc2", yOff: 30 });
   }
+  ensureInstancePinLabels(node);
   state.selection = expandToInstanceMembers(node, [u]);
   state.activeEl = u;
   render();
@@ -4424,6 +4844,8 @@ document.getElementById("btnSaveResource").onclick = () => {
   });
 });
 initSelectionPropsForm();
+initRouteOptsUi();
+initWireMarkModeUi();
 document.addEventListener("keydown", (e) => {
   if (e.key !== "F2" || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target;
@@ -4734,6 +5156,7 @@ function prefsPayload() {
     snap: state.snap,
     showHandles: state.showHandles,
     rotateOwnedLabels: state.rotateOwnedLabels,
+    wireMarkMode: normalizeWireMarkMode(state.wireMarkMode),
     strokeW: state.strokeW,
     strokeColor: state.strokeColor,
     fillColor: state.fillColor,
@@ -4790,6 +5213,10 @@ async function loadPrefs() {
   if (p.rotateOwnedLabels != null) {
     state.rotateOwnedLabels = !!p.rotateOwnedLabels;
     setC("rotateOwnedLabels", p.rotateOwnedLabels);
+  }
+  if (p.wireMarkMode != null) {
+    state.wireMarkMode = normalizeWireMarkMode(p.wireMarkMode);
+    setV("wireMarkMode", state.wireMarkMode);
   }
   if (p.strokeW != null) {
     state.strokeW = p.strokeW;
@@ -4861,6 +5288,25 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       void finishShape();
     }
+    return;
+  }
+  if (state.breakEditMode && e.key === "Escape") {
+    e.preventDefault();
+    setBreakEditMode(false);
+    setStatus("Anulowano tryb łamania.");
+    return;
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    state.selection = [];
+    state.activeEl = null;
+    state.selHandle = null;
+    clearSelInfo();
+    clearHighlight();
+    clearNetlistRouteHighlight();
+    syncSelectionToolbar();
+    render();
+    setStatus("Odznaczono.");
     return;
   }
   if ((e.ctrlKey || e.metaKey) && (e.key === "a" || e.key === "A")) {
@@ -5130,7 +5576,11 @@ try {
     syncToolbarContext,
     refreshNetlistUI,
     routeConnButton: document.getElementById("btnRouteConn"),
+    routeAllConnButton: document.getElementById("btnRouteAllConn"),
+    breakPointButton: document.getElementById("btnBreakPoint"),
     getRouteSelectedConnection: () => routeSelectedConnection,
+    getRouteAllConnections: () => routeAllConnections,
+    toggleBreakEditMode,
   });
 } catch (e) {
   console.error("Błąd inicjalizacji edytora:", e);

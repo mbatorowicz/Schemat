@@ -48,8 +48,8 @@ describe("resolveToolbarGroups", () => {
     expect(g.selectionPropsGroup).toBe(false);
   });
 
-  it("pokazuje selectionProps dla use / conn / text", () => {
-    for (const mode of ["use", "conn", "text"]) {
+  it("pokazuje selectionProps dla use / conn / text / wire", () => {
+    for (const mode of ["use", "conn", "text", "wire"]) {
       const g = resolveToolbarGroups({
         onLib: false,
         onSheet: true,

@@ -79,7 +79,15 @@ function resolveSymbolForEdit(id, libSvg, sheetSvg) {
   );
 }
 
-export function appendEditDefSymbol(id, editDefs, added, { libSvg, sheetSvg, xlinkNs }) {
+/** Ukryj napisy pinów w klonie defs (malują się przez <use> — na arkuszu są osobne teksty). */
+export function hideDefPinLabels(clone) {
+  if (!clone?.querySelectorAll) return;
+  clone.querySelectorAll('[data-part="label"]').forEach((el) => {
+    el.setAttribute("display", "none");
+  });
+}
+
+export function appendEditDefSymbol(id, editDefs, added, { libSvg, sheetSvg, xlinkNs, hidePinLabels = false }) {
   const raw = String(id || "").replace(/^#/, "");
   if (!raw) return;
   const sym = resolveSymbolForEdit(raw, libSvg, sheetSvg);
@@ -91,6 +99,7 @@ export function appendEditDefSymbol(id, editDefs, added, { libSvg, sheetSvg, xli
     } else {
       const clone = useColorAwareClone(sym);
       clone.id = targetId;
+      if (hidePinLabels) hideDefPinLabels(clone);
       editDefs.appendChild(clone);
       added.add(targetId);
     }
@@ -104,16 +113,17 @@ export function appendEditDefSymbol(id, editDefs, added, { libSvg, sheetSvg, xli
  * @returns {{ missing: string[] }}
  */
 export function assembleEditDefs(editDefs, opts) {
-  const { libSvg, sheetSvg, sheetNode, xlinkNs, libraryPreview = false } = opts;
+  const { libSvg, sheetSvg, sheetNode, xlinkNs, libraryPreview = false, hidePinLabels = false } = opts;
   editDefs.innerHTML = "";
   const styleEl = (libSvg && libSvg.querySelector("defs style")) || (sheetSvg && sheetSvg.querySelector("defs style"));
   if (styleEl) editDefs.appendChild(useColorAwareClone(styleEl));
 
   const added = new Set();
   const missing = [];
+  const defOpts = { libSvg, sheetSvg, xlinkNs, hidePinLabels: !libraryPreview && hidePinLabels };
 
   if (libraryPreview && libSvg) {
-    libSymbolGroups(libSvg).forEach((s) => appendEditDefSymbol(s.id, editDefs, added, { libSvg, sheetSvg, xlinkNs }));
+    libSymbolGroups(libSvg).forEach((s) => appendEditDefSymbol(s.id, editDefs, added, defOpts));
     return { missing };
   }
 
@@ -124,7 +134,7 @@ export function assembleEditDefs(editDefs, opts) {
     const href = parseUseHref(u, xlinkNs);
     if (!href) return;
     const before = added.size;
-    appendEditDefSymbol(href, editDefs, added, { libSvg, sheetSvg, xlinkNs });
+    appendEditDefSymbol(href, editDefs, added, defOpts);
     const sym = resolveSymbolForEdit(href, libSvg, sheetSvg);
     const targetId = sym?.id || canonicalSymbolId(href);
     if (!added.has(targetId) && before === added.size) missing.push(targetId);

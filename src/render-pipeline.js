@@ -45,6 +45,7 @@ export function createRenderPipeline(ctx) {
       sheetNode,
       xlinkNs,
       libraryPreview: !onSheet && !!libSvg,
+      hidePinLabels: onSheet,
     });
   }
 

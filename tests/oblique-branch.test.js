@@ -6,6 +6,11 @@ import {
   segmentAxis,
   hitNearestWireOnSheet,
   prependObliqueStub,
+  attachPointOnTrunk,
+  attachForObliqueAlign,
+  buildFanoutBranchPoints,
+  prefixPolylineToPoint,
+  spaceAttachesAlongTrunk,
 } from "../src/polyline-edit.js";
 import {
   createJunctionEl,
@@ -28,6 +33,15 @@ describe("oblique geometry", () => {
     expect(s.attach).toEqual([10, 20]);
     expect(s.tip[0]).toBe(15);
     expect(s.tip[1]).toBe(25);
+  });
+
+  it("obliqueStubPoints flowDir wymusza składową od źródła", () => {
+    // cel nieco „w górę”, ale źródło jest z góry (flow S) → tip i tak w dół
+    const s = obliqueStubPoints({ x: 10, y: 20 }, "V", { x: 50, y: 10 }, 5, "S");
+    expect(s.tip[0]).toBe(15);
+    expect(s.tip[1]).toBe(25);
+    const up = obliqueStubPoints({ x: 10, y: 20 }, "V", { x: 50, y: 40 }, 5, "N");
+    expect(up.tip[1]).toBe(15);
   });
 
   it("buildObliqueBranchPoints zaczyna od attach i tip", () => {
@@ -63,6 +77,81 @@ describe("oblique geometry", () => {
     const hit = hitNearestWireOnSheet(g, 2, 40, 5);
     expect(hit.trunkAxis).toBe("V");
     expect(hit.y).toBeCloseTo(40);
+  });
+
+  it("attachPointOnTrunk preferuje przecięcie osi z celem", () => {
+    const trunk = [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+    ];
+    const a = attachPointOnTrunk(trunk, { x: 40, y: 30 }, 0);
+    expect(a.x).toBe(0);
+    expect(a.y).toBe(30);
+    expect(a.trunkAxis).toBe("V");
+  });
+
+  it("attachForObliqueAlign: tip 45° ląduje na Y pinu", () => {
+    const trunk = [
+      { x: 10, y: 0 },
+      { x: 10, y: 100 },
+    ];
+    const a = attachForObliqueAlign(trunk, { x: 50, y: 40 }, 5, "S");
+    expect(a.x).toBe(10);
+    expect(a.y).toBe(30);
+    expect(a.trunkAxis).toBe("V");
+  });
+
+  it("buildFanoutBranchPoints: wcześniejszy zakręt → prosta do pinu (brązowa linia)", () => {
+    const trunk = [
+      { x: 10, y: 0 },
+      { x: 10, y: 100 },
+    ];
+    const pts = buildFanoutBranchPoints(trunk, { x: 50, y: 40, dir: "W" }, 5, null, "S");
+    expect(pts[0]).toEqual([10, 0]);
+    const attachIdx = pts.findIndex((p, i) => i > 0 && p[0] === 10 && Math.abs(p[1] - 30) < 0.5);
+    expect(attachIdx).toBeGreaterThan(0);
+    const tip = pts[attachIdx + 1];
+    expect(tip[0]).toBe(20);
+    expect(tip[1]).toBe(40);
+    const last = pts[pts.length - 1];
+    expect(last).toEqual([50, 40]);
+    // ostatni segment poziomy, bez jogu ±step przed pinem
+    const prev = pts[pts.length - 2];
+    expect(prev[1]).toBe(40);
+    expect(Math.abs(prev[0] - 50)).toBeGreaterThan(0.5);
+  });
+
+  it("spaceAttachesAlongTrunk rozsuwa bliskie attachy", () => {
+    const trunk = [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+    ];
+    const spaced = spaceAttachesAlongTrunk(
+      trunk,
+      [
+        { x: 0, y: 40, trunkAxis: "V" },
+        { x: 0, y: 42, trunkAxis: "V" },
+      ],
+      5
+    );
+    expect(Math.abs(spaced[1].y - spaced[0].y)).toBeGreaterThanOrEqual(5);
+  });
+
+  it("buildFanoutBranchPoints: wspólny prefiks + ukos 45°", () => {
+    const trunk = [
+      { x: 0, y: 0 },
+      { x: 0, y: 100 },
+    ];
+    const pts = buildFanoutBranchPoints(trunk, { x: 40, y: 40 }, 5, null, "S");
+    expect(pts[0]).toEqual([0, 0]);
+    const attachIdx = pts.findIndex((p, i) => i > 0 && p[0] === 0 && Math.abs(p[1] - 30) < 0.5);
+    expect(attachIdx).toBeGreaterThan(0);
+    const tip = pts[attachIdx + 1];
+    expect(tip[0]).toBe(10);
+    expect(tip[1]).toBe(40);
+    const pref = prefixPolylineToPoint(trunk, { x: 0, y: 30 });
+    expect(pref[0]).toEqual([0, 0]);
+    expect(pref[pref.length - 1]).toEqual([0, 30]);
   });
 });
 

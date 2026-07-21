@@ -12,6 +12,17 @@ export function wireConnId(el) {
   return (el?.getAttribute?.("data-conn-id") || "").trim();
 }
 
+/** Geometria przewodu po id — bez tekstów oznaczników (`data-role=wire-mark`). */
+export function findWireByConnId(root, connId) {
+  if (!root?.querySelectorAll || connId == null || connId === "") return null;
+  const want = String(connId);
+  return (
+    [...root.querySelectorAll("line[data-conn-id], polyline[data-conn-id]")].find(
+      (el) => el.getAttribute("data-conn-id") === want
+    ) || null
+  );
+}
+
 /** @returns {{ a: {x:number,y:number}, b: {x:number,y:number}, points: Array<{x:number,y:number}> } | null} */
 export function wireEndpoints(el) {
   if (!isWireGeometry(el)) return null;
@@ -92,6 +103,13 @@ export function analyzeSheetWires(sheetNode, connections, opts) {
   return { orphans, bare, missing };
 }
 
+/** Trasa to tylko obrys — SVG polyline domyślnie wypełnia wielokąt (czarny trójkąt przy łamaniu). */
+export function ensureWireStrokeOnly(el) {
+  if (!el) return;
+  el.setAttribute("fill", "none");
+  if (el.style) el.style.fill = "none";
+}
+
 export function applyConnMetaToWire(el, record, routeKind) {
   if (!el || !record) return;
   const cls = record._wireClass || null;
@@ -101,21 +119,17 @@ export function applyConnMetaToWire(el, record, routeKind) {
   el.setAttribute("data-to", record.to?.raw || "");
   if (record.net != null) el.setAttribute("data-net", record.net);
   if (record.wire != null) el.setAttribute("data-wire", record.wire);
-  if (record.signal != null) el.setAttribute("data-signal", record.signal);
+  if (record.length != null) {
+    if (record.length) el.setAttribute("data-length", record.length);
+    else el.removeAttribute("data-length");
+  }
+  el.removeAttribute("data-signal");
   if (record.notes != null) el.setAttribute("data-notes", record.notes);
   if (cls) el.setAttribute("class", cls);
+  ensureWireStrokeOnly(el);
 }
 
-export function clearWireConnHighlight(root) {
-  if (!root) return;
-  root.querySelectorAll(".conn-route-hl").forEach((el) => el.classList.remove("conn-route-hl"));
-}
-
-export function highlightWireByConnId(root, connId) {
-  clearWireConnHighlight(root);
-  if (!root || !connId) return null;
-  const want = String(connId);
-  const el = [...root.querySelectorAll("[data-conn-id]")].find((e) => e.getAttribute("data-conn-id") === want);
-  if (el) el.classList.add("conn-route-hl");
-  return el;
+export function markWireManual(el) {
+  if (!el) return;
+  el.setAttribute("data-route", "manual");
 }

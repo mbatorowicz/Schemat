@@ -29,4 +29,58 @@ describe("app-bootstrap", () => {
     btn.onclick();
     expect(routeFn).toHaveBeenCalledOnce();
   });
+
+  it("podpina btnRouteAllConn", () => {
+    let routeAllFn = null;
+    const btn = { onclick: null };
+    bootstrapEditorSync({
+      injectIcons: () => {},
+      initConnMetaModal: () => {},
+      wireHistory: () => {},
+      wireConnModel: () => {},
+      wireProjectMigrate: () => {},
+      wireRenderPipeline: () => {},
+      scene: { build: () => {} },
+      applyView: () => {},
+      drawGrid: () => {},
+      wireNetlistRouting: () => {
+        routeAllFn = vi.fn();
+      },
+      wireSelectionModel: () => {},
+      syncSelectionToolbar: () => {},
+      syncToolbarContext: () => {},
+      refreshNetlistUI: () => {},
+      routeAllConnButton: btn,
+      getRouteAllConnections: () => routeAllFn,
+    });
+    expect(typeof btn.onclick).toBe("function");
+    btn.onclick();
+    expect(routeAllFn).toHaveBeenCalledOnce();
+  });
+
+  it("podpina btnBreakPoint", () => {
+    const toggle = vi.fn();
+    const btn = { onclick: null };
+    bootstrapEditorSync({
+      injectIcons: () => {},
+      initConnMetaModal: () => {},
+      wireHistory: () => {},
+      wireConnModel: () => {},
+      wireProjectMigrate: () => {},
+      wireRenderPipeline: () => {},
+      scene: { build: () => {} },
+      applyView: () => {},
+      drawGrid: () => {},
+      wireNetlistRouting: () => {},
+      wireSelectionModel: () => {},
+      syncSelectionToolbar: () => {},
+      syncToolbarContext: () => {},
+      refreshNetlistUI: () => {},
+      breakPointButton: btn,
+      toggleBreakEditMode: toggle,
+    });
+    expect(typeof btn.onclick).toBe("function");
+    btn.onclick();
+    expect(toggle).toHaveBeenCalledOnce();
+  });
 });

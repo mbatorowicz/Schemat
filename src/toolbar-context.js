@@ -7,7 +7,10 @@ export function resolveToolbarGroups({ onLib, onSheet, symSelected, hasSelection
   else if (!onSheet && hasDir) resourceNameMode = "project";
 
   const propsMode =
-    selectionPropsMode === "use" || selectionPropsMode === "conn" || selectionPropsMode === "text"
+    selectionPropsMode === "use" ||
+    selectionPropsMode === "conn" ||
+    selectionPropsMode === "text" ||
+    selectionPropsMode === "wire"
       ? selectionPropsMode
       : null;
   const showProps = onSheet && !!propsMode;

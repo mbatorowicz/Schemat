@@ -569,10 +569,7 @@
       #netlistConn option[data-ok="0"] {
         color: #b91c1c;
       }
-      .conn-route-hl {
-        stroke-width: 2.4 !important;
-        filter: drop-shadow(0 0 1.5px #2563eb);
-      }
+      /* Legacy: klasa .conn-route-hl nie mutuje już stroke (highlight = overlay scene.sel) */
       #netlistEditor .modal {
         width: min(920px, 96vw);
         max-height: 90vh;
@@ -903,6 +900,14 @@
       .hnd.break.sel {
         fill: #1d4ed8;
       }
+      .hnd.pin-end {
+        fill: #ecfdf5;
+        stroke: #047857;
+        stroke-width: 2;
+      }
+      .hnd.pin-end.sel {
+        fill: #047857;
+      }
       .ctrlline {
         stroke: #a16207;
         stroke-width: 0.6;
@@ -1007,9 +1012,6 @@
               <button id="btnAddLead" class="tbtn" title="Kreska"></button>
               <button id="btnAddPoint" class="tbtn" title="Punkt"></button>
               <button id="btnAddNode" class="tbtn" title="Węzeł"></button>
-              <button id="btnBranchOblique" class="tbtn" title="Odgałęź (ukos 45°)"></button>
-              <button id="btnObliqueStub" class="tbtn" title="Ukos przy końcu trasy"></button>
-              <button id="btnAddPin" class="tbtn" title="Pin"></button>
             </div>
           </div>
 
@@ -1028,9 +1030,20 @@
               <select id="netlistConn" title="Wybierz połączenie" style="width: 130px">
                 <option value="">spis</option>
               </select>
-              <button id="btnRouteConn" class="btn-labeled tbtn" title="Trasuj" disabled>
-                <span class="btn-text">Trasuj</span>
+              <button id="btnRouteConn" class="btn-labeled tbtn" title="Połącz prostą linią" disabled>
+                <span class="btn-text">Połącz</span>
               </button>
+              <button id="btnRouteAllConn" class="btn-labeled tbtn" title="Połącz wszystkie prostą linią" disabled>
+                <span class="btn-text">Wszystkie</span>
+              </button>
+              <button id="btnBreakPoint" class="btn-labeled tbtn" title="Dodaj punkt łamania" disabled>
+                <span class="btn-text">Łamanie</span>
+              </button>
+              <select id="wireMarkMode" title="Konwencja nadruku na końcach przewodu" style="width: 118px">
+                <option value="local">Lokalny</option>
+                <option value="other">Drugi koniec</option>
+                <option value="both">Skąd–dokąd</option>
+              </select>
               <button id="btnPromoteConn" class="btn-labeled tbtn" title="Promuj kreskę do połączenia" disabled>
                 <span class="btn-text">Połączenie</span>
               </button>
@@ -1231,6 +1244,43 @@
                 <label class="toolbar-form__label" for="selPropSym" id="lblSelPropSym">Symbol</label>
                 <select id="selPropSym" class="toolbar-form__input toolbar-form__input--sym"></select>
               </span>
+              <span class="toolbar-form__field context-hidden" id="selPropNetField">
+                <label class="toolbar-form__label" for="selPropNet" id="lblSelPropNet">Sygnał</label>
+                <input
+                  type="text"
+                  id="selPropNet"
+                  class="toolbar-form__input toolbar-form__input--pin"
+                  autocomplete="off"
+                />
+              </span>
+              <span class="toolbar-form__field context-hidden" id="selPropWireField">
+                <label class="toolbar-form__label" for="selPropWire" id="lblSelPropWire">Typ przewodu</label>
+                <input
+                  type="text"
+                  id="selPropWire"
+                  class="toolbar-form__input toolbar-form__input--desc"
+                  autocomplete="off"
+                />
+              </span>
+              <span class="toolbar-form__field context-hidden" id="selPropLengthField">
+                <label class="toolbar-form__label" for="selPropLength" id="lblSelPropLength">Długość</label>
+                <input
+                  type="text"
+                  id="selPropLength"
+                  class="toolbar-form__input toolbar-form__input--pin"
+                  autocomplete="off"
+                  placeholder="np. 2.5 m"
+                />
+              </span>
+              <span class="toolbar-form__field context-hidden" id="selPropNotesField">
+                <label class="toolbar-form__label" for="selPropNotes" id="lblSelPropNotes">Uwagi</label>
+                <input
+                  type="text"
+                  id="selPropNotes"
+                  class="toolbar-form__input toolbar-form__input--desc"
+                  autocomplete="off"
+                />
+              </span>
             </div>
           </div>
 
@@ -1375,6 +1425,20 @@
       </div>
     </div>
 
+    <div id="askTextDialog" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="askTextDialogTitle">
+      <div class="modal" style="width: 380px">
+        <h2 id="askTextDialogTitle">Wartość</h2>
+        <div class="frow">
+          <label for="askTextDialogInput" id="askTextDialogLabel">Wartość</label>
+          <input type="text" id="askTextDialogInput" autocomplete="off" />
+        </div>
+        <div class="actions">
+          <button type="button" id="askTextDialogCancel">Anuluj</button>
+          <button type="button" id="askTextDialogOk" class="primary">OK</button>
+        </div>
+      </div>
+    </div>
+
     <div id="shortcutsHelp" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="shortcutsHelpTitle">
       <div class="modal" style="width: 520px">
         <h2 id="shortcutsHelpTitle">Skróty klawiszowe</h2>
@@ -1435,7 +1499,8 @@
                 <th>Od</th>
                 <th>Do</th>
                 <th>Sygnał</th>
-                <th>Net</th>
+                <th>Typ przewodu</th>
+                <th>Długość</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -1444,11 +1509,11 @@
         </div>
         <div id="netlistEditorForm">
           <div class="frow"><label for="neId">Nr</label><input type="text" id="neId" /></div>
-          <div class="frow"><label for="neSignal">Sygnał</label><input type="text" id="neSignal" /></div>
           <div class="frow"><label for="neFrom">Od (ref:pin)</label><input type="text" id="neFrom" /></div>
           <div class="frow"><label for="neTo">Do (ref:pin)</label><input type="text" id="neTo" /></div>
-          <div class="frow"><label for="neNet">Oznacznik</label><input type="text" id="neNet" /></div>
-          <div class="frow"><label for="neWire">Przewód</label><input type="text" id="neWire" /></div>
+          <div class="frow"><label for="neNet">Sygnał</label><input type="text" id="neNet" /></div>
+          <div class="frow"><label for="neWire">Typ przewodu</label><input type="text" id="neWire" /></div>
+          <div class="frow"><label for="neLength">Długość</label><input type="text" id="neLength" placeholder="np. 2.5 m" /></div>
           <div class="frow full"><label for="neNotes">Uwagi</label><input type="text" id="neNotes" /></div>
         </div>
         <div class="actions" style="flex-wrap: wrap; gap: 8px">
@@ -1468,9 +1533,9 @@
         <div class="frow"><label for="pcId">Nr</label><input type="text" id="pcId" /></div>
         <div class="frow"><label for="pcFrom">Od</label><input type="text" id="pcFrom" /></div>
         <div class="frow"><label for="pcTo">Do</label><input type="text" id="pcTo" /></div>
-        <div class="frow"><label for="pcSignal">Sygnał</label><input type="text" id="pcSignal" /></div>
-        <div class="frow"><label for="pcNet">Oznacznik</label><input type="text" id="pcNet" /></div>
-        <div class="frow"><label for="pcWire">Przewód</label><input type="text" id="pcWire" /></div>
+        <div class="frow"><label for="pcNet">Sygnał</label><input type="text" id="pcNet" /></div>
+        <div class="frow"><label for="pcWire">Typ przewodu</label><input type="text" id="pcWire" /></div>
+        <div class="frow"><label for="pcLength">Długość</label><input type="text" id="pcLength" placeholder="np. 2.5 m" /></div>
         <div class="frow"><label for="pcNotes">Uwagi</label><input type="text" id="pcNotes" /></div>
         <div class="actions">
           <button type="button" id="pcCancel">Anuluj</button>

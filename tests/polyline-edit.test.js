@@ -102,7 +102,28 @@ describe("polyline-edit", () => {
     expect(out.tagName.toLowerCase()).toBe("polyline");
     expect(out.getAttribute("data-conn-id")).toBe("1");
     expect(out.getAttribute("data-route")).toBe("manual");
+    expect(out.getAttribute("fill")).toBe("none");
+    expect(out.style.fill).toBe("none");
     expect(pointsOfWire(out)).toHaveLength(3);
+  });
+
+  it("łamanie polyline: bez wypełnienia trójkąta", () => {
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const poly = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+    poly.setAttribute("points", "0,0 0,100");
+    poly.setAttribute("data-conn-id", "2");
+    svg.appendChild(poly);
+    const out = applyWirePoints(
+      poly,
+      [
+        [0, 0],
+        [40, 50],
+        [0, 100],
+      ],
+      null
+    );
+    expect(out.getAttribute("fill")).toBe("none");
+    expect(out.style.fill).toBe("none");
   });
 
   it("hitWireSegment", () => {

@@ -1,15 +1,15 @@
 /**
- * Rozwiązywanie końców połączeń netlisty i automatyczne trasowanie przewodów.
+ * Rozwiązywanie końców połączeń netlisty i proste łączenie pinów (odcinek prosty).
  */
 
 import { NetlistModel } from "./netlist-model.js";
 import { qsById, qsByData } from "./dom-selectors.js";
-import { OrthogonalRouter } from "./orthogonal-router.js";
 import { fmt } from "./svg-utils.js";
-import { rotatePoint } from "./svg-dom.js";
+import { readUseOrient, mapLocalToSheet, flipDirWithOrient, rotateDir } from "./instance-orient.js";
 import { definitionForUseElement } from "./symbol-service.js";
 import { hostRootFrom } from "./stage-layers.js";
 import { W } from "./ui-wording.js";
+import { askRouteChoice } from "./ui-dialog.js";
 import {
   allocateConnectionId,
   adoptConnectionsToSheet,
@@ -23,7 +23,9 @@ import {
   wireMatchesEndpoints,
   applyConnMetaToWire,
   analyzeSheetWires,
+  findWireByConnId,
 } from "./wire-geometry.js";
+import { removeWireMarks, syncWireMarks } from "./wire-markers.js";
 import {
   findTopoNodeByRef,
   ensureNodeRef,
@@ -40,31 +42,18 @@ import {
   nearestJunction,
   junctionCenter,
 } from "./junctions.js";
+import { formatPointsAttr } from "./polyline-edit.js";
+import { pinWireEnds } from "./wire-ends.js";
+const pinKey = NetlistModel.pinKey;
+const pinAliases = NetlistModel.pinAliases;
+const endpointKey = NetlistModel.endpointKey;
 
-function pinKey(v) {
-  return String(v || "")
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .replace(/\u2212/g, "-");
-}
-
-function pinAliases(pin) {
-  const p = pinKey(pin);
-  const map = {
-    "V+": ["V+", " +V"],
-    "V-": ["V-", "-V"],
-    "+V": ["+V", "V+"],
-    "-V": ["-V", "V-"],
-    ENCODER: ["ENCODER", "ENC"],
-  };
-  return (map[p] || [p]).map(pinKey);
-}
-
-function rotateDir(dir, angle) {
-  const order = ["N", "E", "S", "W"];
-  const i = order.indexOf(dir);
-  if (i < 0) return "E";
-  return order[(i + (Math.round((+angle || 0) / 90) % 4) + 4) % 4];
+function pointsToAttr(points) {
+  const pairs = (points || []).map((p) => {
+    if (Array.isArray(p)) return [p[0], p[1]];
+    return [p.x, p.y];
+  });
+  return formatPointsAttr(pairs);
 }
 
 export function createNetlistRouting(ctx) {
@@ -90,6 +79,7 @@ export function createNetlistRouting(ctx) {
     persistConnections,
     nearestJoint,
     wireColor,
+    applyConnectionRecord,
   } = ctx;
 
   function targetSheet() {
@@ -224,13 +214,14 @@ export function createNetlistRouting(ctx) {
       if (!conn) continue;
       const ux = num(use, "x");
       const uy = num(use, "y");
-      const angle = parseFloat(use.getAttribute("data-ang") || "0");
+      const orient = readUseOrient(use);
       return {
         ok: true,
         kind: "conn",
         conn,
-        mapXY: (x, y) => rotatePoint(ux + x, uy + y, ux, uy, angle),
-        angle,
+        mapXY: (x, y) => mapLocalToSheet(ux, uy, orient, x, y),
+        angle: orient.ang,
+        orient,
         isPoint: isConnPoint(conn),
         onSheet: false,
         element: use,
@@ -266,7 +257,11 @@ export function createNetlistRouting(ctx) {
       };
     }
     const ep = connEndpointCoords(loc.conn, loc.mapXY, towardXY);
-    const dir = loc.angle ? rotateDir(ep.dir, loc.angle) : ep.dir;
+    const dir = loc.orient
+      ? flipDirWithOrient(ep.dir, loc.orient)
+      : loc.angle
+        ? rotateDir(ep.dir, loc.angle)
+        : ep.dir;
     return {
       ok: true,
       x: ep.x,
@@ -322,29 +317,105 @@ export function createNetlistRouting(ctx) {
     return { record, from: r.from, to: r.to, ok: r.ok, reason: r.reason };
   }
 
-  function routeObstacles(sheet, excluded, endpoints) {
+  function netOfWireEl(el) {
+    const attr = (el.getAttribute("data-net") || "").trim();
+    if (attr && !NetlistModel.isBlankNet(attr)) return attr;
+    const id = wireConnId(el);
+    const rec = state.netlist?.connections?.find((c) => String(c.id) === String(id));
+    return rec?.net && !NetlistModel.isBlankNet(rec.net) ? String(rec.net).trim() : "";
+  }
+
+  function wireCorridorRects(el, half) {
+    const ends = wireEndpoints(el);
+    if (!ends?.points?.length) return [];
+    const hw = Math.max(+half || 0, 1);
+    const rects = [];
+    for (let i = 0; i < ends.points.length - 1; i++) {
+      const a = ends.points[i];
+      const b = ends.points[i + 1];
+      const minX = Math.min(a.x, b.x) - hw;
+      const minY = Math.min(a.y, b.y) - hw;
+      const maxX = Math.max(a.x, b.x) + hw;
+      const maxY = Math.max(a.y, b.y) + hw;
+      rects.push({ x: minX, y: minY, width: Math.max(maxX - minX, hw * 2), height: Math.max(maxY - minY, hw * 2) });
+    }
+    return rects;
+  }
+
+  function pushPaddedBox(out, b, pad) {
+    if (!b) return;
+    out.push({
+      x: b.x - pad,
+      y: b.y - pad,
+      width: b.width + pad * 2,
+      height: b.height + pad * 2,
+    });
+  }
+
+  /**
+   * @param {object} [opts]
+   * @param {string} [opts.forNet] — ten sam niepusty potencjał nie blokuje
+   * @param {Iterable<string>} [opts.skipConnIds]
+   */
+  function routeObstacles(sheet, excluded, endpoints, opts) {
     if (state.active !== sheet) return [];
     const node = currentSymNode();
     const root = hostRootFrom(getHost);
     if (!node || !root) return [];
     const skip = new Set(excluded || []);
+    const skipIds = new Set([...(opts?.skipConnIds || [])].map(String));
+    const forNet = opts?.forNet && !NetlistModel.isBlankNet(opts.forNet) ? String(opts.forNet).trim() : "";
+    const step = state.step || 5;
+    const symbolPad = step;
+    const textPad = Math.max(step * 0.75, 2);
     const out = [];
-    const near = (b, p) =>
-      p.x >= b.x - state.step &&
-      p.x <= b.x + b.width + state.step &&
-      p.y >= b.y - state.step &&
-      p.y <= b.y + b.height + state.step;
+    /** Czy punkt pinu styka się z bboxem (wtedy nie blokuj całego symbolu — inaczej 0 tras). */
+    const touchesPin = (b, p) =>
+      p &&
+      p.x >= b.x - step * 2 &&
+      p.x <= b.x + b.width + step * 2 &&
+      p.y >= b.y - step * 2 &&
+      p.y <= b.y + b.height + step * 2;
+    // Symbole: keep-out, ale pomiń bbox końców trasy (pin na brzegu symbolu)
     [...node.children].forEach((el, i) => {
       if (skip.has(el)) return;
-      const tag = el.tagName.toLowerCase();
-      if (tag === "polyline" && el.getAttribute("data-conn-id")) return;
+      if (el.getAttribute?.("data-role") === "wire-mark") return;
+      if (isWireGeometry(el) && wireConnId(el)) return;
+      const tag = el.tagName?.toLowerCase?.();
+      if (tag === "text") return;
       const cel = root.children[i];
       if (!cel) return;
       try {
         const b = bboxInRoot(cel, root);
-        if ((endpoints || []).some((p) => near(b, p))) return;
-        out.push(b);
+        if ((endpoints || []).some((p) => touchesPin(b, p))) return;
+        pushPaddedBox(out, b, symbolPad);
       } catch (e) {}
+    });
+    // Opisy — blokuj, chyba że to etykieta przy pinie końcowym
+    [...node.querySelectorAll("text[data-owner-ref], text[data-part='label'], text.sheet-label")].forEach((el) => {
+      if (skip.has(el)) return;
+      try {
+        const idx = [...node.children].indexOf(el);
+        const cel = idx >= 0 ? root.children[idx] : null;
+        let b = null;
+        if (cel) b = bboxInRoot(cel, root);
+        else if (typeof el.getBBox === "function") {
+          const gb = el.getBBox();
+          b = { x: gb.x, y: gb.y, width: gb.width, height: gb.height };
+        }
+        if (!b) return;
+        if ((endpoints || []).some((p) => touchesPin(b, p))) return;
+        pushPaddedBox(out, b, textPad);
+      } catch (e) {}
+    });
+    // Obce potencjały — korytarze; wspólny niepusty net OK; pusty/„—” zawsze koliduje z innymi
+    [...node.querySelectorAll("line[data-conn-id], polyline[data-conn-id]")].forEach((el) => {
+      const cid = wireConnId(el);
+      if (!cid || skipIds.has(cid)) return;
+      const wNet = netOfWireEl(el);
+      const sameLiveNet = forNet && wNet && wNet === forNet;
+      if (sameLiveNet) return;
+      wireCorridorRects(el, step).forEach((r) => out.push(r));
     });
     return out;
   }
@@ -352,7 +423,7 @@ export function createNetlistRouting(ctx) {
   function findAdoptCandidate(node, record, fromXY, toXY) {
     if (!node || !record) return null;
     const tol = Math.max(8, (state.step || 5) * 1.5);
-    const own = qsByData(node, "conn-id", record.id);
+    const own = findWireByConnId(node, record.id);
     if (own) return { el: own, kind: "owned" };
     let best = null;
     [...node.children].forEach((el) => {
@@ -365,30 +436,99 @@ export function createNetlistRouting(ctx) {
     return best;
   }
 
-  function placeAutoRoute(node, record, d, sheet) {
-    const points = OrthogonalRouter.route({
-      start: d.from,
-      end: d.to,
-      startDir: d.from.dir,
-      endDir: d.to.dir,
-      step: state.step,
-      obstacles: routeObstacles(sheet, [d.from.element, d.to.element], [d.from, d.to]),
-    });
-    if (!points || points.length < 2) return null;
-    const old = qsByData(node, "conn-id", record.id);
-    if (old) old.remove();
-    const cls = NetlistModel.wireClass(record);
-    const poly = mkEl("polyline", {
-      points: points.map((p) => fmt(p.x) + "," + fmt(p.y)).join(" "),
-      class: cls,
-      "data-conn-id": record.id,
-      "data-route": "auto",
-      "data-from": record.from.raw,
-      "data-to": record.to.raw,
-    });
-    if (typeof wireColor === "function") poly.style.stroke = wireColor(cls);
-    node.appendChild(poly);
+  /** Uzupełnij pusty potencjał (infer); zwraca zaktualizowany rekord. */
+  function ensureRecordNet(record) {
+    if (!record) return record;
+    let net = record.net;
+    if (NetlistModel.isBlankNet(net)) {
+      net = NetlistModel.inferConnectionNet(record, state.netlist?.connections || []);
+    }
+    if (String(net || "") !== String(record.net || "")) {
+      record.net = net;
+      const list = state.netlist?.connections;
+      if (list) {
+        const i = list.findIndex((c) => c.id === record.id);
+        if (i >= 0) list[i] = record;
+      }
+    }
+    return record;
+  }
+
+  function finishPlacedWire(poly, record) {
+    const sw =
+      (state.routeOpts && state.routeOpts.strokeWidth) ||
+      (state.strokeW != null && state.strokeW !== "" ? String(state.strokeW) : "");
+    if (typeof applyConnectionRecord === "function") {
+      applyConnectionRecord(record, {
+        el: poly,
+        sheetNode: poly.parentNode,
+        routeKind: "auto",
+        persist: false,
+        upsert: true,
+        strokeWidth: sw,
+      });
+    } else {
+      const cls = NetlistModel.wireClass(record);
+      applyConnMetaToWire(poly, { ...record, _wireClass: cls }, "auto");
+      if (typeof wireColor === "function") poly.style.stroke = wireColor(cls);
+      if (sw) poly.style.strokeWidth = String(sw);
+      if (poly.parentNode) syncWireMarks(poly.parentNode, poly, mkEl, state.wireMarkMode);
+    }
     return poly;
+  }
+
+  /** Prosta linia między pinami — bez omijania przeszkód. */
+  function placeStraightConnection(node, record, d, sheet) {
+    if (!d?.ok || !d.from || !d.to) return null;
+    return placeWirePolyline(
+      node,
+      record,
+      [
+        { x: d.from.x, y: d.from.y },
+        { x: d.to.x, y: d.to.y },
+      ],
+      null,
+      sheet
+    );
+  }
+
+  function isManualOwned(node, recordId) {
+    const el = findWireByConnId(node, recordId);
+    return !!(el && el.getAttribute("data-route") === "manual");
+  }
+
+  function pinPlacedWire(poly, record, sheet) {
+    if (!poly || !record || !sheet) return;
+    const d = resolveConnectionEndpoints(sheet, record);
+    if (!d.ok) return;
+    const ends = wireEndpoints(poly);
+    if (!ends) {
+      pinWireEnds(poly, d.from, d.to, true);
+    } else {
+      const dFromStart = Math.hypot(ends.a.x - d.from.x, ends.a.y - d.from.y);
+      const dToStart = Math.hypot(ends.a.x - d.to.x, ends.a.y - d.to.y);
+      pinWireEnds(poly, d.from, d.to, dFromStart <= dToStart);
+    }
+    if (poly.parentNode) syncWireMarks(poly.parentNode, poly, mkEl, state.wireMarkMode);
+  }
+
+  function placeWirePolyline(node, record, points, extraAttrs, sheet) {
+    if (!points || points.length < 2) return null;
+    ensureRecordNet(record);
+    const old = findWireByConnId(node, record.id);
+    if (old) {
+      removeWireMarks(node, record.id);
+      old.remove();
+    }
+    const poly = mkEl("polyline", {
+      points: pointsToAttr(points),
+      class: NetlistModel.wireClass(record),
+      ...(extraAttrs || {}),
+    });
+    node.appendChild(poly);
+    const out = finishPlacedWire(poly, record);
+    pinPlacedWire(out || poly, record, sheet || targetSheet());
+    return out || poly;
   }
 
   async function routeSelectedConnection() {
@@ -409,13 +549,13 @@ export function createNetlistRouting(ctx) {
     if (!node) return;
     const fromXY = { x: d.from.x, y: d.from.y };
     const toXY = { x: d.to.x, y: d.to.y };
-    const owned = qsByData(node, "conn-id", record.id);
+    const owned = findWireByConnId(node, record.id);
     const isManual = owned && owned.getAttribute("data-route") === "manual";
 
     if (isManual) {
       const choice = askChoice
-        ? await askChoice(W.confirm.keepOrReplaceRoute, {
-            title: "Trasowanie",
+        ? await askRouteChoice(askChoice, W.confirm.keepOrReplaceRoute, {
+            title: "Połączenie",
             cancelLabel: "Anuluj",
             localLabel: "Zastąp",
             libraryLabel: "Zachowaj",
@@ -423,7 +563,11 @@ export function createNetlistRouting(ctx) {
         : "library";
       if (choice === "cancel") return;
       if (choice === "library") {
-        applyConnMetaToWire(owned, { ...record, _wireClass: NetlistModel.wireClass(record) }, "manual");
+        if (typeof applyConnectionRecord === "function") {
+          applyConnectionRecord(record, { el: owned, routeKind: "manual", persist: false, upsert: true });
+        } else {
+          applyConnMetaToWire(owned, { ...record, _wireClass: NetlistModel.wireClass(record) }, "manual");
+        }
         state.selection = [owned];
         state.activeEl = owned;
         render();
@@ -434,19 +578,30 @@ export function createNetlistRouting(ctx) {
       const adopt = findAdoptCandidate(node, record, fromXY, toXY);
       if (adopt && adopt.kind !== "owned") {
         const choice = askChoice
-          ? await askChoice(W.confirm.adoptOrReroute, {
-              title: "Trasowanie",
+          ? await askRouteChoice(askChoice, W.confirm.adoptOrReroute, {
+              title: "Połączenie",
               cancelLabel: "Anuluj",
-              localLabel: "Trasuj auto",
+              localLabel: "Prosta linia",
               libraryLabel: "Adoptuj",
             })
           : "library";
         if (choice === "cancel") return;
         if (choice === "library") {
           pushUndo();
-          const cls = NetlistModel.wireClass(record);
-          applyConnMetaToWire(adopt.el, { ...record, _wireClass: cls }, "manual");
-          if (typeof wireColor === "function") adopt.el.style.stroke = wireColor(cls);
+          if (typeof applyConnectionRecord === "function") {
+            applyConnectionRecord(record, {
+              el: adopt.el,
+              sheetNode: node,
+              routeKind: "manual",
+              persist: false,
+              upsert: true,
+            });
+          } else {
+            const cls = NetlistModel.wireClass(record);
+            applyConnMetaToWire(adopt.el, { ...record, _wireClass: cls }, "manual");
+            if (typeof wireColor === "function") adopt.el.style.stroke = wireColor(cls);
+            syncWireMarks(node, adopt.el, mkEl, state.wireMarkMode);
+          }
           state.selection = [adopt.el];
           state.activeEl = adopt.el;
           render();
@@ -455,22 +610,86 @@ export function createNetlistRouting(ctx) {
         }
       } else if (owned) {
         const ok = askConfirm
-          ? await askConfirm(W.confirm.replaceManualRoute, { title: "Trasowanie", okLabel: "Zastąp" })
+          ? await askConfirm(W.confirm.replaceManualRoute, { title: "Połączenie", okLabel: "Zastąp" })
           : true;
         if (!ok) return;
       }
     }
 
     pushUndo();
-    const poly = placeAutoRoute(node, record, d, sheet);
+    ensureRecordNet(record);
+    const poly = placeStraightConnection(node, record, d, sheet);
     if (!poly) {
-      setStatus("Router nie znalazł trasy.", { toast: true, tone: "warning" });
+      setStatus("Nie można połączyć pinów.", { toast: true, tone: "warning" });
       return;
     }
     state.selection = [poly];
     state.activeEl = poly;
     render();
-    setStatus("Wytrasowano połączenie " + record.id + ".", { toast: true, tone: "success" });
+    setStatus("Połączono " + record.id + " prostą linią.", { toast: true, tone: "success" });
+  }
+
+  /** Połącz wszystkie pending: prosta linia pin→pin. */
+  async function routeAllConnections() {
+    if (!state.netlist?.connections?.length) {
+      setStatus("Brak połączeń w spisie.", { toast: true, tone: "warning" });
+      return;
+    }
+    const sheet = targetSheet();
+    if (!sheet) {
+      setStatus("Brak aktywnego arkusza.");
+      return;
+    }
+    if (state.active !== sheet) selectSheet(sheet);
+    const node = currentSymNode();
+    if (!node) return;
+
+    const all = state.netlist.connections.slice();
+    const manuals = all.filter((r) => isManualOwned(node, r.id));
+    let forceManual = false;
+    if (manuals.length) {
+      const choice = askChoice
+        ? await askRouteChoice(
+            askChoice,
+            "Część tras jest ręczna (" + manuals.length + "). Jak potraktować ręczne?",
+            {
+              title: "Połącz wszystkie",
+              cancelLabel: "Anuluj",
+              localLabel: "Zastąp ręczne",
+              libraryLabel: "Pomiń ręczne",
+            }
+          )
+        : "library";
+      if (choice === "cancel") return;
+      forceManual = choice === "local";
+    }
+
+    const pending = all.filter((r) => forceManual || !isManualOwned(node, r.id));
+    if (!pending.length) {
+      setStatus("Brak połączeń do połączenia.", { toast: true, tone: "info" });
+      return;
+    }
+
+    pushUndo();
+    let ok = 0;
+    let fail = 0;
+    for (const record of pending) {
+      ensureRecordNet(record);
+      const d = resolveConnectionEndpoints(sheet, record);
+      if (!d.ok) {
+        fail++;
+        continue;
+      }
+      const poly = placeStraightConnection(node, record, d, sheet);
+      if (poly) ok++;
+      else fail++;
+    }
+
+    render();
+    setStatus(
+      "Połączono " + ok + " połączeń prostą linią" + (fail ? ", nieudanych: " + fail : "") + ".",
+      { toast: true, tone: fail && !ok ? "warning" : "success" }
+    );
   }
 
   /**
@@ -537,12 +756,15 @@ export function createNetlistRouting(ctx) {
       id: allocateConnectionId(state.netlist.connections, preferred),
       from: NetlistModel.parseEndpoint(endpointRawFromSnap(a)),
       to: NetlistModel.parseEndpoint(endpointRawFromSnap(b)),
-      signal: el.getAttribute("data-signal") || "",
       net: el.getAttribute("data-net") || "—",
       wire: el.getAttribute("data-wire") || "do ustalenia",
+      length: el.getAttribute("data-length") || "",
       notes: el.getAttribute("data-notes") || "",
       section: 1,
     };
+    if (NetlistModel.isBlankNet(draft.net)) {
+      draft.net = NetlistModel.inferConnectionNet(draft, state.netlist.connections);
+    }
 
     let record = draft;
     if (typeof opts?.editRecord === "function") {
@@ -554,9 +776,20 @@ export function createNetlistRouting(ctx) {
     pushUndo();
     state.netlist.connections = upsertConnection(state.netlist.connections, record);
     state.selectedConnId = record.id;
-    const cls = NetlistModel.wireClass(record);
-    applyConnMetaToWire(el, { ...record, _wireClass: cls }, "manual");
-    if (typeof wireColor === "function") el.style.stroke = wireColor(cls);
+    if (typeof applyConnectionRecord === "function") {
+      applyConnectionRecord(record, {
+        el,
+        sheetNode: el.parentNode,
+        routeKind: "manual",
+        persist: false,
+        upsert: false,
+      });
+    } else {
+      const cls = NetlistModel.wireClass(record);
+      applyConnMetaToWire(el, { ...record, _wireClass: cls }, "manual");
+      if (typeof wireColor === "function") el.style.stroke = wireColor(cls);
+      if (el.parentNode) syncWireMarks(el.parentNode, el, mkEl, state.wireMarkMode);
+    }
     if (settingsCfg) syncNetlistToProject(state, sheet, settingsCfg);
     if (typeof persistConnections === "function") await persistConnections();
     state.selection = [el];
@@ -617,8 +850,11 @@ export function createNetlistRouting(ctx) {
     connectionDiagnostics,
     routeObstacles,
     routeSelectedConnection,
+    routeAllConnections,
     promoteSelectionToConnection,
     findAdoptCandidate,
+    placeStraightConnection,
+    ensureRecordNet,
     sheetWireHealth,
     collectNetlistProposals,
     nextProposalId,

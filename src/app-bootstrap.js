@@ -35,6 +35,9 @@ export function bootstrapEditorSync(ctx) {
     syncToolbarContext,
     refreshNetlistUI,
     routeConnButton,
+    routeAllConnButton,
+    breakPointButton,
+    toggleBreakEditMode,
   } = ctx;
 
   injectIcons();
@@ -50,6 +53,15 @@ export function bootstrapEditorSync(ctx) {
       const fn = ctx.getRouteSelectedConnection();
       if (fn) fn();
     };
+  }
+  if (routeAllConnButton && ctx.getRouteAllConnections) {
+    routeAllConnButton.onclick = () => {
+      const fn = ctx.getRouteAllConnections();
+      if (fn) fn();
+    };
+  }
+  if (breakPointButton && typeof toggleBreakEditMode === "function") {
+    breakPointButton.onclick = () => toggleBreakEditMode();
   }
   syncSelectionToolbar();
   syncToolbarContext();

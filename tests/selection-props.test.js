@@ -10,14 +10,19 @@ import {
 import { num, fmt } from "../src/svg-utils.js";
 
 describe("resolveSelectionPropsMode", () => {
-  it("rozróżnia use / conn / text / null", () => {
+  it("rozróżnia use / conn / text / wire / null", () => {
     const useEl = { tagName: "use", getAttribute: () => null };
     const connEl = { tagName: "g", getAttribute: (n) => (n === "data-role" ? "conn" : null) };
     const textEl = { tagName: "text", getAttribute: () => null };
+    const wireEl = {
+      tagName: "polyline",
+      getAttribute: (n) => (n === "data-conn-id" ? "5" : null),
+    };
 
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [useEl] })).toBe("use");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [connEl] })).toBe("conn");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [textEl] })).toBe("text");
+    expect(resolveSelectionPropsMode({ onSheet: true, selection: [wireEl] })).toBe("wire");
     expect(resolveSelectionPropsMode({ onSheet: true, selection: [connEl], connLabelSel: connEl })).toBe("text");
     expect(resolveSelectionPropsMode({ onSheet: false, selection: [useEl] })).toBe(null);
   });
@@ -57,6 +62,29 @@ describe("selectionElRef", () => {
 });
 
 describe("readSelectionPropsState", () => {
+  it("czyta sygnał/przewód/długość dla wire", () => {
+    const wire = {
+      tagName: "polyline",
+      getAttribute: (n) =>
+        ({
+          "data-conn-id": "5",
+          "data-net": "L",
+          "data-wire": "1.5mm2",
+          "data-length": "2.5 m",
+          "data-notes": "zasilanie",
+          "data-from": "F1:2",
+        })[n] ?? null,
+    };
+    expect(readSelectionPropsState({ mode: "wire", el: wire })).toMatchObject({
+      connId: "5",
+      net: "L",
+      wire: "1.5mm2",
+      length: "2.5 m",
+      notes: "zasilanie",
+    });
+    expect(selectionPropsFocusField("wire")).toBe("selPropNet");
+  });
+
   it("czyta prefix/nr/opis dla use", () => {
     const use = {
       tagName: "use",
@@ -96,7 +124,7 @@ describe("readSelectionPropsState", () => {
         el: conn,
         lead: { len: "12", dir: "E" },
       })
-    ).toEqual({
+    ).toMatchObject({
       ref: "X2",
       prefix: "",
       num: "",
@@ -118,6 +146,7 @@ describe("selectionPropsFocusField", () => {
     expect(selectionPropsFocusField("conn")).toBe("selPropPin");
     expect(selectionPropsFocusField("conn", { isLead: true })).toBe("selPropLen");
     expect(selectionPropsFocusField("text")).toBe("selPropText");
+    expect(selectionPropsFocusField("wire")).toBe("selPropNet");
     expect(selectionPropsFocusField(null)).toBe(null);
   });
 });

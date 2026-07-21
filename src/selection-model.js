@@ -48,7 +48,9 @@ export function createSelectionModel(ctx) {
   }
 
   function strokeRecords(records = selectedRecords()) {
-    return records.filter((r) => (STROKE_TAGS.has(r.tag) || isConnGroup(r.el)) && paintVisible(r.cs.stroke));
+    // Nie wymagaj paintVisible — przewody ze stylu CSS (.wL itd.) na klonie hosta
+    // często mają puste/computed „none”, a i tak da się ustawić stroke/grubość inline.
+    return records.filter((r) => STROKE_TAGS.has(r.tag) || isConnGroup(r.el));
   }
 
   function strokeTarget(r) {

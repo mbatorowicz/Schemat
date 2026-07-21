@@ -213,6 +213,12 @@ function geomSummary(el, kind) {
     const parts = [];
     if (x != null && y != null) parts.push(`x=${x}, y=${y}`);
     if (ang != null) parts.push(`kąt=${ang}°`);
+    if (kind === "use") {
+      const flips = [];
+      if (el.getAttribute("data-flip-h") === "1") flips.push("H");
+      if (el.getAttribute("data-flip-v") === "1") flips.push("V");
+      if (flips.length) parts.push(`lustro=${flips.join("+")}`);
+    }
     const tr = (el.getAttribute("transform") || "").trim();
     if (tr) parts.push(`transform=${tr}`);
     return parts.join(" · ") || "—";
@@ -317,6 +323,10 @@ export function sheetElementPropertySections(el, index) {
     ident.push(["Etykieta na schemacie", ownerLabelForRef(el.parentNode, ref) || "—"]);
     const ang = el.getAttribute("data-ang");
     if (ang != null && ang !== "") ident.push(["Kąt", ang + "°"]);
+    const flips = [];
+    if (el.getAttribute("data-flip-h") === "1") flips.push("poziom");
+    if (el.getAttribute("data-flip-v") === "1") flips.push("pion");
+    if (flips.length) ident.push(["Lustro", flips.join(", ")]);
   }
   if (isConnGroupEl(el)) {
     ident.push(["Oznaczenie", el.getAttribute("data-ref") || "—"]);
@@ -334,6 +344,8 @@ export function sheetElementPropertySections(el, index) {
     ident.push(["data-from", el.getAttribute("data-from") || "—"]);
     ident.push(["data-to", el.getAttribute("data-to") || "—"]);
     ident.push(["data-net", el.getAttribute("data-net") || "—"]);
+    if (el.getAttribute("data-wire")) ident.push(["data-wire", el.getAttribute("data-wire")]);
+    if (el.getAttribute("data-length")) ident.push(["data-length", el.getAttribute("data-length")]);
     ident.push(["data-wire", el.getAttribute("data-wire") || "—"]);
   }
   if (el.tagName && el.tagName.toLowerCase() === "text") {

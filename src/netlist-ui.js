@@ -17,7 +17,8 @@ import {
   removeConnectionById,
   allocateConnectionId,
 } from "./sheet-connections.js";
-import { highlightWireByConnId, clearWireConnHighlight, isWireGeometry, wireConnId } from "./wire-geometry.js";
+import { isWireGeometry, wireConnId } from "./wire-geometry.js";
+import { highlightWireByConnId, clearWireConnHighlight } from "./wire-highlight.js";
 import { qsById } from "./dom-selectors.js";
 
 /**
@@ -54,6 +55,7 @@ export function createNetlistUi(deps) {
     promoteSelectionToConnection,
     currentSymNode,
     selectSheetElement,
+    applyConnectionRecord,
   } = deps;
 
   let editorModal = null;
@@ -98,7 +100,7 @@ export function createNetlistUi(deps) {
       const d = connectionDiagnostics(r);
       const o = document.createElement("option");
       o.value = r.id;
-      o.textContent = r.id + " · " + r.from.raw + " → " + r.to.raw + " · " + (d.ok ? "OK" : d.reason);
+      o.textContent = NetlistModel.connectionListLabel(r, d.ok ? "OK" : d.reason);
       o.dataset.ok = d.ok ? "1" : "0";
       sel.appendChild(o);
     });
@@ -106,10 +108,17 @@ export function createNetlistUi(deps) {
     else state.selectedConnId = "";
     const routeBtn = document.getElementById("btnRouteConn");
     if (routeBtn) routeBtn.disabled = !state.netlist || !sel.value;
+    const routeAllBtn = document.getElementById("btnRouteAllConn");
+    if (routeAllBtn) routeAllBtn.disabled = !state.netlist || !(state.netlist.connections || []).length;
     const promoteBtn = document.getElementById("btnPromoteConn");
-    if (promoteBtn) {
-      const el = state.activeEl || state.selection?.[0];
-      promoteBtn.disabled = !isWireGeometry(el);
+    const breakBtn = document.getElementById("btnBreakPoint");
+    const wireEl = state.activeEl || state.selection?.[0];
+    const wireOk = isWireGeometry(wireEl);
+    if (promoteBtn) promoteBtn.disabled = !wireOk;
+    if (breakBtn) {
+      const onSheet = !!(state.active && state.sheets?.includes?.(state.active));
+      breakBtn.disabled = !onSheet;
+      breakBtn.classList.toggle("primary", !!state.breakEditMode);
     }
     const health = document.getElementById("netlistHealth");
     if (health) {
@@ -273,19 +282,20 @@ export function createNetlistUi(deps) {
       g("neId").value = "";
       g("neFrom").value = "";
       g("neTo").value = "";
-      g("neSignal").value = "";
       g("neNet").value = "—";
       g("neWire").value = "do ustalenia";
+      if (g("neLength")) g("neLength").value = "";
       g("neNotes").value = "";
       return;
     }
-    g("neId").value = record.id || "";
-    g("neFrom").value = record.from?.raw || "";
-    g("neTo").value = record.to?.raw || "";
-    g("neSignal").value = record.signal || "";
-    g("neNet").value = record.net || "—";
-    g("neWire").value = record.wire || "do ustalenia";
-    g("neNotes").value = record.notes || "";
+    const n = NetlistModel.normalizeConnection(record);
+    g("neId").value = n.id || "";
+    g("neFrom").value = n.from?.raw || "";
+    g("neTo").value = n.to?.raw || "";
+    g("neNet").value = n.net || "—";
+    g("neWire").value = n.wire || "do ustalenia";
+    if (g("neLength")) g("neLength").value = n.length || "";
+    g("neNotes").value = n.notes || "";
   }
 
   function readEditorForm() {
@@ -294,11 +304,22 @@ export function createNetlistUi(deps) {
       id: g("neId").value.trim(),
       from: g("neFrom").value.trim(),
       to: g("neTo").value.trim(),
-      signal: g("neSignal").value.trim(),
       net: g("neNet").value.trim(),
       wire: g("neWire").value.trim(),
+      length: g("neLength")?.value.trim() || "",
       notes: g("neNotes").value.trim(),
       section: 1,
+    });
+  }
+
+  function patchWireFromRecord(rec) {
+    if (typeof applyConnectionRecord !== "function" || !rec?.id) return;
+    const node = currentSymNode?.();
+    applyConnectionRecord(rec, {
+      sheetNode: node,
+      persist: false,
+      upsert: false,
+      routeKind: undefined,
     });
   }
 
@@ -309,20 +330,23 @@ export function createNetlistUi(deps) {
     tbody.innerHTML = "";
     (state.netlist?.connections || []).forEach((r) => {
       const d = connectionDiagnostics(r);
+      const n = NetlistModel.normalizeConnection(r);
       const tr = document.createElement("tr");
       tr.dataset.id = r.id;
       if (r.id === editorSelectedId) tr.classList.add("selected");
       tr.innerHTML =
         "<td>" +
-        r.id +
+        n.id +
         "</td><td>" +
-        (r.from?.raw || "") +
+        (n.from?.raw || "") +
         "</td><td>" +
-        (r.to?.raw || "") +
+        (n.to?.raw || "") +
         "</td><td>" +
-        (r.signal || "") +
+        (n.net || "") +
         "</td><td>" +
-        (r.net || "") +
+        (n.wire || "") +
+        "</td><td>" +
+        (n.length || "") +
         "</td><td>" +
         (d.ok ? "OK" : d.reason) +
         "</td>";
@@ -373,13 +397,14 @@ export function createNetlistUi(deps) {
         return;
       }
       const g = (id) => document.getElementById(id);
-      g("pcId").value = draft.id;
-      g("pcFrom").value = draft.from?.raw || "";
-      g("pcTo").value = draft.to?.raw || "";
-      g("pcSignal").value = draft.signal || "";
-      g("pcNet").value = draft.net || "—";
-      g("pcWire").value = draft.wire || "do ustalenia";
-      g("pcNotes").value = draft.notes || "";
+      const dn = NetlistModel.normalizeConnection(draft);
+      g("pcId").value = dn.id;
+      g("pcFrom").value = dn.from?.raw || "";
+      g("pcTo").value = dn.to?.raw || "";
+      g("pcNet").value = dn.net || "—";
+      g("pcWire").value = dn.wire || "do ustalenia";
+      if (g("pcLength")) g("pcLength").value = dn.length || "";
+      g("pcNotes").value = dn.notes || "";
       const finish = (ok) => {
         bg.classList.remove("open");
         g("pcOk").onclick = null;
@@ -393,9 +418,9 @@ export function createNetlistUi(deps) {
             id: g("pcId").value.trim() || draft.id,
             from: g("pcFrom").value.trim(),
             to: g("pcTo").value.trim(),
-            signal: g("pcSignal").value.trim(),
             net: g("pcNet").value.trim(),
             wire: g("pcWire").value.trim(),
+            length: g("pcLength")?.value.trim() || "",
             notes: g("pcNotes").value.trim(),
           })
         );
@@ -440,17 +465,27 @@ export function createNetlistUi(deps) {
       const state = getState();
       state.selectedConnId = e.target.value;
       document.getElementById("btnRouteConn").disabled = !state.selectedConnId;
+      const routeAllBtn = document.getElementById("btnRouteAllConn");
+      if (routeAllBtn) routeAllBtn.disabled = !state.netlist || !(state.netlist.connections || []).length;
       syncHighlight();
       if (state.selectedConnId) {
         const r = state.netlist.connections.find((x) => x.id === state.selectedConnId);
         const d = connectionDiagnostics(r);
-        setStatus(d.ok ? "Połączenie " + r.id + " gotowe do trasowania." : d.reason, {
-          toast: !d.ok,
-          tone: d.ok ? "info" : "warning",
-        });
+        setStatus(
+          d.ok
+            ? "Połączenie " + r.id + " (niebieskie podświetlenie ze spisu · Esc / klik pustego = odznacz)."
+            : d.reason,
+          {
+            toast: !d.ok,
+            tone: d.ok ? "info" : "warning",
+          }
+        );
         const node = currentSymNode?.();
         const wire = node && highlightWireByConnId(node, state.selectedConnId);
         if (wire && typeof selectSheetElement === "function") selectSheetElement(wire, { noScroll: true });
+      } else {
+        const node = currentSymNode?.();
+        if (node) clearWireConnHighlight(node);
       }
     };
     document.getElementById("btnExportNetlist").onclick = openNetlistReview;
@@ -505,6 +540,7 @@ export function createNetlistUi(deps) {
       state.netlist.connections = upsertConnection(list, rec);
       editorSelectedId = rec.id;
       state.selectedConnId = rec.id;
+      patchWireFromRecord(rec);
       fillEditorTable();
       persistNow();
       refreshNetlistUI();

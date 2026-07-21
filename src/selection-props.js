@@ -1,9 +1,10 @@
 /**
  * Tryb i stan formularza właściwości zaznaczenia na belce kontekstowej.
- * use | conn | text | null
+ * use | conn | text | wire | null
  */
 
 import { splitInstanceRef } from "./instance-refs.js";
+import { isWireGeometry, wireConnId } from "./wire-geometry.js";
 
 /** Oznaczenie instancji z elementu (use / text / conn). */
 export function selectionElRef(el) {
@@ -46,6 +47,7 @@ export function resolveSelectionPropsMode({ onSheet, selection, connLabelSel }) 
     const el = selection[0];
     if (!el || !el.tagName) return null;
     if (el.getAttribute && el.getAttribute("data-role") === "conn") return "conn";
+    if (isWireGeometry(el) && wireConnId(el)) return "wire";
     const t = el.tagName.toLowerCase();
     if (t === "use") return "use";
     if (t === "text") return "text";
@@ -87,6 +89,12 @@ export function readSelectionPropsState({
     len: "",
     dir: "",
     isLead: false,
+    net: "",
+    signal: "",
+    wire: "",
+    length: "",
+    notes: "",
+    connId: "",
   };
   if (!mode) return empty;
   if (mode === "text") {
@@ -97,6 +105,18 @@ export function readSelectionPropsState({
     };
   }
   if (!el) return empty;
+  if (mode === "wire") {
+    return {
+      ...empty,
+      connId: wireConnId(el) || "",
+      net: (el.getAttribute("data-net") || "").trim(),
+      signal: "",
+      wire: (el.getAttribute("data-wire") || "").trim(),
+      length: (el.getAttribute("data-length") || "").trim(),
+      notes: (el.getAttribute("data-notes") || "").trim(),
+      ref: (el.getAttribute("data-from") || "").trim(),
+    };
+  }
   const ref = (el.getAttribute("data-ref") || "").trim();
   if (mode === "conn") {
     return {
@@ -140,6 +160,7 @@ export function selectionPropsFocusField(mode, { isLead = false } = {}) {
   if (mode === "use") return "selPropRef";
   if (mode === "conn") return isLead ? "selPropLen" : "selPropPin";
   if (mode === "text") return "selPropText";
+  if (mode === "wire") return "selPropNet";
   return null;
 }
 

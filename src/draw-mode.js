@@ -15,6 +15,7 @@ import {
   pointsOfWire,
 } from "./polyline-edit.js";
 import { OrthogonalRouter } from "./orthogonal-router.js";
+import { readUseOrient, mapLocalToSheet } from "./instance-orient.js";
 
 export const DRAW_NEED = {
   line: Infinity,
@@ -22,7 +23,6 @@ export const DRAW_NEED = {
   circle: 2,
   arc: 3,
   text: 1,
-  pin: 1,
   point: 1,
   node: 1,
   lead: 2,
@@ -35,7 +35,6 @@ export const DRAW_BTN = {
   circle: "btnAddCircle",
   arc: "btnAddArc",
   text: "btnAddText",
-  pin: "btnAddPin",
   point: "btnAddPoint",
   node: "btnAddNode",
   lead: "btnAddLead",
@@ -76,8 +75,48 @@ export function createDrawMode(deps) {
     styleLine,
     styleText,
     styleNode,
+    applyConnectionRecord,
     prompt: promptFn = typeof window !== "undefined" ? window.prompt.bind(window) : () => null,
+    askText,
   } = deps;
+
+  async function askSignal(defaultNet) {
+    if (typeof askText === "function") {
+      const v = await askText("Sygnał połączenia", { defaultValue: defaultNet || "—", label: "Sygnał" });
+      return (v == null ? defaultNet : v) || "—";
+    }
+    if (typeof promptFn === "function") {
+      const v = promptFn("Sygnał połączenia:", defaultNet || "—");
+      return (v == null ? defaultNet : v) || "—";
+    }
+    return defaultNet || "—";
+  }
+
+  function attachProposal(el, proposal) {
+    const norm = NetlistModel.normalizeConnection(proposal);
+    if (typeof applyConnectionRecord === "function") {
+      applyConnectionRecord(norm, {
+        el,
+        sheetNode: typeof currentSymNode === "function" ? currentSymNode() : null,
+        routeKind: "manual",
+        persist: false,
+        upsert: false,
+      });
+    } else {
+      const cls = NetlistModel.wireClass(norm);
+      el.setAttribute("class", cls);
+      el.style.stroke = wireColor(cls);
+      el.setAttribute("data-conn-id", norm.id);
+      el.setAttribute("data-route", "manual");
+      el.setAttribute("data-from", norm.from.raw);
+      el.setAttribute("data-to", norm.to.raw);
+      el.setAttribute("data-net", norm.net);
+      el.setAttribute("data-wire", norm.wire);
+      if (norm.length) el.setAttribute("data-length", norm.length);
+      el.setAttribute("data-notes", norm.notes);
+    }
+    return norm;
+  }
 
   function startDraw(kind) {
     const node = currentSymNode();
@@ -133,14 +172,14 @@ export function createDrawMode(deps) {
       const def = definitionForUseElement(el, state.lib?.svg, state.srcSvg, XLINK);
       const ux = num(el, "x");
       const uy = num(el, "y");
-      const angle = parseFloat(el.getAttribute("data-ang") || "0");
+      const orient = readUseOrient(el);
       const ref = el.getAttribute("data-ref");
       if (!def) return;
       [...def.querySelectorAll('[data-role="conn"]')].forEach((c) => {
         pushConnContactCandidates(
           out,
           c,
-          (x, y) => rotatePoint(ux + x, uy + y, ux, uy, angle),
+          (x, y) => mapLocalToSheet(ux, uy, orient, x, y),
           ref,
           c.getAttribute("data-pin"),
           el
@@ -319,27 +358,16 @@ export function createDrawMode(deps) {
     const fromSnap = { ref: junc.getAttribute("data-ref"), pin: "", kind: "junction" };
     const toSnap = endSnap?.ref ? endSnap : { ref: "", pin: "", kind: "free", x: endPt[0], y: endPt[1] };
     if (fromSnap.ref && toSnap.ref && fromSnap.ref !== toSnap.ref) {
-      const net = (promptFn("Oznacznik/potencjał połączenia:", "—") || "—").trim();
-      const id = nextProposalId();
-      const proposal = {
-        id,
+      const draft = {
+        id: nextProposalId(),
         from: NetlistModel.parseEndpoint(endpointRawFromSnap(fromSnap)),
         to: NetlistModel.parseEndpoint(endpointRawFromSnap(toSnap)),
-        signal: "",
-        net,
+        net: "—",
         wire: "do ustalenia",
         notes: "odgałęzienie ukośne",
       };
-      const cls = NetlistModel.wireClass(proposal);
-      el.setAttribute("class", cls);
-      el.style.stroke = wireColor(cls);
-      el.setAttribute("data-conn-id", id);
-      el.setAttribute("data-route", "manual");
-      el.setAttribute("data-from", proposal.from.raw);
-      el.setAttribute("data-to", proposal.to.raw);
-      el.setAttribute("data-net", net);
-      el.setAttribute("data-wire", proposal.wire);
-      el.setAttribute("data-notes", proposal.notes);
+      draft.net = NetlistModel.inferConnectionNet(draft, state.netlist?.connections || []);
+      attachProposal(el, draft);
       el.setAttribute("data-branch", "oblique");
     } else {
       el.setAttribute("data-route", "manual");
@@ -522,23 +550,6 @@ export function createDrawMode(deps) {
       el.textContent = t;
       styleText(el);
       added.push(el);
-    } else if (k === "pin") {
-      const c = pts[0];
-      const t = promptFn("Etykieta przyłącza (pin):", "A1");
-      if (t === null) {
-        render();
-        return;
-      }
-      const anch = promptFn("Wyrównanie: start / middle / end", "start");
-      if (anch === null) {
-        render();
-        return;
-      }
-      const el = mkEl("text", { x: c[0], y: c[1], class: "pin" });
-      if (["start", "middle", "end"].includes(anch)) el.setAttribute("text-anchor", anch);
-      el.textContent = t;
-      styleText(el);
-      added.push(el);
     } else if (k === "node") {
       const el = mkEl("circle", { cx: pts[0][0], cy: pts[0][1], r: 4, class: "node" });
       styleNode(el);
@@ -577,29 +588,16 @@ export function createDrawMode(deps) {
         const a = snaps[0];
         const b = snaps[snaps.length - 1];
         if (a && b && a.ref && b.ref && !(a.ref === b.ref && (a.pin || "") === (b.pin || ""))) {
-          const net = (promptFn("Oznacznik/potencjał połączenia:", "—") || "—").trim();
-          const id = nextProposalId();
-          const fromRaw = endpointRawFromSnap(a);
-          const toRaw = endpointRawFromSnap(b);
-          const proposal = {
-            id,
-            from: NetlistModel.parseEndpoint(fromRaw),
-            to: NetlistModel.parseEndpoint(toRaw),
-            signal: "",
-            net,
+          const draft = {
+            id: nextProposalId(),
+            from: NetlistModel.parseEndpoint(endpointRawFromSnap(a)),
+            to: NetlistModel.parseEndpoint(endpointRawFromSnap(b)),
+            net: "—",
             wire: "do ustalenia",
             notes: "propozycja z edytora",
           };
-          const cls = NetlistModel.wireClass(proposal);
-          el.setAttribute("class", cls);
-          el.style.stroke = wireColor(cls);
-          el.setAttribute("data-conn-id", id);
-          el.setAttribute("data-route", "manual");
-          el.setAttribute("data-from", proposal.from.raw);
-          el.setAttribute("data-to", proposal.to.raw);
-          el.setAttribute("data-net", net);
-          el.setAttribute("data-wire", proposal.wire);
-          el.setAttribute("data-notes", proposal.notes);
+          draft.net = NetlistModel.inferConnectionNet(draft, state.netlist?.connections || []);
+          attachProposal(el, draft);
         }
         node.appendChild(el);
         state.selection = [el];

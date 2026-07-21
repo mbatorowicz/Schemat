@@ -26,6 +26,19 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Listy sidebara       | `sidebar-lists.js` / `sidebar-empty.js`              | symbole, arkusze, elementy + empty states                                                           |
 | Boot UI              | `project-boot.js`                                    | komunikaty startu                                                                                   |
 | Netlista health      | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh                                                                     |
+| Połączenia write-path | `connection-apply.js` + `netlist-model.js`           | `applyConnectionRecord` — SVG ↔ spis                                                                |
+| Spis (SSOT)          | `sheet-connections.js` + `projekt.json`               | `sheetConnections`; md tylko legacy                                                                 |
+
+### Słownik pól połączenia
+
+| UI (etykieta) | Klucz modelu | Uwagi |
+|---------------|--------------|--------|
+| Sygnał | `net` | L/N/PE/+24V… — potencjał (tekst; trasy domyślnie czarne) |
+| Typ przewodu | `wire` | typ/oznaczenie kabla (BOM) |
+| Długość | `length` | ręczne, nie z geometrii |
+| Uwagi | `notes` | — |
+
+Legacy pole `signal` jest migrowane do `net` w `normalizeConnection` i nie jest eksponowane w UI.
 
 ## Przepływ symboli (nie psuj tego łańcucha)
 
@@ -81,5 +94,11 @@ Kluczowe scenariusze ręczne:
 - [x] `element-factory.js` — tworzenie elementów (mkText, mkChrome, mkHandle, mkPrev)
 - [x] Wydzielenie UI netlisty do `netlist-ui.js`
 - [x] Wydzielenie zapisu plików do `file-io.js`
+- [x] Jeden write-path połączeń (`connection-apply.js`)
+- [x] `selection-props-ui.js` + `connection-fields.js` (binder pól połączenia)
+- [x] `askRouteChoice` / `askText` / connMeta → `ui-dialog.js`
+- [x] Draw-mode: infer sygnału zamiast `prompt` (modal `askText` dostępny)
+- [x] `route-opts-ui.js` wydzielony z `main.js`
 - [ ] jsdom w testach dla `assembleEditDefs`
 - [ ] Normalizacja zapisu: mniej inline, więcej klas CSS
+- [ ] Dalsze rozbicie `main.js` (project / handles / viewport)

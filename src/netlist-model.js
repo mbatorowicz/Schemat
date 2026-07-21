@@ -63,21 +63,44 @@ export function parse(markdown) {
     }
     if (!inConnections) return;
     const cells = parseTableRow(line);
-    if (!cells || cells[0] === "Nr") return;
+    if (!cells) return;
+    if (cells[0] === "Nr") {
+      // v2: Nr|Od|Do|Sygnał|Przewód|Długość|Uwagi — legacy: …|Sygnał|Oznacznik|Przewód|Uwagi
+      meta._tableFmt = cells[4] === "Oznacznik" || cells.includes("Oznacznik") ? "legacy" : "v2";
+      return;
+    }
     const id = cells[0];
     if (!/^\d+[A-Za-z]?$/.test(id)) return;
-    connections.push({
-      id,
-      section,
-      from: parseEndpoint(cells[1]),
-      to: parseEndpoint(cells[2]),
-      signal: cells[3],
-      net: cells[4].replace(/^`|`$/g, ""),
-      wire: cells[5],
-      notes: cells[6],
-      rawCells: cells,
-    });
+    const fmt = meta._tableFmt || (cells.length >= 7 && /^`/.test(cells[4] || "") ? "legacy" : "v2");
+    if (fmt === "legacy") {
+      connections.push({
+        id,
+        section,
+        from: parseEndpoint(cells[1]),
+        to: parseEndpoint(cells[2]),
+        signal: cells[3],
+        net: (cells[4] || "").replace(/^`|`$/g, ""),
+        wire: cells[5],
+        length: "",
+        notes: cells[6],
+        rawCells: cells,
+      });
+    } else {
+      connections.push({
+        id,
+        section,
+        from: parseEndpoint(cells[1]),
+        to: parseEndpoint(cells[2]),
+        signal: "",
+        net: (cells[3] || "").replace(/^`|`$/g, ""),
+        wire: cells[4],
+        length: cells[5] || "",
+        notes: cells[6],
+        rawCells: cells,
+      });
+    }
   });
+  delete meta._tableFmt;
   connections.sort((a, b) => compareIds(a.id, b.id));
   return { meta, connections, source: String(markdown || "") };
 }
@@ -96,27 +119,108 @@ export function wireClass(record) {
   return "w24";
 }
 
+/** Typowe oznaczniki potencjału do UI / auto-uzupełniania. */
+export const COMMON_NETS = ["L", "N", "PE", "+24V", "0V", "+48V"];
+
+export function isBlankNet(net) {
+  const n = String(net == null ? "" : net)
+    .trim()
+    .replace(/\u2212/g, "-");
+  return !n || n === "—" || n === "-" || n === "–";
+}
+
+export function pinKey(v) {
+  return String(v || "")
+    .toUpperCase()
+    .replace(/\s+/g, "")
+    .replace(/\u2212/g, "-");
+}
+
+export function pinAliases(pin) {
+  const p = pinKey(pin);
+  const map = {
+    "V+": ["V+", "+V"],
+    "V-": ["V-", "-V"],
+    "+V": ["+V", "V+"],
+    "-V": ["-V", "V-"],
+    ENCODER: ["ENCODER", "ENC"],
+  };
+  return (map[p] || [p]).map(pinKey);
+}
+
+export function endpointKey(ep) {
+  const ref = normalizeRef(ep?.ref);
+  if (!ref) return "";
+  return ref + ":" + pinKey(ep?.pin);
+}
+
+/** @deprecated użyj endpointKey */
+function endpointKeyOf(ep) {
+  return endpointKey(ep);
+}
+
+/** Inferuj potencjał z nazw pinów (L/N/PE/…). */
+export function inferNetFromPins(record) {
+  const pins = [record?.from?.pin, record?.to?.pin].map((p) =>
+    String(p || "")
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "")
+      .replace(/\u2212/g, "-")
+  );
+  for (const pin of pins) {
+    if (pin === "L" || pin === "N" || pin === "PE") return pin;
+    if (pin === "+48V" || pin === "48V") return "+48V";
+    if (pin === "0V" || pin === "PUL0" || pin === "GND" || pin === "M") return "0V";
+    if (pin === "+24V" || pin === "24V" || pin === "+V" || pin === "V+" || pin === "24+") return "+24V";
+  }
+  return "";
+}
+
+/**
+ * Auto-wypełnij potencjał: istniejący → rodzeństwo ze wspólnym pinem → piny → fallback.
+ * @returns {string}
+ */
+export function inferConnectionNet(record, connections) {
+  if (!isBlankNet(record?.net)) return String(record.net).trim();
+  const fromKey = endpointKeyOf(record?.from);
+  const toKey = endpointKeyOf(record?.to);
+  const list = connections || [];
+  for (const c of list) {
+    if (!c || c.id === record?.id || isBlankNet(c.net)) continue;
+    const fk = endpointKeyOf(c.from);
+    const tk = endpointKeyOf(c.to);
+    if ((fromKey && (fk === fromKey || tk === fromKey)) || (toKey && (fk === toKey || tk === toKey))) {
+      return String(c.net).trim();
+    }
+  }
+  const fromPins = inferNetFromPins(record);
+  if (fromPins) return fromPins;
+  return "—";
+}
+
 export function markdownRow(record) {
   const from =
     (record.from && record.from.raw) ||
     [record.from && record.from.ref, record.from && record.from.pin].filter(Boolean).join(":");
   const to =
     (record.to && record.to.raw) || [record.to && record.to.ref, record.to && record.to.pin].filter(Boolean).join(":");
+  const n = normalizeConnection(record);
   return (
     "| " +
-    (record.id || "NOWE") +
+    (n.id || "NOWE") +
     " | " +
     from +
     " | " +
     to +
-    " | " +
-    (record.signal || "") +
     " | `" +
-    (record.net || "—") +
+    (n.net || "—") +
     "` | " +
-    (record.wire || "do ustalenia") +
+    (n.wire || "do ustalenia") +
     " | " +
-    (record.notes || "propozycja z edytora") +
+    (n.length || "") +
+    " | " +
+    (n.notes || "propozycja z edytora") +
     " |"
   );
 }
@@ -124,10 +228,20 @@ export function markdownRow(record) {
 export function proposalPreview(records) {
   if (!records || !records.length) return "Brak nowych połączeń.";
   return [
-    "| Nr | Od | Do | Sygnał | Oznacznik | Przewód | Uwagi |",
-    "|----|----|----|--------|-----------|---------|-------|",
+    "| Nr | Od | Do | Sygnał | Przewód | Długość | Uwagi |",
+    "|----|----|----|--------|---------|---------|-------|",
     ...records.map(markdownRow),
   ].join("\n");
+}
+
+/** Format wiersza dropdownu spisu. */
+export function connectionListLabel(record, statusText) {
+  const n = normalizeConnection(record);
+  const parts = [n.id, (n.from?.raw || "") + " → " + (n.to?.raw || ""), n.net || "—"];
+  if (n.wire && n.wire !== "do ustalenia") parts.push(n.wire);
+  if (n.length) parts.push(n.length);
+  if (statusText) parts.push(statusText);
+  return parts.join(" · ");
 }
 
 export function endpointRaw(ep) {
@@ -142,14 +256,22 @@ export function endpointRaw(ep) {
 export function normalizeConnection(record) {
   const from = parseEndpoint(endpointRaw(record?.from) || endpointRaw(record?.fromRaw) || "");
   const to = parseEndpoint(endpointRaw(record?.to) || endpointRaw(record?.toRaw) || "");
+  let net = cleanCell(record?.net);
+  let signal = cleanCell(record?.signal);
+  // Migracja: osobne pole signal → Sygnał (=net), gdy net pusty
+  if (isBlankNet(net) && signal) {
+    net = signal;
+    signal = "";
+  }
   return {
     id: String(record?.id || "").trim() || "1",
     section: Number(record?.section) || 1,
     from,
     to,
-    signal: cleanCell(record?.signal),
-    net: cleanCell(record?.net) || "—",
+    signal: "",
+    net: net || "—",
     wire: cleanCell(record?.wire) || "do ustalenia",
+    length: cleanCell(record?.length),
     notes: cleanCell(record?.notes),
   };
 }
@@ -162,9 +284,9 @@ export function connectionsToJson(list) {
       section: n.section,
       from: endpointRaw(n.from),
       to: endpointRaw(n.to),
-      signal: n.signal,
       net: n.net,
       wire: n.wire,
+      length: n.length,
       notes: n.notes,
     };
   });
@@ -203,8 +325,8 @@ export function serialize(netlist) {
     "",
     "## 1. Połączenia",
     "",
-    "| Nr | Od | Do | Sygnał | Oznacznik | Przewód | Uwagi |",
-    "|----|----|----|--------|-----------|---------|-------|",
+    "| Nr | Od | Do | Sygnał | Przewód | Długość | Uwagi |",
+    "|----|----|----|--------|---------|---------|-------|",
     ...rows,
     "",
   ].join("\n");
@@ -218,6 +340,14 @@ export const NetlistModel = {
   normalizeRef,
   compareIds,
   wireClass,
+  COMMON_NETS,
+  isBlankNet,
+  inferNetFromPins,
+  inferConnectionNet,
+  pinKey,
+  pinAliases,
+  endpointKey,
+  connectionListLabel,
   markdownRow,
   proposalPreview,
   normalizeConnection,

@@ -1,5 +1,11 @@
+// @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 import { DRAW_NEED, DRAW_BTN, createDrawMode } from "../src/draw-mode.js";
+
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 describe("draw-mode constants", () => {
   it("mapuje tryby na liczbę punktów i przyciski", () => {
@@ -8,8 +14,18 @@ describe("draw-mode constants", () => {
     expect(DRAW_NEED.line).toBe(Infinity);
     expect(DRAW_BTN.lead).toBe("btnAddLead");
     expect(DRAW_BTN.text).toBe("btnAddText");
+    expect(DRAW_BTN.pin).toBeUndefined();
+    expect(DRAW_NEED.pin).toBeUndefined();
     expect(DRAW_BTN.branch).toBe("btnBranchOblique");
     expect(DRAW_NEED.branch).toBe(2);
+  });
+
+  it("smoke: brak przycisku Pin (A) — duplikat Tekstu", () => {
+    const html = readFileSync(join(root, "index.html"), "utf8");
+    const main = readFileSync(join(root, "src/main.js"), "utf8");
+    expect(html).not.toContain("btnAddPin");
+    expect(main).not.toContain("btnAddPin");
+    expect(html).toContain('id="btnAddText"');
   });
 });
 
