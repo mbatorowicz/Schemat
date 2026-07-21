@@ -9,11 +9,7 @@ import {
 } from "./sheet-elements.js";
 import { buildAlignUnits, resolveAlignElements, unionBox, computeAlignDeltas } from "./selection-align.js";
 import { flipPoint, flipAngleDeg, normalizeAngleDeg, collectFlipTargets } from "./selection-flip.js";
-import {
-  readUseOrient,
-  writeUseOrient,
-  composeSheetFlip,
-} from "./instance-orient.js";
+import { readUseOrient, writeUseOrient, composeSheetFlip } from "./instance-orient.js";
 import {
   syncInstanceLabelAngles,
   syncAllInstanceLabelAngles,
@@ -1837,11 +1833,9 @@ function syncSelectionProps(mode) {
       if (lengthInp) lengthInp.value = "";
       if (notesInp) notesInp.value = "";
     }
-    [refField, numField, pinField, descField, desc2Field, textField, lenField, dirField, symField].forEach(
-      (f) => {
-        if (f) f.classList.add("context-hidden");
-      }
-    );
+    [refField, numField, pinField, descField, desc2Field, textField, lenField, dirField, symField].forEach((f) => {
+      if (f) f.classList.add("context-hidden");
+    });
     setConnectionPropsVisible({ netField, wireField, lengthField, notesField }, false);
     state._selPropTextEl = null;
     return;
@@ -1895,10 +1889,7 @@ function syncSelectionProps(mode) {
   if (desc2Field) desc2Field.classList.toggle("context-hidden", mode !== "use");
   if (textField) textField.classList.toggle("context-hidden", mode !== "text");
   if (symField) symField.classList.toggle("context-hidden", mode !== "use");
-  setConnectionPropsVisible(
-    { netField, wireField, lengthField, notesField },
-    mode === "wire"
-  );
+  setConnectionPropsVisible({ netField, wireField, lengthField, notesField }, mode === "wire");
   if (mode === "text") state._selPropTextEl = selectionTextTarget();
   else state._selPropTextEl = null;
 }
@@ -1989,12 +1980,7 @@ async function commitSelectionProps() {
     const prevWire = (el.getAttribute("data-wire") || "").trim();
     const prevLength = (el.getAttribute("data-length") || "").trim();
     const prevNotes = (el.getAttribute("data-notes") || "").trim();
-    if (
-      nextNet === (prevNet || "—") &&
-      nextWire === prevWire &&
-      nextLength === prevLength &&
-      nextNotes === prevNotes
-    ) {
+    if (nextNet === (prevNet || "—") && nextWire === prevWire && nextLength === prevLength && nextNotes === prevNotes) {
       return;
     }
     pushUndo();

@@ -201,9 +201,7 @@ export function buildObliqueBranchPoints(attach, trunkAxis, endXY, step, routeFn
   const startDir = cardinalFromDelta(stub.tip[0] - stub.attach[0], stub.tip[1] - stub.attach[1]);
   const pin = String(pinDir || endXY?.dir || "").toUpperCase();
   const endDir =
-    pin === "N" || pin === "E" || pin === "S" || pin === "W"
-      ? pin
-      : cardinalFromDelta(tip.x - end.x, tip.y - end.y);
+    pin === "N" || pin === "E" || pin === "S" || pin === "W" ? pin : cardinalFromDelta(tip.x - end.x, tip.y - end.y);
 
   let routePts = [];
   // Tip już na osi pinu → prosta bez A*/jogów
@@ -342,11 +340,13 @@ export function attachPointOnTrunk(trunkPts, targetXY, minClear) {
     const end = ptXY(trunkPts[trunkPts.length - 1]);
     if (Math.hypot(best.x - start.x, best.y - start.y) < clear) {
       const pushed = pointAlongPolyline(trunkPts, clear);
-      if (pushed) best = { ...best, x: pushed.x, y: pushed.y, segmentIndex: pushed.segmentIndex, trunkAxis: pushed.trunkAxis };
+      if (pushed)
+        best = { ...best, x: pushed.x, y: pushed.y, segmentIndex: pushed.segmentIndex, trunkAxis: pushed.trunkAxis };
     } else if (Math.hypot(best.x - end.x, best.y - end.y) < clear) {
       const total = polylineLength(trunkPts);
       const pushed = pointAlongPolyline(trunkPts, Math.max(0, total - clear));
-      if (pushed) best = { ...best, x: pushed.x, y: pushed.y, segmentIndex: pushed.segmentIndex, trunkAxis: pushed.trunkAxis };
+      if (pushed)
+        best = { ...best, x: pushed.x, y: pushed.y, segmentIndex: pushed.segmentIndex, trunkAxis: pushed.trunkAxis };
     }
   }
 
@@ -424,8 +424,7 @@ export function attachForObliqueAlign(trunkPts, destXY, step, flowDir) {
   const stub = obliqueStubPoints(seed, seed.trunkAxis, dest, len, flowDir);
   const sx = stub.tip[0] - stub.attach[0];
   const sy = stub.tip[1] - stub.attach[1];
-  const alignedTarget =
-    seed.trunkAxis === "V" ? { x: dest.x, y: dest.y - sy } : { x: dest.x - sx, y: dest.y };
+  const alignedTarget = seed.trunkAxis === "V" ? { x: dest.x, y: dest.y - sy } : { x: dest.x - sx, y: dest.y };
   const aligned = attachPointOnTrunk(trunkPts, alignedTarget, len);
   return aligned || attachPointOnTrunk(trunkPts, dest, len);
 }
@@ -475,15 +474,7 @@ export function buildFanoutBranchPoints(trunkPts, destXY, step, routeFn, flowDir
   const prefix = prefixPolylineToPoint(trunkPts, attach);
   if (!prefix || prefix.length < 1) return null;
   const pinDir = destXY?.dir;
-  const branch = buildObliqueBranchPoints(
-    attach,
-    attach.trunkAxis,
-    destXY,
-    step,
-    routeFn,
-    flowDir,
-    pinDir
-  );
+  const branch = buildObliqueBranchPoints(attach, attach.trunkAxis, destXY, step, routeFn, flowDir, pinDir);
   const out = prefix.map((p) => [p[0], p[1]]);
   branch.forEach((p, i) => {
     if (i === 0) return;

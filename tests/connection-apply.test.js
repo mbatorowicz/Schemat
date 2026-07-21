@@ -58,4 +58,3 @@ describe("applyConnectionRecord", () => {
     expect(marks.every((t) => t.textContent !== "5")).toBe(true);
   });
 });
-

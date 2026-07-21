@@ -578,7 +578,9 @@
       #netlistEditorTable {
         width: 100%;
         border-collapse: collapse;
-        font: 12px/1.35 Arial, sans-serif;
+        font:
+          12px/1.35 Arial,
+          sans-serif;
         margin: 8px 0 12px;
       }
       #netlistEditorTable th,
@@ -1513,7 +1515,9 @@
           <div class="frow"><label for="neTo">Do (ref:pin)</label><input type="text" id="neTo" /></div>
           <div class="frow"><label for="neNet">Sygnał</label><input type="text" id="neNet" /></div>
           <div class="frow"><label for="neWire">Typ przewodu</label><input type="text" id="neWire" /></div>
-          <div class="frow"><label for="neLength">Długość</label><input type="text" id="neLength" placeholder="np. 2.5 m" /></div>
+          <div class="frow">
+            <label for="neLength">Długość</label><input type="text" id="neLength" placeholder="np. 2.5 m" />
+          </div>
           <div class="frow full"><label for="neNotes">Uwagi</label><input type="text" id="neNotes" /></div>
         </div>
         <div class="actions" style="flex-wrap: wrap; gap: 8px">
@@ -1535,7 +1539,9 @@
         <div class="frow"><label for="pcTo">Do</label><input type="text" id="pcTo" /></div>
         <div class="frow"><label for="pcNet">Sygnał</label><input type="text" id="pcNet" /></div>
         <div class="frow"><label for="pcWire">Typ przewodu</label><input type="text" id="pcWire" /></div>
-        <div class="frow"><label for="pcLength">Długość</label><input type="text" id="pcLength" placeholder="np. 2.5 m" /></div>
+        <div class="frow">
+          <label for="pcLength">Długość</label><input type="text" id="pcLength" placeholder="np. 2.5 m" />
+        </div>
         <div class="frow"><label for="pcNotes">Uwagi</label><input type="text" id="pcNotes" /></div>
         <div class="actions">
           <button type="button" id="pcCancel">Anuluj</button>

@@ -257,11 +257,7 @@ export function createNetlistRouting(ctx) {
       };
     }
     const ep = connEndpointCoords(loc.conn, loc.mapXY, towardXY);
-    const dir = loc.orient
-      ? flipDirWithOrient(ep.dir, loc.orient)
-      : loc.angle
-        ? rotateDir(ep.dir, loc.angle)
-        : ep.dir;
+    const dir = loc.orient ? flipDirWithOrient(ep.dir, loc.orient) : loc.angle ? rotateDir(ep.dir, loc.angle) : ep.dir;
     return {
       ok: true,
       x: ep.x,
@@ -649,16 +645,12 @@ export function createNetlistRouting(ctx) {
     let forceManual = false;
     if (manuals.length) {
       const choice = askChoice
-        ? await askRouteChoice(
-            askChoice,
-            "Część tras jest ręczna (" + manuals.length + "). Jak potraktować ręczne?",
-            {
-              title: "Połącz wszystkie",
-              cancelLabel: "Anuluj",
-              localLabel: "Zastąp ręczne",
-              libraryLabel: "Pomiń ręczne",
-            }
-          )
+        ? await askRouteChoice(askChoice, "Część tras jest ręczna (" + manuals.length + "). Jak potraktować ręczne?", {
+            title: "Połącz wszystkie",
+            cancelLabel: "Anuluj",
+            localLabel: "Zastąp ręczne",
+            libraryLabel: "Pomiń ręczne",
+          })
         : "library";
       if (choice === "cancel") return;
       forceManual = choice === "local";
@@ -686,10 +678,10 @@ export function createNetlistRouting(ctx) {
     }
 
     render();
-    setStatus(
-      "Połączono " + ok + " połączeń prostą linią" + (fail ? ", nieudanych: " + fail : "") + ".",
-      { toast: true, tone: fail && !ok ? "warning" : "success" }
-    );
+    setStatus("Połączono " + ok + " połączeń prostą linią" + (fail ? ", nieudanych: " + fail : "") + ".", {
+      toast: true,
+      tone: fail && !ok ? "warning" : "success",
+    });
   }
 
   /**

@@ -54,18 +54,18 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 ## 4. Pojęcia domenowe
 
-| Termin              | Znaczenie                                       | Reprezentacja SVG                                                 |
-| ------------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
-| **Symbol (typ)**    | Definicja graficzna w bibliotece                | `<g id="WD">` w E-00                                              |
-| **Instancja**       | Wystąpienie symbolu na schemacie                | `<use data-ref="WD1" href="#WD">`                                 |
-| **Złącze — punkt**  | Zacisk / listwa na schemacie                    | `<g data-role="conn" data-kind="point">` — widoczne kółko         |
-| **Złącze — kreska** | Przyłącze kierunkowe w symbolu                  | `<g data-role="conn" data-kind="lead">` — widoczna linia          |
-| **Pin**             | Nazwa przyłącza w netliście                     | `data-pin` na złączu, np. `L`, `N`, `1`                           |
-| **Punkt styku**     | Geometryczny punkt łączenia przewodu ze złączem | `<circle data-part="contact" data-contact="…">` — czerwony marker |
-| **Węzeł**           | Punkt topologii / łamania; może być końcem połączenia | `<circle class="node" data-ref="N1">` (adres `N1` w spisie)  |
-| **Etykieta pinu**   | Sam tekst bez semantyki złącza                  | `<text class="pin">`                                              |
-| **Spis połączeń**   | Tabela połączeń elektrycznych                   | `polaczenia_E-01.md`                                              |
-| **Endpoint**        | Adres w netliście                               | `WD1:L`, `X1:3`                                                   |
+| Termin              | Znaczenie                                             | Reprezentacja SVG                                                 |
+| ------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
+| **Symbol (typ)**    | Definicja graficzna w bibliotece                      | `<g id="WD">` w E-00                                              |
+| **Instancja**       | Wystąpienie symbolu na schemacie                      | `<use data-ref="WD1" href="#WD">`                                 |
+| **Złącze — punkt**  | Zacisk / listwa na schemacie                          | `<g data-role="conn" data-kind="point">` — widoczne kółko         |
+| **Złącze — kreska** | Przyłącze kierunkowe w symbolu                        | `<g data-role="conn" data-kind="lead">` — widoczna linia          |
+| **Pin**             | Nazwa przyłącza w netliście                           | `data-pin` na złączu, np. `L`, `N`, `1`                           |
+| **Punkt styku**     | Geometryczny punkt łączenia przewodu ze złączem       | `<circle data-part="contact" data-contact="…">` — czerwony marker |
+| **Węzeł**           | Punkt topologii / łamania; może być końcem połączenia | `<circle class="node" data-ref="N1">` (adres `N1` w spisie)       |
+| **Etykieta pinu**   | Sam tekst bez semantyki złącza                        | `<text class="pin">`                                              |
+| **Spis połączeń**   | Tabela połączeń elektrycznych                         | `polaczenia_E-01.md`                                              |
+| **Endpoint**        | Adres w netliście                                     | `WD1:L`, `X1:3`                                                   |
 
 ### Model złącza (XOR wizualny)
 

@@ -123,11 +123,7 @@ describe("wire-markers", () => {
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
     const poly = makeWire(g, { id: "1", from: "X:1", to: "" });
     poly.setAttribute("data-to", "");
-    fillMissingWireEndpoints(
-      poly,
-      { from: parseEndpoint("A:1"), to: parseEndpoint("B:2") },
-      endpointRaw
-    );
+    fillMissingWireEndpoints(poly, { from: parseEndpoint("A:1"), to: parseEndpoint("B:2") }, endpointRaw);
     expect(poly.getAttribute("data-from")).toBe("X:1");
     expect(poly.getAttribute("data-to")).toBe("B:2");
   });

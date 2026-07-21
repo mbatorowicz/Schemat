@@ -106,10 +106,7 @@ export function removeWireMarks(sheetNode, connId) {
  */
 export function fillMissingWireEndpoints(wireEl, record, endpointRawFn) {
   if (!wireEl || !record) return false;
-  const rawOf =
-    typeof endpointRawFn === "function"
-      ? endpointRawFn
-      : (ep) => (ep && (ep.raw || "")) || "";
+  const rawOf = typeof endpointRawFn === "function" ? endpointRawFn : (ep) => (ep && (ep.raw || "")) || "";
   let changed = false;
   const from = String(rawOf(record.from) || "").trim();
   const to = String(rawOf(record.to) || "").trim();

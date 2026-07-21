@@ -1,11 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect } from "vitest";
-import {
-  flipPoint,
-  flipAngleDeg,
-  normalizeAngleDeg,
-  collectFlipTargets,
-} from "../src/selection-flip.js";
+import { flipPoint, flipAngleDeg, normalizeAngleDeg, collectFlipTargets } from "../src/selection-flip.js";
 import { composeSheetFlip, writeUseOrient, readUseOrient } from "../src/instance-orient.js";
 
 describe("selection-flip", () => {

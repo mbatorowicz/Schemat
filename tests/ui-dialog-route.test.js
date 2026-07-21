@@ -6,10 +6,13 @@ describe("askRouteChoice", () => {
     const ask = vi.fn(async () => "local");
     const r = await askRouteChoice(ask, "msg", { localLabel: "Zastąp", libraryLabel: "Zachowaj" });
     expect(r).toBe("local");
-    expect(ask).toHaveBeenCalledWith("msg", expect.objectContaining({
-      title: "Trasowanie",
-      localLabel: "Zastąp",
-      libraryLabel: "Zachowaj",
-    }));
+    expect(ask).toHaveBeenCalledWith(
+      "msg",
+      expect.objectContaining({
+        title: "Trasowanie",
+        localLabel: "Zastąp",
+        libraryLabel: "Zachowaj",
+      })
+    );
   });
 });

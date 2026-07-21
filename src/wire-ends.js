@@ -26,7 +26,13 @@ export function pinWireEnds(el, fromXY, toXY, fromIsStart = true) {
   }
   const ends = wireEndpoints(el);
   if (!ends?.points?.length) {
-    el.setAttribute("points", formatPointsAttr([[a.x, a.y], [b.x, b.y]]));
+    el.setAttribute(
+      "points",
+      formatPointsAttr([
+        [a.x, a.y],
+        [b.x, b.y],
+      ])
+    );
     return el;
   }
   const pts = ends.points.map((p) => [p.x, p.y]);

@@ -37,10 +37,34 @@ describe("connection-fields", () => {
 
   it("setConnectionPropsVisible pokazuje tylko sygnał", () => {
     const els = {
-      netField: { classList: { toggle: (c, on) => { els._net = !on; } } },
-      wireField: { classList: { add: (c) => { els._wireHidden = c === "context-hidden"; } } },
-      lengthField: { classList: { add: (c) => { els._lenHidden = c === "context-hidden"; } } },
-      notesField: { classList: { add: (c) => { els._notesHidden = c === "context-hidden"; } } },
+      netField: {
+        classList: {
+          toggle: (c, on) => {
+            els._net = !on;
+          },
+        },
+      },
+      wireField: {
+        classList: {
+          add: (c) => {
+            els._wireHidden = c === "context-hidden";
+          },
+        },
+      },
+      lengthField: {
+        classList: {
+          add: (c) => {
+            els._lenHidden = c === "context-hidden";
+          },
+        },
+      },
+      notesField: {
+        classList: {
+          add: (c) => {
+            els._notesHidden = c === "context-hidden";
+          },
+        },
+      },
     };
     setConnectionPropsVisible(els, true);
     expect(els._net).toBe(true);

@@ -4,39 +4,39 @@
 
 Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logiki w `main.js`.
 
-| Obszar               | Moduł SSOT                                           | Odpowiedzialność                                                                                    |
-| -------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Symbole, href        | `symbol-service.js`                                  | `parseUseHref`, `resolveSymbolDef`, `definitionForUseElement`, `auditSymbolsOnSheet`, migracja refs |
-| Defs podglądu/zapisu | `defs-assembler.js`                                  | `useColorAwareClone`, `assembleEditDefs`, aliasy id                                                 |
-| Mapowanie DOM        | `dom-pairing.js`                                     | `childPair`, `forEachPaired` — src ↔ klon                                                           |
-| Render               | `render-pipeline.js`                                 | `rebuildEditDefs`, `rebuildHost`, `bboxInRoot`                                                      |
-| Scena DOM            | `stage-layers.js`                                    | `createStageLayers`, gettery `host`/`sel`/…, `hostRootFrom`                                         |
-| Boot                 | `app-bootstrap.js`                                   | kolejność init + `wireSceneDependentModules`                                                        |
-| Migracje             | `project-migrate.js`                                 | `migrateProject()` — jedna kolejność                                                                |
-| Typografia           | `element-styles.js`                                  | `applyTextStyle` — bez nadpisywania bez `force`                                                     |
-| Złącza               | `conn-model.js` + `conn-theme.js`                    | geometria vs etykieta (`touchLabel`)                                                                |
-| Zapis arkusza        | `sheet-persistence.js`                               | `dirty`, `inlineSheetDefsSafe`                                                                      |
-| Formularze toolbara  | `toolbar-form.css` + `toolbar-context.js`            | layout pól nazw, widoczność grup                                                                    |
-| Shell UI             | `index.html` `#toolbarMode` + `#toolbarContext`      | 2 linie: tryb + kontekst                                                                            |
-| Wording UI           | `ui-wording.js`                                      | etykiety, tooltips, statusy                                                                         |
-| Badge zapisu         | `save-badge.js` + `project-perm-ui.js`               | dirty / perm / ok                                                                                   |
-| Dialogi / toasty     | `ui-dialog.js`                                       | confirm, choice (schemat/biblioteka), toast, a11y modal                                             |
-| Baner rysowania      | `draw-mode-ui.js`                                    | DRAW_HINT / DRAW_LABELS / syncDrawBanner                                                            |
-| Tryb rysowania       | `draw-mode.js`                                       | startDraw / preview / finishShape / joint snap                                                      |
-| Listy sidebara       | `sidebar-lists.js` / `sidebar-empty.js`              | symbole, arkusze, elementy + empty states                                                           |
-| Boot UI              | `project-boot.js`                                    | komunikaty startu                                                                                   |
-| Netlista health      | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh                                                                     |
+| Obszar                | Moduł SSOT                                           | Odpowiedzialność                                                                                    |
+| --------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Symbole, href         | `symbol-service.js`                                  | `parseUseHref`, `resolveSymbolDef`, `definitionForUseElement`, `auditSymbolsOnSheet`, migracja refs |
+| Defs podglądu/zapisu  | `defs-assembler.js`                                  | `useColorAwareClone`, `assembleEditDefs`, aliasy id                                                 |
+| Mapowanie DOM         | `dom-pairing.js`                                     | `childPair`, `forEachPaired` — src ↔ klon                                                           |
+| Render                | `render-pipeline.js`                                 | `rebuildEditDefs`, `rebuildHost`, `bboxInRoot`                                                      |
+| Scena DOM             | `stage-layers.js`                                    | `createStageLayers`, gettery `host`/`sel`/…, `hostRootFrom`                                         |
+| Boot                  | `app-bootstrap.js`                                   | kolejność init + `wireSceneDependentModules`                                                        |
+| Migracje              | `project-migrate.js`                                 | `migrateProject()` — jedna kolejność                                                                |
+| Typografia            | `element-styles.js`                                  | `applyTextStyle` — bez nadpisywania bez `force`                                                     |
+| Złącza                | `conn-model.js` + `conn-theme.js`                    | geometria vs etykieta (`touchLabel`)                                                                |
+| Zapis arkusza         | `sheet-persistence.js`                               | `dirty`, `inlineSheetDefsSafe`                                                                      |
+| Formularze toolbara   | `toolbar-form.css` + `toolbar-context.js`            | layout pól nazw, widoczność grup                                                                    |
+| Shell UI              | `index.html` `#toolbarMode` + `#toolbarContext`      | 2 linie: tryb + kontekst                                                                            |
+| Wording UI            | `ui-wording.js`                                      | etykiety, tooltips, statusy                                                                         |
+| Badge zapisu          | `save-badge.js` + `project-perm-ui.js`               | dirty / perm / ok                                                                                   |
+| Dialogi / toasty      | `ui-dialog.js`                                       | confirm, choice (schemat/biblioteka), toast, a11y modal                                             |
+| Baner rysowania       | `draw-mode-ui.js`                                    | DRAW_HINT / DRAW_LABELS / syncDrawBanner                                                            |
+| Tryb rysowania        | `draw-mode.js`                                       | startDraw / preview / finishShape / joint snap                                                      |
+| Listy sidebara        | `sidebar-lists.js` / `sidebar-empty.js`              | symbole, arkusze, elementy + empty states                                                           |
+| Boot UI               | `project-boot.js`                                    | komunikaty startu                                                                                   |
+| Netlista health       | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh                                                                     |
 | Połączenia write-path | `connection-apply.js` + `netlist-model.js`           | `applyConnectionRecord` — SVG ↔ spis                                                                |
-| Spis (SSOT)          | `sheet-connections.js` + `projekt.json`               | `sheetConnections`; md tylko legacy                                                                 |
+| Spis (SSOT)           | `sheet-connections.js` + `projekt.json`              | `sheetConnections`; md tylko legacy                                                                 |
 
 ### Słownik pól połączenia
 
-| UI (etykieta) | Klucz modelu | Uwagi |
-|---------------|--------------|--------|
-| Sygnał | `net` | L/N/PE/+24V… — potencjał (tekst; trasy domyślnie czarne) |
-| Typ przewodu | `wire` | typ/oznaczenie kabla (BOM) |
-| Długość | `length` | ręczne, nie z geometrii |
-| Uwagi | `notes` | — |
+| UI (etykieta) | Klucz modelu | Uwagi                                                    |
+| ------------- | ------------ | -------------------------------------------------------- |
+| Sygnał        | `net`        | L/N/PE/+24V… — potencjał (tekst; trasy domyślnie czarne) |
+| Typ przewodu  | `wire`       | typ/oznaczenie kabla (BOM)                               |
+| Długość       | `length`     | ręczne, nie z geometrii                                  |
+| Uwagi         | `notes`      | —                                                        |
 
 Legacy pole `signal` jest migrowane do `net` w `normalizeConnection` i nie jest eksponowane w UI.
 

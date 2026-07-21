@@ -143,7 +143,8 @@ export function createSelectionPropsUi(deps) {
     const labelEl = connLabelEl();
     const refNow = useEl ? useEl.getAttribute("data-ref") || "" : "";
     const descLbl = mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc") : null;
-    const desc2Lbl = mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc2") : null;
+    const desc2Lbl =
+      mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc2") : null;
     const lead =
       mode === "conn" && el && typeof isConnLead === "function" && isConnLead(el)
         ? leadPropsFromConn(el, connParts(el), { num, fmt })

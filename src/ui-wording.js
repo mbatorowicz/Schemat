@@ -182,8 +182,7 @@ export const W = {
     sheetNoProject: "Brak otwartego projektu — schemat zostanie utworzony tylko w pamięci. Kontynuować?",
     replaceManualRoute: "Trasa jest ręczna. Zastąpić ją prostą linią między pinami?",
     keepOrReplaceRoute: "Istnieje ręczna trasa dla tego połączenia. Zachować ją czy zastąpić prostą linią?",
-    adoptOrReroute:
-      "Znaleziono kreskę między pinami tego połączenia. Adoptować geometrię czy połączyć prostą linią?",
+    adoptOrReroute: "Znaleziono kreskę między pinami tego połączenia. Adoptować geometrię czy połączyć prostą linią?",
   },
   toast: {
     saved: "Zapisano.",
