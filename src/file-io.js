@@ -1,6 +1,6 @@
 import { serializeSvg } from "./svg-utils.js";
 import { inlineSheetDefsSafe, clearSheetDirty } from "./sheet-persistence.js";
-import { clearLibDirty } from "./project-dirty.js";
+import { clearLibDirty, clearSettingsDirty } from "./project-dirty.js";
 import { auditSymbolsOnSheet } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
 
@@ -210,6 +210,7 @@ export function createFileIo(deps) {
     }
 
     const settingsOk = saveProjectSettings ? await saveProjectSettings() : false;
+    if (settingsOk) clearSettingsDirty();
     flushDoc();
     if (buildSymbolList) buildSymbolList();
     if (syncListSelection) syncListSelection();

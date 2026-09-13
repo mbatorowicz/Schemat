@@ -56,7 +56,7 @@ import {
   sheetKey,
   findSheetByKey,
 } from "./sheet-persistence.js";
-import { countDirtyAll, markActiveTargetDirty } from "./project-dirty.js";
+import { countDirtyAll, markActiveTargetDirty, markSettingsDirty } from "./project-dirty.js";
 import {
   readFontSizePx,
   applyTextStyle,
@@ -478,7 +478,10 @@ function wireNetlistRouting() {
     askConfirm,
     askChoice,
     getSettingsCfg: () => settingsCfg,
-    persistConnections: () => saveProjectSettings(),
+    persistConnections: () => {
+      markSettingsDirty();
+      persistCache();
+    },
     nearestJoint: (...a) => nearestJoint(...a),
     wireColor,
     applyConnectionRecord,

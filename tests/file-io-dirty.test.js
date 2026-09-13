@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   markSheetDirty,
   clearSheetDirty,
@@ -10,6 +10,7 @@ import {
 } from "../src/sheet-persistence.js";
 import { shouldWriteLibraryCache, libraryCacheScore } from "../src/boot-cache.js";
 import { createFileIo } from "../src/file-io.js";
+import { clearSettingsDirty, isSettingsDirty, markSettingsDirty } from "../src/project-dirty.js";
 
 describe("sheet dirty / save guards", () => {
   it("markuje i liczy dirty arkusze", () => {
@@ -99,6 +100,10 @@ function fileIoFor(state, extras = {}) {
 }
 
 describe("saveProjectToDisk — biblioteka dirty", () => {
+  afterEach(() => {
+    clearSettingsDirty();
+  });
+
   it("lib.dirty === false i jest handle → writeHandle lib nie wołany", async () => {
     const libHandle = mockHandle("E-00_symbole.svg");
     const lib = { svg: tinySvg(), name: "E-00_symbole.svg", handle: libHandle, dirty: false };
@@ -117,6 +122,16 @@ describe("saveProjectToDisk — biblioteka dirty", () => {
     await fileIoFor(state).saveProjectToDisk();
     expect(libHandle.createWritable).toHaveBeenCalledTimes(1);
     expect(lib.dirty).toBe(false);
+  });
+
+  it("po udanym zapisie JSON czyści settingsDirty", async () => {
+    markSettingsDirty();
+    const libHandle = mockHandle("E-00_symbole.svg");
+    const lib = { svg: tinySvg(), name: "E-00_symbole.svg", handle: libHandle, dirty: false };
+    const dir = grantedDir({ "E-00_symbole.svg": libHandle });
+    const state = { dir, lib, libHandle, sheets: [] };
+    await fileIoFor(state, { saveProjectSettings: vi.fn(async () => true) }).saveProjectToDisk();
+    expect(isSettingsDirty()).toBe(false);
   });
 
   it("brak handle (pierwszy zapis) zapisuje nawet gdy dirty jest puste", async () => {

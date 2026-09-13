@@ -20,6 +20,7 @@ import {
 import { isWireGeometry, wireConnId } from "./wire-geometry.js";
 import { highlightWireByConnId, clearWireConnHighlight } from "./wire-highlight.js";
 import { qsById } from "./dom-selectors.js";
+import { markSettingsDirty } from "./project-dirty.js";
 
 /**
  * Odświeżanie health/UI spisu z debounce (po render / zmianie arkusza).
@@ -68,14 +69,14 @@ export function createNetlistUi(deps) {
     return state.lastSheet && state.sheets.includes(state.lastSheet) ? state.lastSheet : state.sheets[0] || null;
   }
 
-  /** Sync + cache + (na razie) JSON na dysk — dawniej persistNow. */
+  /** Sync + dirty + cache. projekt.json dopiero przy Ctrl+S. */
   function commitNetlist() {
     const state = getState();
     const sheet = targetSheet();
     const settingsCfg = getSettingsCfg();
     if (sheet && settingsCfg) syncNetlistToProject(state, sheet, settingsCfg);
+    markSettingsDirty();
     saveProject();
-    if (typeof saveProjectSettings === "function") saveProjectSettings();
   }
 
   function syncHighlight() {
