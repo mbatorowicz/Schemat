@@ -1,12 +1,6 @@
 import { connAllCss, syncConnStylesInLib } from "./conn-theme.js";
 import { createConnModel } from "./conn-model.js";
-import {
-  walkDir,
-  getFileHandleByPath,
-  resolveSharedLibrary,
-  normalizeRelPath,
-  relinkExistingFileHandle,
-} from "./project-files.js";
+import { walkDir, getFileHandleByPath, normalizeRelPath, relinkExistingFileHandle } from "./project-files.js";
 import {
   sheetElementListLabel,
   instanceRefOf,
@@ -107,14 +101,7 @@ import {
   findLibraryInProject,
   createLibraryRecord,
 } from "./library-loader.js";
-import {
-  idbSet,
-  idbGet,
-  writeJsonCache,
-  restoreLibrarySnapshot,
-  restoreProjectSnapshot,
-  restorePrefsSnapshot,
-} from "./persistence.js";
+import { idbSet, idbGet, restoreLibrarySnapshot, restoreProjectSnapshot, restorePrefsSnapshot } from "./persistence.js";
 import { qsById, qsaByOwnerRef } from "./dom-selectors.js";
 import { mkHandle, mkPrev } from "./element-factory.js";
 import { createNetlistUi, createNetlistLiveValidator } from "./netlist-ui.js";
@@ -125,8 +112,6 @@ import {
   resolveBootActiveTarget,
   prefsSheetKey,
   libraryCacheScore,
-  shouldWriteLibraryCache,
-  shouldWriteProjectCache,
 } from "./boot-cache.js";
 import { emptySvgMarkup, uniqueLibraryFileName, uniqueFileName } from "./document-scaffold.js";
 import {
@@ -184,6 +169,8 @@ import { createDrawMode } from "./draw-mode.js";
 import { bindShortcutsHelp } from "./shortcuts-help.js";
 import { summarizeNetlistHealth } from "./netlist-validate.js";
 import { resolveBootStatusMessage, setBootLock } from "./project-boot.js";
+import { persistEditorCache } from "./persist-cache.js";
+import { relinkLibraryHandles } from "./relink-handles.js";
 import {
   pointsOfWire,
   hitWireSegment,
@@ -4724,38 +4711,16 @@ function libSnapshot() {
 }
 /** LS + IDB — dawniej persistNow. Nie zapisuje na dysk. */
 function persistCache() {
-  if (_noSave) return;
-  let quotaFail = false;
-  try {
-    const snap = projectSnapshot();
-    let existing = null;
-    try {
-      const raw = localStorage.getItem("edytor.project");
-      existing = raw ? JSON.parse(raw) : null;
-    } catch (e) {}
-    if (shouldWriteProjectCache(snap, existing, _cacheGenerationFloor)) {
-      const w = writeJsonCache("project", "edytor.project", snap);
-      if (w && w.ok === false) quotaFail = true;
-    }
-  } catch (e) {}
-  if (state.lib?.svg) {
-    syncConnStylesInLib(state.lib.svg, SVGNS);
-    const s = libSnapshot();
-    if (s) {
-      let existing = null;
-      try {
-        const raw = localStorage.getItem("edytor.lib");
-        existing = raw ? JSON.parse(raw) : null;
-      } catch (e) {}
-      if (shouldWriteLibraryCache(s, existing, _libCacheScoreFloor)) {
-        const w = writeJsonCache("libDoc", "edytor.lib", s);
-        if (w && w.ok === false) quotaFail = true;
-      }
-    }
-  }
-  if (quotaFail) {
-    setStatus("Nie zapisano kopii roboczej (brak miejsca w przeglądarce).", { toast: true, tone: "warning" });
-  }
+  persistEditorCache({
+    noSave: _noSave,
+    projectSnapshot,
+    lib: state.lib,
+    libSnapshot,
+    syncLibStyles: (svg) => syncConnStylesInLib(svg, SVGNS),
+    cacheGenerationFloor: _cacheGenerationFloor,
+    libCacheScoreFloor: _libCacheScoreFloor,
+    setStatus,
+  });
 }
 function flushDoc() {
   persistCache();
@@ -5042,21 +5007,16 @@ async function relinkHandles(dir) {
   for (const sh of state.sheets) {
     sh.handle = await relinkExistingFileHandle(dir, sh.relPath, sh.name);
   }
-  try {
-    const shared = await resolveSharedLibrary(dir, settingsCfg.library);
-    if (shared) {
-      state.libHandle = shared.handle;
-      if (state.lib) state.lib.handle = shared.handle;
-      settingsCfg.library = normalizeRelPath(shared.relPath);
-      return;
-    }
-  } catch (e) {}
-  if (settingsCfg.library) {
-    try {
-      const lh = await getFileHandleByPath(dir, settingsCfg.library);
-      state.libHandle = lh;
-      if (state.lib) state.lib.handle = lh;
-    } catch (e) {}
+  const linked = await relinkLibraryHandles(dir, settingsCfg.library, { setStatus });
+  if (linked.shared) {
+    state.libHandle = linked.shared.handle;
+    if (state.lib) state.lib.handle = linked.shared.handle;
+    settingsCfg.library = normalizeRelPath(linked.shared.relPath);
+    return;
+  }
+  if (linked.handle) {
+    state.libHandle = linked.handle;
+    if (state.lib) state.lib.handle = linked.handle;
   }
 }
 /** Nadpisuje arkusze w pamięci treścią z plików SVG na dysku (pełny skan, nie merge z cache). */

@@ -318,6 +318,11 @@ export const status = {
   settingsSavedNoProject: "Zapisano ustawienia (otw\u00f3rz projekt, aby zapisa\u0107 do projekt.json).",
   drawCancelled: "Anulowano rysowanie.",
   breakCancelled: "Anulowano tryb \u0142amania.",
+  cacheProjectUnreadable: "Nie udało się odczytać kopii roboczej projektu.",
+  cacheProjectFailed: "Nie udało się zapisać kopii roboczej projektu.",
+  cacheLibraryUnreadable: "Nie udało się odczytać kopii roboczej biblioteki.",
+  relinkSharedLibraryFailed: "Nie udało się ponownie powiązać wspólnej biblioteki.",
+  relinkLibraryFailed: "Nie udało się ponownie powiązać biblioteki.",
 };
 
 export function emptyListCopy(kind) {
@@ -378,6 +383,11 @@ export function collectWordingStrings() {
     status.settingsSavedNoProject,
     status.drawCancelled,
     status.breakCancelled,
+    status.cacheProjectUnreadable,
+    status.cacheProjectFailed,
+    status.cacheLibraryUnreadable,
+    status.relinkSharedLibraryFailed,
+    status.relinkLibraryFailed,
     W.list.renameHint,
     W.list.renameAria,
   ];

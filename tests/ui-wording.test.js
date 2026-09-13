@@ -67,6 +67,11 @@ describe("ui-wording SSOT", () => {
       status.settingsSavedNoProject,
       status.drawCancelled,
       status.breakCancelled,
+      status.cacheProjectUnreadable,
+      status.cacheProjectFailed,
+      status.cacheLibraryUnreadable,
+      status.relinkSharedLibraryFailed,
+      status.relinkLibraryFailed,
     ].forEach((s) => expect(all).toContain(s));
     expect(status.importedLoose("a.svg")).toContain("a.svg");
     expect(status.projectOpenFailed("x")).toContain("x");
