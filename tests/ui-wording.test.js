@@ -11,6 +11,7 @@ import {
   saveFileLabel,
   saveActionTip,
   paramsSaveTip,
+  status,
 } from "../src/ui-wording.js";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -53,5 +54,21 @@ describe("ui-wording SSOT", () => {
     expect(saveFileLabel({ onLib: true, onSheet: false })).toBe(W.save.fileLib);
     expect(paramsSaveTip("symbol")).toBe(W.saveTip.symbol);
     expect(paramsSaveTip("sheet")).toBe(W.saveTip.sheet);
+  });
+
+  it("zbiera statusy otwarcia, importu, ustawień i anulowania rysowania", () => {
+    const all = collectWordingStrings();
+    [
+      status.folderReadFailed,
+      status.invalidSvg,
+      status.invalidSvgFile,
+      status.settingsSavedToJson,
+      status.settingsSavedNeedPerm,
+      status.settingsSavedNoProject,
+      status.drawCancelled,
+      status.breakCancelled,
+    ].forEach((s) => expect(all).toContain(s));
+    expect(status.importedLoose("a.svg")).toContain("a.svg");
+    expect(status.projectOpenFailed("x")).toContain("x");
   });
 });

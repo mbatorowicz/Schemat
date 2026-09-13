@@ -1440,7 +1440,7 @@ async function scanProject(dir) {
   try {
     walked = await walkDir(dir);
   } catch (e) {
-    setStatus("Nie udało się odczytać folderu.");
+    setStatus(status.folderReadFailed);
     return;
   }
   const dirtyN = countDirtySheets(state.sheets);
@@ -1479,13 +1479,13 @@ async function scanProject(dir) {
     saveProject();
   } catch (e) {
     console.error(e);
-    setStatus("B\u0142\u0105d otwarcia projektu: " + (e.message || e));
+    setStatus(status.projectOpenFailed(e.message || e));
   }
 }
 function importLoose(text, name) {
   const p = parseSvg(text);
   if (!p) {
-    setStatus("Niepoprawny SVG.");
+    setStatus(status.invalidSvg);
     return;
   }
   if (firstSchId(p.svg)) {
@@ -1506,7 +1506,7 @@ function importLoose(text, name) {
       render();
     }
   }
-  setStatus("Zaimportowano " + name + " (bez folderu \u2014 zapis przez „Zapisz jako”).");
+  setStatus(status.importedLoose(name));
   saveProject();
 }
 
@@ -1524,7 +1524,7 @@ async function pickLibrary() {
     const f = await h.getFile();
     const p = parseSvg(await f.text());
     if (!p) {
-      setStatus("Niepoprawny plik SVG.");
+      setStatus(status.invalidSvgFile);
       return;
     }
     state.libHandle = h;
@@ -4675,14 +4675,8 @@ document.getElementById("setSave").onclick = () => {
   saveSettingsCfg();
   closeSettings();
   if (state.dir) {
-    saveProjectSettings().then((ok) =>
-      setStatus(
-        ok
-          ? "Zapisano ustawienia do projekt.json."
-          : "Zapisano ustawienia (folder: kliknij Przywróć dostęp, aby zapisać na dysk)."
-      )
-    );
-  } else setStatus("Zapisano ustawienia (otwórz projekt, aby zapisać do projekt.json).");
+    saveProjectSettings().then((ok) => setStatus(ok ? status.settingsSavedToJson : status.settingsSavedNeedPerm));
+  } else setStatus(status.settingsSavedNoProject);
   markDirty();
 };
 settingsBg.addEventListener("pointerdown", (e) => {
@@ -4945,7 +4939,7 @@ window.addEventListener("keydown", (e) => {
       e.preventDefault();
       exitDraw();
       render();
-      setStatus("Anulowano rysowanie.");
+      setStatus(status.drawCancelled);
     } else if (e.key === "Enter") {
       e.preventDefault();
       void finishShape();
@@ -4955,7 +4949,7 @@ window.addEventListener("keydown", (e) => {
   if (state.breakEditMode && e.key === "Escape") {
     e.preventDefault();
     setBreakEditMode(false);
-    setStatus("Anulowano tryb łamania.");
+    setStatus(status.breakCancelled);
     return;
   }
   if (e.key === "Escape") {

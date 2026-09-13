@@ -303,6 +303,21 @@ export const status = {
   undoEmpty: "Brak czego cofn\u0105\u0107.",
   undone: "Cofni\u0119to.",
   redone: "Ponowiono.",
+  folderReadFailed: "Nie uda\u0142o si\u0119 odczyta\u0107 folderu.",
+  projectOpenFailed(err) {
+    return `B\u0142\u0105d otwarcia projektu: ${err}`;
+  },
+  invalidSvg: "Niepoprawny SVG.",
+  invalidSvgFile: "Niepoprawny plik SVG.",
+  importedLoose(name) {
+    return `Zaimportowano ${name} (bez folderu \u2014 zapis przez \u201eZapisz jako\u201d).`;
+  },
+  settingsSavedToJson: "Zapisano ustawienia do projekt.json.",
+  settingsSavedNeedPerm:
+    "Zapisano ustawienia (folder: kliknij Przywr\u00f3\u0107 dost\u0119p, aby zapisa\u0107 na dysk).",
+  settingsSavedNoProject: "Zapisano ustawienia (otw\u00f3rz projekt, aby zapisa\u0107 do projekt.json).",
+  drawCancelled: "Anulowano rysowanie.",
+  breakCancelled: "Anulowano tryb \u0142amania.",
 };
 
 export function emptyListCopy(kind) {
@@ -355,6 +370,14 @@ export function collectWordingStrings() {
     status.resourceInvalidLibrary,
     status.resourceInvalidProject,
     status.pickSheet,
+    status.folderReadFailed,
+    status.invalidSvg,
+    status.invalidSvgFile,
+    status.settingsSavedToJson,
+    status.settingsSavedNeedPerm,
+    status.settingsSavedNoProject,
+    status.drawCancelled,
+    status.breakCancelled,
     W.list.renameHint,
     W.list.renameAria,
   ];
