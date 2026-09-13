@@ -111,3 +111,4 @@ Kluczowe scenariusze ręczne:
 - [x] Bezpieczeństwo: `textContent` w spisie, `sanitizeSvgDom`, CSP, reject `..` w ścieżkach
 - [ ] Normalizacja zapisu: mniej inline, więcej klas CSS
 - [ ] Dalsze rozbicie `main.js` (project / handles / viewport) — otwarte
+- [ ] Vitest 3: GHSA-82fw-gwwq-j7x9 (`@vitest/mocker`) — świadomie; łatka od 4.1.11, `--force` na v5 poza zakresem. Ryzyko tylko przy wystawionym HMR WS `vitest`.
