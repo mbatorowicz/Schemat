@@ -6,13 +6,13 @@
 | **Projekt**          | Transporter boczny do drukarki · CS-TB-48 |
 | **Wytwórca**         | CNC Solutions                             |
 | **Norma**            | EN 60204-1 (schematy elektryczne maszyn)  |
-| **Wersja dokumentu** | 1.7 · 2026-07-19                          |
+| **Wersja dokumentu** | 1.8 · 2026-09-13                          |
 
 ---
 
 ## 1. Cel produktu
 
-Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: wspólnej biblioteki symboli, arkuszy schematów (E-01…) oraz powiązanego spisu połączeń. Edytor jest źródłem plików trafiających do DTR (`build/dtr.pdf`) i dokumentacji wytwórczej.
+Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: wspólnej biblioteki symboli, arkuszy schematów (Zasilanie, Bezpieczeństwo, Enable, Napęd, Zator…) oraz powiązanego spisu połączeń. Edytor jest źródłem plików trafiających do DTR (`build/dtr.pdf`) i dokumentacji wytwórczej.
 
 **Główna wartość:** jeden workflow od symbolu → instancji na schemacie → wpisu w netliście → trasowania przewodu.
 
@@ -64,7 +64,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 | **Punkt styku**     | Geometryczny punkt łączenia przewodu ze złączem       | `<circle data-part="contact" data-contact="…">` — czerwony marker |
 | **Węzeł**           | Punkt topologii / łamania; może być końcem połączenia | `<circle class="node" data-ref="N1">` (adres `N1` w spisie)       |
 | **Etykieta pinu**   | Sam tekst bez semantyki złącza                        | `<text class="pin">`                                              |
-| **Spis połączeń**   | Tabela połączeń elektrycznych                         | `polaczenia_E-01.md`                                              |
+| **Spis połączeń**   | Tabela połączeń elektrycznych                         | `projekt.json` → `sheetConnections` (md tylko legacy / migracja)  |
 | **Endpoint**        | Adres w netliście                                     | `WD1:L`, `X1:3`                                                   |
 
 ### Model złącza (XOR wizualny)
@@ -106,7 +106,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ### Must have
 
 - Jako konstruktor dodaję przyłącza L/N/PE jako **kreski** w symbolu WD.
-- Jako konstruktor dodaję zaciski listwy X1 jako **punkty** na schemacie E-01.
+- Jako konstruktor dodaję zaciski listwy X1 jako **punkty** na schemacie Zasilanie.
 - Jako konstruktor wstawiam symbol z biblioteki i otrzymuję auto-numerację (WD1, G1…).
 - Jako konstruktor wczytuję spis połączeń i trasuję wybrane połączenie.
 - Jako konstruktor zapisuję projekt do folderu bez utraty zmian.
@@ -116,10 +116,11 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - Jako konstruktor edytuję styl zaznaczonych elementów z paska kontekstowego.
 - Jako konstruktor klonuję złącze z auto-inkrementacją pinu.
 - Jako konstruktor widzę podgląd rysowania bez mylących markerów.
+- Jako konstruktor widzę walidator spójności netlisty vs schemat na żywo (`#netlistHealth`).
 
 ### Could have
 
-- Walidator spójności netlisty vs schemat w czasie rzeczywistym.
+- _(brak — live validator jest w Should have)_
 
 ### Won't have (na razie)
 
@@ -132,9 +133,9 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ### 6.1 Projekt i pliki
 
 - FR-01: Otwarcie folderu projektu z `showDirectoryPicker` lub fallback `<input type=file>`.
-- FR-02: Rekurencyjne skanowanie folderu: arkusze `sch-*` (np. `project/CS-TB-48/E-01.svg`), biblioteka `lib/E-00_symbole.svg`; opcjonalnie legacy `polaczenia_<arkusz>.md`.
+- FR-02: Rekurencyjne skanowanie folderu: arkusze `sch-*` (np. `project/CS-TB-48/Zasilanie.svg`, `Bezpieczenstwo.svg`, `Enable.svg`, `Naped.svg`, `Zator.svg`), biblioteka `lib/E-00_symbole.svg`; opcjonalnie legacy `polaczenia_<arkusz>.md` (tylko migracja).
 - FR-03: Wczytanie `projekt.json` (orientacja A4, metadane, `library`, **`sheetConnections`** — SSOT spisu połączeń per arkusz).
-- FR-03a: Konwencja: klucz arkusza = `relPath`/`name`; legacy `E-01.svg` ↔ `polaczenia_E-01.md` (migracja); biblioteka domyślnie `lib/E-00_symbole.svg`.
+- FR-03a: Konwencja: klucz arkusza = `relPath`/`name`; legacy `Zasilanie.svg` ↔ `polaczenia_Zasilanie.md` (migracja); biblioteka domyślnie `lib/E-00_symbole.svg`.
 - FR-03b: Po otwarciu projektu: biblioteka + spis z `sheetConnections` (gdy brak — jednorazowa migracja z md).
 - FR-04: Zapis nadpisujący i „zapisz jako” dla aktywnego pliku SVG.
 - FR-05: Przywracanie dostępu do folderu (IndexedDB) po restarcie przeglądarki.
@@ -295,9 +296,9 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 | `schematy/project/CS-TB-48/Enable.svg`         | Arkusz enable (K2)                                        |
 | `schematy/project/CS-TB-48/Naped.svg`          | Arkusz napędu                                             |
 | `schematy/project/CS-TB-48/Zator.svg`          | Arkusz układu zatoru                                      |
-| `schematy/project/CS-TB-48/polaczenia_*.md`    | Spisy połączeń per arkusz                                 |
-| `schematy/project/CS-TB-48/polaczenia.md`      | Master netlista (referencja)                              |
-| `schematy/project/CS-TB-48/projekt.json`       | Metadane projektu                                         |
+| `schematy/project/CS-TB-48/projekt.json`       | Metadane + SSOT spisu (`sheetConnections`)                |
+| `schematy/project/CS-TB-48/polaczenia_*.md`    | Legacy / migracja do `sheetConnections`                   |
+| `schematy/project/CS-TB-48/polaczenia.md`      | Legacy master (referencja DTR), nie SSOT edytora          |
 | `build/build.ps1`                              | PDF DTR (pre-commit hook)                                 |
 
 ---
@@ -305,7 +306,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ## 10. Metryki sukcesu
 
 - Nowa **kreska** w symbolu WD: tylko linia w kolorze symbolu, bez kółka; czerwony punkt styku na końcu.
-- Nowy **punkt** na E-01: tylko kółko zacisku (obrys jak symbol), 4 czerwone punkty styku na obwodzie.
+- Nowy **punkt** na Zasilaniu: tylko kółko zacisku (obrys jak symbol), 4 czerwone punkty styku na obwodzie.
 - Snap i trasowanie łączą się z punktami styku (`data-part="contact"`), nie ze środkiem jointa.
 - Punkt złącza: router wybiera styk automatycznie; użytkownik nie ustawia kierunku w UI.
 - Netlista rozpoznaje wszystkie `[data-role="conn"][data-ref][data-pin]`.
@@ -318,10 +319,12 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 | Priorytet | Element                                              | Status                                        |
 | --------- | ---------------------------------------------------- | --------------------------------------------- |
-| Wysoki    | Dalszy podział `main.js` (statusy → wording)         | W toku                                        |
-| Średni    | Walidator spójności netlisty vs schemat              | Live `#netlistHealth`                         |
+| Wysoki    | Dalszy podział `main.js` (project / handles / viewport; reszta statusów → wording) | Otwarte                                       |
+| Średni    | Walidator spójności netlisty vs schemat              | Zrobione — live `#netlistHealth`              |
 | Niski     | Rename pliku schematu na dysku (+ `polaczenia_*.md`) | Świadomie poza UI — lista zmienia tylko tytuł |
-| Niski     | E-02 jako arkusz w tym samym edytorze                | Otwarte                                       |
+| Niski     | Kolejny arkusz w tym samym edytorze                  | Otwarte                                       |
+
+**Zrealizowane (1.8):** SSOT spisu = `projekt.json` → `sheetConnections`; dirty/mutex zapisu; sanitize SVG po DOM; CSP; belka przez `createSelectionPropsUi`; eksport symbolu przez `exportSymbolSvg`; symbole tylko z `symbol-service.js`; `wireDrawMode` w bootstrap; focus trap; bez `window.prompt`; coverage w CI; partia statusów w `ui-wording`.
 
 **Zrealizowane (1.7):** belka `#selectionPropsGroup` (ref/pin/treść/symbol/długość/kierunek, bez `prompt()`); wyrównania; `#elemProps` RO; sanitize javascript:/data:; CI lint+format; testy history/draw/dirty.
 

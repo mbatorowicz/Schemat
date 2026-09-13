@@ -7,7 +7,7 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Obszar                | Moduł SSOT                                           | Odpowiedzialność                                                                                    |
 | --------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
 | Symbole, href         | `symbol-service.js`                                  | `parseUseHref`, `resolveSymbolDef`, `definitionForUseElement`, `auditSymbolsOnSheet`, migracja refs |
-| Defs podglądu/zapisu  | `defs-assembler.js`                                  | `useColorAwareClone`, `assembleEditDefs`, aliasy id                                                 |
+| Defs podglądu/zapisu  | `defs-assembler.js`                                  | `useColorAwareClone`, `assembleEditDefs`, `exportSymbolSvg`, aliasy id                              |
 | Mapowanie DOM         | `dom-pairing.js`                                     | `childPair`, `forEachPaired` — src ↔ klon                                                           |
 | Render                | `render-pipeline.js`                                 | `rebuildEditDefs`, `rebuildHost`, `bboxInRoot`                                                      |
 | Scena DOM             | `stage-layers.js`                                    | `createStageLayers`, gettery `host`/`sel`/…, `hostRootFrom`                                         |
@@ -16,6 +16,8 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Typografia            | `element-styles.js`                                  | `applyTextStyle` — bez nadpisywania bez `force`                                                     |
 | Złącza                | `conn-model.js` + `conn-theme.js`                    | geometria vs etykieta (`touchLabel`)                                                                |
 | Zapis arkusza         | `sheet-persistence.js`                               | `dirty`, `inlineSheetDefsSafe`                                                                      |
+| Belka właściwości     | `selection-props-ui.js`                              | `createSelectionPropsUi` — sync/init/commit wire; non-wire callback z `main.js`                     |
+| Dirty projektu        | `project-dirty.js` + `save-badge.js`                 | arkusze + lib + settings; badge i Ctrl+S                                                            |
 | Formularze toolbara   | `toolbar-form.css` + `toolbar-context.js`            | layout pól nazw, widoczność grup                                                                    |
 | Shell UI              | `index.html` `#toolbarMode` + `#toolbarContext`      | 2 linie: tryb + kontekst                                                                            |
 | Wording UI            | `ui-wording.js`                                      | etykiety, tooltips, statusy                                                                         |
@@ -69,10 +71,12 @@ inlineSheetDefsSafe()     ← osadza używane symbole z biblioteki
 wireHistory() / wireConnModel() / wireProjectMigrate() / wireRenderPipeline()
 scene.build() + drawGrid()          ← stage-layers.js (gettery host/sel/…)
 wireNetlistRouting() / wireSelectionModel()   ← getHost: () => scene.host
+wireDrawMode()                      ← bootstrapEditorSync, nie wewnątrz netlisty
 ```
 
 Moduły zależne od klonu podglądu **nigdy** nie dostają surowego `gHost` z momentu wire — tylko `getHost()`.
 Kolejność wymuszona przez `app-bootstrap.js`. Przycisk **Trasuj** (`btnRouteConn`) podpinany przez `getRouteSelectedConnection()` **po** `wireNetlistRouting()`.
+`main.js` importuje `resolveLibSymbol` / `resolveSheetSymbol` wyłącznie z `symbol-service.js`.
 
 ## Testy regresji (uruchamiaj po każdej większej zmianie)
 
@@ -95,10 +99,15 @@ Kluczowe scenariusze ręczne:
 - [x] Wydzielenie UI netlisty do `netlist-ui.js`
 - [x] Wydzielenie zapisu plików do `file-io.js`
 - [x] Jeden write-path połączeń (`connection-apply.js`)
-- [x] `selection-props-ui.js` + `connection-fields.js` (binder pól połączenia)
-- [x] `askRouteChoice` / `askText` / connMeta → `ui-dialog.js`
+- [x] `selection-props-ui.js` + `createSelectionPropsUi` podpięte w `main.js`
+- [x] `connection-fields.js` (binder pól połączenia)
+- [x] `askRouteChoice` / `askText` / connMeta → `ui-dialog.js` (focus trap na confirm/choice)
 - [x] Draw-mode: infer sygnału zamiast `prompt` (modal `askText` dostępny)
+- [x] `wireDrawMode()` w `bootstrapEditorSync`, nie w `wireNetlistRouting`
+- [x] `exportSymbolSvg` — eksport przez te same klony defs co podgląd
 - [x] `route-opts-ui.js` wydzielony z `main.js`
-- [ ] jsdom w testach dla `assembleEditDefs`
+- [x] jsdom: `assembleEditDefs` / `exportSymbolSvg` (`tests/defs-assembler-export.test.js`)
+- [x] Zapis: `persistCache` / `commitNetlist`, mapa dirty, mutex Ctrl+S, cache z rewizją
+- [x] Bezpieczeństwo: `textContent` w spisie, `sanitizeSvgDom`, CSP, reject `..` w ścieżkach
 - [ ] Normalizacja zapisu: mniej inline, więcej klas CSS
-- [ ] Dalsze rozbicie `main.js` (project / handles / viewport)
+- [ ] Dalsze rozbicie `main.js` (project / handles / viewport) — otwarte
