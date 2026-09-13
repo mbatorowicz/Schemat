@@ -9,19 +9,22 @@ export function createConfirmDialog(opts = {}) {
   const bgId = opts.id || "confirmDialog";
   const titleId = opts.titleId || "confirmDialogTitle";
   let resolveFn = null;
+  let a11y = null;
 
   function el() {
     return document.getElementById(bgId);
   }
 
+  function settle(result) {
+    const r = resolveFn;
+    resolveFn = null;
+    if (a11y?.isOpen()) a11y.close();
+    else el()?.classList.remove("open");
+    if (r) r(!!result);
+  }
+
   function close(result) {
-    const bg = el();
-    if (bg) bg.classList.remove("open");
-    if (resolveFn) {
-      const r = resolveFn;
-      resolveFn = null;
-      r(!!result);
-    }
+    settle(result);
   }
 
   /**
@@ -43,33 +46,32 @@ export function createConfirmDialog(opts = {}) {
       ok.classList.toggle("danger-btn", !!cfg.danger);
     }
     if (cancel) cancel.textContent = cfg.cancelLabel || "Anuluj";
-    bg.classList.add("open");
-    if (ok) ok.focus();
+    if (a11y) a11y.open();
+    else {
+      bg.classList.add("open");
+      if (cancel) cancel.focus();
+    }
     return new Promise((resolve) => {
       resolveFn = resolve;
     });
   }
 
   function init() {
-    const bg = el();
     const ok = document.getElementById("confirmDialogOk");
     const cancel = document.getElementById("confirmDialogCancel");
-    if (ok) ok.onclick = () => close(true);
-    if (cancel) cancel.onclick = () => close(false);
-    if (bg) {
-      bg.addEventListener("pointerdown", (e) => {
-        if (e.target === bg) close(false);
-      });
-    }
+    a11y = bindModalA11y({
+      id: bgId,
+      labelledBy: titleId,
+      initialFocus: "confirmDialogCancel",
+      onClose: () => settle(false),
+    });
+    if (ok) ok.onclick = () => settle(true);
+    if (cancel) cancel.onclick = () => settle(false);
     document.addEventListener("keydown", (e) => {
       if (!el()?.classList.contains("open")) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close(false);
-      }
       if (e.key === "Enter" && document.activeElement?.id === "confirmDialogOk") {
         e.preventDefault();
-        close(true);
+        settle(true);
       }
     });
   }
@@ -85,20 +87,23 @@ export function createChoiceDialog(opts = {}) {
   const bgId = opts.id || "choiceDialog";
   const titleId = opts.titleId || "choiceDialogTitle";
   let resolveFn = null;
+  let a11y = null;
 
   function el() {
     return document.getElementById(bgId);
   }
 
   /** @param {"cancel"|"local"|"library"} result */
+  function settle(result) {
+    const r = resolveFn;
+    resolveFn = null;
+    if (a11y?.isOpen()) a11y.close();
+    else el()?.classList.remove("open");
+    if (r) r(result);
+  }
+
   function close(result) {
-    const bg = el();
-    if (bg) bg.classList.remove("open");
-    if (resolveFn) {
-      const r = resolveFn;
-      resolveFn = null;
-      r(result);
-    }
+    settle(result || "cancel");
   }
 
   /**
@@ -127,33 +132,29 @@ export function createChoiceDialog(opts = {}) {
     if (cancel) cancel.textContent = cfg.cancelLabel || "Anuluj";
     if (local) local.textContent = cfg.localLabel || "Tylko ten schemat";
     if (lib) lib.textContent = cfg.libraryLabel || "Zaktualizuj bibliotekę";
-    bg.classList.add("open");
-    if (lib) lib.focus();
+    if (a11y) a11y.open();
+    else {
+      bg.classList.add("open");
+      if (cancel) cancel.focus();
+    }
     return new Promise((resolve) => {
       resolveFn = resolve;
     });
   }
 
   function init() {
-    const bg = el();
     const cancel = document.getElementById("choiceDialogCancel");
     const local = document.getElementById("choiceDialogLocal");
     const lib = document.getElementById("choiceDialogLib");
-    if (cancel) cancel.onclick = () => close("cancel");
-    if (local) local.onclick = () => close("local");
-    if (lib) lib.onclick = () => close("library");
-    if (bg) {
-      bg.addEventListener("pointerdown", (e) => {
-        if (e.target === bg) close("cancel");
-      });
-    }
-    document.addEventListener("keydown", (e) => {
-      if (!el()?.classList.contains("open")) return;
-      if (e.key === "Escape") {
-        e.preventDefault();
-        close("cancel");
-      }
+    a11y = bindModalA11y({
+      id: bgId,
+      labelledBy: titleId,
+      initialFocus: "choiceDialogCancel",
+      onClose: () => settle("cancel"),
     });
+    if (cancel) cancel.onclick = () => settle("cancel");
+    if (local) local.onclick = () => settle("local");
+    if (lib) lib.onclick = () => settle("library");
   }
 
   return { ask, close, init };

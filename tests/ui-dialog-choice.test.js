@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { createChoiceDialog } from "../src/ui-dialog.js";
+import { createChoiceDialog, createConfirmDialog } from "../src/ui-dialog.js";
 
 describe("createChoiceDialog", () => {
   beforeEach(() => {
@@ -34,5 +34,44 @@ describe("createChoiceDialog", () => {
     const pCancel = dlg.ask("msg");
     document.getElementById("choiceDialogCancel").click();
     expect(await pCancel).toBe("cancel");
+  });
+
+  it("po ask pierwszy przycisk ma fokus i aria-modal", async () => {
+    const dlg = createChoiceDialog();
+    dlg.init();
+    const p = dlg.ask("msg");
+    const bg = document.getElementById("choiceDialog");
+    expect(bg.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement?.id).toBe("choiceDialogCancel");
+    document.getElementById("choiceDialogCancel").click();
+    expect(await p).toBe("cancel");
+  });
+});
+
+describe("createConfirmDialog", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <div id="confirmDialog" class="modal-bg">
+        <div class="modal">
+          <h2 id="confirmDialogTitle">Potwierdzenie</h2>
+          <p id="confirmDialogBody"></p>
+          <div class="actions">
+            <button type="button" id="confirmDialogCancel">Anuluj</button>
+            <button type="button" id="confirmDialogOk">OK</button>
+          </div>
+        </div>
+      </div>
+    `;
+  });
+
+  it("po ask pierwszy przycisk ma fokus i aria-modal", async () => {
+    const dlg = createConfirmDialog();
+    dlg.init();
+    const p = dlg.ask("Na pewno?");
+    const bg = document.getElementById("confirmDialog");
+    expect(bg.getAttribute("aria-modal")).toBe("true");
+    expect(document.activeElement?.id).toBe("confirmDialogCancel");
+    document.getElementById("confirmDialogOk").click();
+    expect(await p).toBe(true);
   });
 });
