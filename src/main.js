@@ -84,7 +84,7 @@ import {
   setRectCorner,
 } from "./svg-dom.js";
 import { createRenderPipeline } from "./render-pipeline.js";
-import { useColorAwareClone } from "./defs-assembler.js";
+import { useColorAwareClone, exportSymbolSvg } from "./defs-assembler.js";
 import { definitionForUseElement, setUseHref, syncUseSymbolHrefs } from "./symbol-service.js";
 import { createProjectMigrator } from "./project-migrate.js";
 import { SETTINGS_DEFAULT, applySettingsForm } from "./project-settings.js";
@@ -4468,50 +4468,21 @@ function exportSymbol() {
     setStatus("Najpierw wybierz symbol.");
     return;
   }
-  let bb;
+  let bbox = null;
   try {
-    bb = scene.host.getBBox();
+    bbox = scene.host.getBBox();
   } catch (e) {
-    bb = null;
+    bbox = null;
   }
-  const m = 8;
-  const x = bb ? fmt(bb.x - m) : "-20",
-    y = bb ? fmt(bb.y - m) : "-20",
-    w = bb ? fmt(bb.width + 2 * m) : "200",
-    h = bb ? fmt(bb.height + 2 * m) : "200";
-  const styleEl =
-    (state.lib && state.lib.svg && state.lib.svg.querySelector("defs style")) ||
-    (state.srcSvg && state.srcSvg.querySelector("defs style"));
-  // zbierz definicje wszystkich symboli (aby zagnieżdżone <use> się rozwiązały)
-  let symDefs = "";
-  state.symbols.forEach((s) => {
-    symDefs += new XMLSerializer().serializeToString(useColorAwareClone(s.node));
+  const out = exportSymbolSvg({
+    node,
+    libSvg: state.lib?.svg,
+    sheetSvg: state.srcSvg,
+    bbox,
+    fmt,
+    xlinkNs: XLINK,
   });
-  const styleStr = styleEl ? new XMLSerializer().serializeToString(useColorAwareClone(styleEl)) : "";
-  const body = new XMLSerializer().serializeToString(node).replace(/\sid="[^"]*"/, "");
-  const out =
-    '<?xml version="1.0" encoding="UTF-8"?>\n' +
-    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="' +
-    x +
-    " " +
-    y +
-    " " +
-    w +
-    " " +
-    h +
-    '" width="' +
-    w +
-    '" height="' +
-    h +
-    '">\n' +
-    "<defs>" +
-    styleStr +
-    symDefs +
-    "</defs>\n" +
-    body +
-    "\n</svg>\n";
-  const b = new Blob([out], { type: "image/svg+xml" });
-  const u = URL.createObjectURL(b);
+  const u = URL.createObjectURL(new Blob([out], { type: "image/svg+xml" }));
   const a = document.createElement("a");
   a.href = u;
   a.download = node.id + ".svg";

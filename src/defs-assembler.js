@@ -9,7 +9,8 @@ import {
   syncUseSymbolHrefs,
   parseUseHref,
 } from "./symbol-service.js";
-import { SVGNS } from "./svg-constants.js";
+import { SVGNS, XLINK } from "./svg-constants.js";
+import { sanitizeSvgDom, serializeSvg, fmt as fmtDefault } from "./svg-utils.js";
 
 /** Klon z CSS stroke/fill jako var(--object-stroke) dla edycji kolorów symboli. */
 export function useColorAwareClone(node) {
@@ -141,4 +142,48 @@ export function assembleEditDefs(editDefs, opts) {
   });
 
   return { missing: [...new Set(missing)] };
+}
+
+/**
+ * Dokument SVG eksportu symbolu — te same klony defs co podgląd.
+ * Nie skleja XML ręcznie.
+ */
+export function exportSymbolSvg({
+  node,
+  libSvg,
+  sheetSvg,
+  bbox,
+  fmt: fmtFn = fmtDefault,
+  xlinkNs = XLINK,
+  margin = 8,
+}) {
+  if (!node) return "";
+  const x = bbox ? fmtFn(bbox.x - margin) : "-20";
+  const y = bbox ? fmtFn(bbox.y - margin) : "-20";
+  const w = bbox ? fmtFn(bbox.width + 2 * margin) : "200";
+  const h = bbox ? fmtFn(bbox.height + 2 * margin) : "200";
+
+  const svg = document.createElementNS(SVGNS, "svg");
+  svg.setAttribute("xmlns", SVGNS);
+  svg.setAttribute("xmlns:xlink", xlinkNs);
+  svg.setAttribute("viewBox", x + " " + y + " " + w + " " + h);
+  svg.setAttribute("width", w);
+  svg.setAttribute("height", h);
+
+  const defs = document.createElementNS(SVGNS, "defs");
+  svg.appendChild(defs);
+  assembleEditDefs(defs, {
+    libSvg,
+    sheetSvg: sheetSvg || libSvg,
+    sheetNode: null,
+    xlinkNs,
+    libraryPreview: true,
+  });
+
+  const body = node.cloneNode(true);
+  if (body.removeAttribute) body.removeAttribute("id");
+  svg.appendChild(body);
+
+  sanitizeSvgDom(svg);
+  return serializeSvg(svg) + "\n";
 }
