@@ -325,33 +325,30 @@ export function createNetlistUi(deps) {
     });
   }
 
+  function appendTextTd(tr, text) {
+    const td = document.createElement("td");
+    td.textContent = text == null ? "" : String(text);
+    tr.appendChild(td);
+  }
+
   function fillEditorTable() {
     const state = getState();
     const tbody = document.getElementById("netlistEditorBody");
     if (!tbody) return;
-    tbody.innerHTML = "";
+    tbody.replaceChildren();
     (state.netlist?.connections || []).forEach((r) => {
       const d = connectionDiagnostics(r);
       const n = NetlistModel.normalizeConnection(r);
       const tr = document.createElement("tr");
       tr.dataset.id = r.id;
       if (r.id === editorSelectedId) tr.classList.add("selected");
-      tr.innerHTML =
-        "<td>" +
-        n.id +
-        "</td><td>" +
-        (n.from?.raw || "") +
-        "</td><td>" +
-        (n.to?.raw || "") +
-        "</td><td>" +
-        (n.net || "") +
-        "</td><td>" +
-        (n.wire || "") +
-        "</td><td>" +
-        (n.length || "") +
-        "</td><td>" +
-        (d.ok ? "OK" : d.reason) +
-        "</td>";
+      appendTextTd(tr, n.id);
+      appendTextTd(tr, n.from?.raw || "");
+      appendTextTd(tr, n.to?.raw || "");
+      appendTextTd(tr, n.net || "");
+      appendTextTd(tr, n.wire || "");
+      appendTextTd(tr, n.length || "");
+      appendTextTd(tr, d.ok ? "OK" : d.reason);
       tr.onclick = () => {
         editorSelectedId = r.id;
         const st = getState();
