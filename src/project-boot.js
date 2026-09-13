@@ -1,5 +1,18 @@
 /** Komunikaty i decyzje bootu UI (wydzielone z main.js). */
 
+export const BOOT_LOADING_STATUS = "Wczytywanie\u2026";
+
+/**
+ * Blokada toolbar + stage na czas bootu (`body.is-booting`).
+ * @returns {{ locked: boolean }}
+ */
+export function setBootLock(on, { body = typeof document !== "undefined" ? document.body : null, statusEl } = {}) {
+  if (!body?.classList) return { locked: false };
+  body.classList.toggle("is-booting", !!on);
+  if (on && statusEl) statusEl.textContent = BOOT_LOADING_STATUS;
+  return { locked: !!on };
+}
+
 /**
  * @param {{
  *   loadedFromDisk: boolean,

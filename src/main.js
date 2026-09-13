@@ -183,7 +183,7 @@ import { createDrawBannerSync } from "./draw-mode-ui.js";
 import { createDrawMode } from "./draw-mode.js";
 import { bindShortcutsHelp } from "./shortcuts-help.js";
 import { summarizeNetlistHealth } from "./netlist-validate.js";
-import { resolveBootStatusMessage } from "./project-boot.js";
+import { resolveBootStatusMessage, setBootLock } from "./project-boot.js";
 import {
   pointsOfWire,
   hitWireSegment,
@@ -329,6 +329,7 @@ const elemProps = document.getElementById("elemProps");
 const elemPropsTitle = document.getElementById("elemPropsTitle");
 const elemPropsBody = document.getElementById("elemPropsBody");
 const statusEl = document.getElementById("status");
+setBootLock(true, { statusEl });
 const drawBannerEl = document.getElementById("drawBanner");
 const toolbarEl = document.getElementById("toolbar");
 const hud = document.getElementById("hud");
@@ -5330,6 +5331,7 @@ try {
     });
     setStatus(bootUi.message, { toast: bootUi.toast, tone: bootUi.tone });
     _noSave = false;
+    setBootLock(false);
     persistCache();
     savePrefs();
     await refreshGrantButton();
@@ -5337,5 +5339,7 @@ try {
   } catch (e) {
     console.error("Błąd wczytywania projektu:", e);
     setStatus("Błąd wczytywania: " + (e.message || e), { toast: true, tone: "danger" });
+    _noSave = false;
+    setBootLock(false);
   }
 })();

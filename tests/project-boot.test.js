@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveBootStatusMessage } from "../src/project-boot.js";
+import { resolveBootStatusMessage, setBootLock, BOOT_LOADING_STATUS } from "../src/project-boot.js";
 
 describe("resolveBootStatusMessage", () => {
   it("komunikat z dysku bez toastu", () => {
@@ -25,5 +25,23 @@ describe("resolveBootStatusMessage", () => {
     });
     expect(m.tone).toBe("warning");
     expect(m.message).toContain("Przywróć dostęp");
+  });
+
+  it("setBootLock stawia i zdejmuje is-booting oraz status Wczytywanie…", () => {
+    const classes = new Set();
+    const body = {
+      classList: {
+        toggle(name, on) {
+          if (on) classes.add(name);
+          else classes.delete(name);
+        },
+      },
+    };
+    const statusNode = { textContent: "" };
+    expect(setBootLock(true, { body, statusEl: statusNode }).locked).toBe(true);
+    expect(classes.has("is-booting")).toBe(true);
+    expect(statusNode.textContent).toBe(BOOT_LOADING_STATUS);
+    expect(setBootLock(false, { body, statusEl: statusNode }).locked).toBe(false);
+    expect(classes.has("is-booting")).toBe(false);
   });
 });

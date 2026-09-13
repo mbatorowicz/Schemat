@@ -30,6 +30,10 @@
         grid-template-rows: auto 1fr;
         height: 100vh;
       }
+      body.is-booting #toolbar,
+      body.is-booting #stage {
+        pointer-events: none;
+      }
       #toolbar {
         display: flex;
         flex-direction: column;
@@ -924,7 +928,7 @@
       }
     </style>
   </head>
-  <body>
+  <body class="is-booting">
     <div id="app">
       <div id="toolbar">
         <div id="toolbarMode" class="toolbar-line">
