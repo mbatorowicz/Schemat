@@ -2223,8 +2223,8 @@ function ensureInstancePinLabels(node) {
 }
 
 function render() {
-  const missing = rebuildEditDefs(scene.defs).missing;
-  if (missing.length) console.warn("Brak symboli w podglądzie:", missing.join(", "));
+  const { missing, reused } = rebuildEditDefs(scene.defs);
+  if (missing.length && !reused) console.warn("Brak symboli w podglądzie:", missing.join(", "));
   const node = currentSymNode();
   if (!node) {
     scene.host.innerHTML = "";

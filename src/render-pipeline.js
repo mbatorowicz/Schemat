@@ -3,12 +3,66 @@
  */
 import { assembleEditDefs } from "./defs-assembler.js";
 import { childIndex, childPair } from "./dom-pairing.js";
+import { libSymbolGroups, parseUseHref, resolveSymbol, syncUseSymbolHrefs } from "./symbol-service.js";
 
 export { useColorAwareClone, assembleEditDefs, appendEditDefSymbol } from "./defs-assembler.js";
 export { childIndex, childPair, cloneChild, forEachPaired } from "./dom-pairing.js";
 
+let nextOid = 1;
+const objectIds = new WeakMap();
+
+function oid(obj) {
+  if (!obj || (typeof obj !== "object" && typeof obj !== "function")) return "0";
+  let id = objectIds.get(obj);
+  if (!id) {
+    id = String(nextOid++);
+    objectIds.set(obj, id);
+  }
+  return id;
+}
+
+function styleFingerprint(libSvg, sheetSvg) {
+  const styleEl = (libSvg && libSvg.querySelector("defs style")) || (sheetSvg && sheetSvg.querySelector("defs style"));
+  return styleEl ? `${oid(styleEl)}:${styleEl.textContent || ""}` : "";
+}
+
+function symbolFingerprint(node) {
+  return node ? `${oid(node)}:${node.innerHTML || ""}` : "-";
+}
+
+/** Sygnatura tego, co `assembleEditDefs` klonuje — bez geometrii arkusza. */
+export function editDefsCacheKey({ libSvg, sheetSvg, sheetNode, previewNode, libraryPreview, hidePinLabels, xlinkNs }) {
+  const flags = `${libraryPreview ? 1 : 0}:${hidePinLabels ? 1 : 0}`;
+  const styleKey = styleFingerprint(libSvg, sheetSvg);
+
+  if (libraryPreview && libSvg) {
+    const ids = libSymbolGroups(libSvg)
+      .map((s) => s.id)
+      .sort()
+      .join(",");
+    return `lib|${flags}|${oid(libSvg)}|${ids}|${symbolFingerprint(previewNode)}|${styleKey}`;
+  }
+
+  if (!sheetNode) {
+    return `empty|${flags}|${oid(libSvg)}|${oid(sheetSvg)}|${styleKey}`;
+  }
+
+  const hrefs = [];
+  sheetNode.querySelectorAll("use").forEach((u) => {
+    const href = parseUseHref(u, xlinkNs);
+    if (href) hrefs.push(href);
+  });
+  const unique = [...new Set(hrefs)].sort();
+  const bodies = unique.map((id) => {
+    const sym = resolveSymbol(libSvg, sheetSvg, id);
+    return `${id}:${symbolFingerprint(sym)}`;
+  });
+  return `sheet|${flags}|${oid(libSvg)}|${oid(sheetSvg)}|${oid(sheetNode)}|${unique.join(",")}|${bodies.join(";")}|${styleKey}`;
+}
+
 export function createRenderPipeline(ctx) {
   const { state, XLINK: xlinkNs, createSVGPoint, isSheetActive, currentSymNode } = ctx;
+  let defsCache = null;
 
   function bboxInRoot(el, root) {
     const b = el.getBBox();
@@ -38,15 +92,36 @@ export function createRenderPipeline(ctx) {
     const onSheet = isSheetActive();
     const libSvg = state.lib?.svg || null;
     const sheetSvg = state.srcSvg || null;
-    const sheetNode = onSheet ? currentSymNode() : null;
-    return assembleEditDefs(editDefs, {
+    const previewNode = currentSymNode();
+    const sheetNode = onSheet ? previewNode : null;
+    const libraryPreview = !onSheet && !!libSvg;
+    const hidePinLabels = onSheet;
+
+    if (sheetNode) syncUseSymbolHrefs(sheetNode, xlinkNs, libSvg);
+
+    const key = editDefsCacheKey({
+      libSvg,
+      sheetSvg,
+      sheetNode,
+      previewNode,
+      libraryPreview,
+      hidePinLabels,
+      xlinkNs,
+    });
+    if (defsCache && defsCache.defs === editDefs && defsCache.key === key) {
+      return { missing: defsCache.missing, reused: true };
+    }
+
+    const result = assembleEditDefs(editDefs, {
       libSvg,
       sheetSvg,
       sheetNode,
       xlinkNs,
-      libraryPreview: !onSheet && !!libSvg,
-      hidePinLabels: onSheet,
+      libraryPreview,
+      hidePinLabels,
     });
+    defsCache = { defs: editDefs, key, missing: result.missing };
+    return { missing: result.missing, reused: false };
   }
 
   function rebuildHost(gHost) {
