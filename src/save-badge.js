@@ -1,10 +1,10 @@
 /** Stan badge zapisu / dirty / uprawnień — czysta logika (testowalna). */
 
 /**
- * @param {{ dirtyN: number, needPerm: boolean, hasDir: boolean, hasLibDirty?: boolean }} p
+ * @param {{ dirtyN: number, needPerm: boolean, hasDir: boolean, hasLibDirty?: boolean, settingsDirty?: boolean }} p
  * @returns {{ kind: "ok"|"dirty"|"perm"|"idle", label: string, tip: string, actionable: boolean }}
  */
-export function resolveSaveBadgeState({ dirtyN, needPerm, hasDir, hasLibDirty = false }) {
+export function resolveSaveBadgeState({ dirtyN, needPerm, hasDir, hasLibDirty = false, settingsDirty = false }) {
   if (needPerm && hasDir) {
     return {
       kind: "perm",
@@ -13,7 +13,7 @@ export function resolveSaveBadgeState({ dirtyN, needPerm, hasDir, hasLibDirty = 
       actionable: true,
     };
   }
-  const dirty = (dirtyN | 0) + (hasLibDirty ? 1 : 0);
+  const dirty = (dirtyN | 0) + (hasLibDirty ? 1 : 0) + (settingsDirty ? 1 : 0);
   if (dirty > 0) {
     const n = dirtyN | 0;
     const label = n > 0 ? (n === 1 ? "1 niezapisany" : n + " niezapisane") : "Niezapisane";

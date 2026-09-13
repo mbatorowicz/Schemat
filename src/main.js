@@ -56,6 +56,7 @@ import {
   sheetKey,
   findSheetByKey,
 } from "./sheet-persistence.js";
+import { countDirtyAll } from "./project-dirty.js";
 import {
   readFontSizePx,
   applyTextStyle,
@@ -4531,7 +4532,7 @@ function markActiveDirty() {
   syncDirtyIndicator();
 }
 function syncDirtyIndicator() {
-  const n = countDirtySheets(state.sheets);
+  const n = countDirtyAll(state);
   if (statusEl) statusEl.dataset.unsaved = n > 0 ? "1" : "0";
   if (savePermBadge) savePermBadge.syncDirtyOnly();
 }

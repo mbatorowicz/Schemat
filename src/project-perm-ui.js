@@ -1,11 +1,12 @@
 /** Badge zapisu / przywracanie uprawnień folderu. */
 
 import { resolveSaveBadgeState } from "./save-badge.js";
+import { getDirtyMap } from "./project-dirty.js";
 
 /**
  * @param {{
  *   getState: () => { dir: unknown, libHandle: unknown, lib?: { dirty?: boolean }, sheets: unknown[] },
- *   countDirtySheets: (sheets: unknown[]) => number,
+ *   countDirtySheets?: (sheets: unknown[]) => number,
  *   needsPerm: (h: unknown) => Promise<boolean>,
  *   badgeEl?: HTMLElement|null,
  *   labelEl?: HTMLElement|null,
@@ -26,11 +27,14 @@ export function createSavePermBadge(deps) {
     const badge = badgeEl || document.getElementById("saveBadge");
     const label = labelEl || document.getElementById("saveBadgeLabel");
     if (!badge) return resolveSaveBadgeState({ dirtyN: 0, needPerm: false, hasDir: false });
+    const map = getDirtyMap(state);
+    const sheetsDirty = countDirtySheets ? countDirtySheets(state.sheets || []) : map.sheetsDirty;
     const view = resolveSaveBadgeState({
-      dirtyN: countDirtySheets(state.sheets || []),
+      dirtyN: sheetsDirty,
       needPerm: !!needPerm,
       hasDir: !!state.dir,
-      hasLibDirty: !!state.lib?.dirty,
+      hasLibDirty: map.libDirty,
+      settingsDirty: map.settingsDirty,
     });
     badge.dataset.kind = view.kind;
     badge.title = view.tip;
