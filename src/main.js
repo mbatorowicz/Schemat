@@ -1,6 +1,12 @@
 import { connAllCss, syncConnStylesInLib } from "./conn-theme.js";
 import { createConnModel } from "./conn-model.js";
-import { walkDir, getFileHandleByPath, resolveSharedLibrary, normalizeRelPath } from "./project-files.js";
+import {
+  walkDir,
+  getFileHandleByPath,
+  resolveSharedLibrary,
+  normalizeRelPath,
+  relinkExistingFileHandle,
+} from "./project-files.js";
 import {
   sheetElementListLabel,
   instanceRefOf,
@@ -113,9 +119,9 @@ import {
   resolveReloadSheetsOutcome,
   resolveBootActiveTarget,
   prefsSheetKey,
-  projectCacheScore,
   libraryCacheScore,
   shouldWriteLibraryCache,
+  shouldWriteProjectCache,
 } from "./boot-cache.js";
 import { emptySvgMarkup, uniqueLibraryFileName, uniqueFileName } from "./document-scaffold.js";
 import {
@@ -1258,6 +1264,7 @@ async function newProject() {
   idbSet("dir", dir).catch(() => {});
   settingsCfg = res.settings;
   state.sheets = res.firstSheet ? [res.firstSheet] : [];
+  if (state.sheets.length) bumpProjectGeneration();
   state.projectNetlists = [];
   state.netlist = null;
   adoptLibraryFromParsed(res.library.parsed, res.library.name, res.library.handle);
@@ -1460,6 +1467,7 @@ async function applyWalkedProject(walked, opts = {}) {
       libCandidates.push({ handle: f.handle, name: f.name, relPath: f.relPath, parsed: p, isSheet: false });
   }
   state.sheets = sheets;
+  if (sheets.length) bumpProjectGeneration();
   if (!skipLib) {
     const libPick = await findLibraryInProject(walked, settingsCfg.library, libCandidates);
     if (libPick) {
@@ -1528,6 +1536,7 @@ function importLoose(text, name) {
   if (firstSchId(p.svg)) {
     const sh = { handle: null, name, svg: p.svg, doc: p.doc, id: firstSchId(p.svg) };
     state.sheets.push(sh);
+    bumpProjectGeneration();
     buildSymbolList();
     selectSymbol(sh.id);
   } else {
@@ -4927,6 +4936,7 @@ async function newSheet() {
     }
     const sheet = doc.sheet;
     state.sheets.push(sheet);
+    bumpProjectGeneration();
     buildSymbolList();
     selectSheet(sheet);
     if (state.dir) {
@@ -5028,8 +5038,12 @@ settingsBg.addEventListener("pointerdown", (e) => {
 let _noSave = true,
   _docT = null,
   _prefsT = null;
-let _cacheScoreFloor = 0,
-  _libCacheScoreFloor = 0;
+let _cacheGenerationFloor = 0,
+  _libCacheScoreFloor = 0,
+  projectGeneration = 0;
+function bumpProjectGeneration() {
+  projectGeneration = Math.max(projectGeneration, _cacheGenerationFloor) + 1;
+}
 function markDirty() {
   if (_noSave) return;
   clearTimeout(_docT);
@@ -5037,6 +5051,7 @@ function markDirty() {
 }
 function projectSnapshot() {
   return {
+    generation: projectGeneration,
     savedAt: Date.now(),
     dirName: state.dir?.name || null,
     sheets: state.sheets.map((s) => ({
@@ -5067,10 +5082,9 @@ function persistCache() {
       const raw = localStorage.getItem("edytor.project");
       existing = raw ? JSON.parse(raw) : null;
     } catch (e) {}
-    const newScore = projectCacheScore(snap);
-    const oldScore = Math.max(projectCacheScore(existing), _cacheScoreFloor);
-    if (newScore > 0 && newScore >= oldScore) writeJsonCache("project", "edytor.project", snap);
-    else if (newScore === 0 && oldScore === 0) writeJsonCache("project", "edytor.project", snap);
+    if (shouldWriteProjectCache(snap, existing, _cacheGenerationFloor)) {
+      writeJsonCache("project", "edytor.project", snap);
+    }
   } catch (e) {}
   if (state.lib?.svg) {
     syncConnStylesInLib(state.lib.svg, SVGNS);
@@ -5368,11 +5382,7 @@ async function reloadLibraryFromHandle() {
 }
 async function relinkHandles(dir) {
   for (const sh of state.sheets) {
-    try {
-      sh.handle = sh.relPath
-        ? await getFileHandleByPath(dir, sh.relPath, true)
-        : await dir.getFileHandle(sh.name, { create: true });
-    } catch (e) {}
+    sh.handle = await relinkExistingFileHandle(dir, sh.relPath, sh.name);
   }
   try {
     const shared = await resolveSharedLibrary(dir, settingsCfg.library);
@@ -5588,7 +5598,8 @@ try {
 
     const cachedProj = await restoreProject();
     const cachedSheets = sheetsFromProjectSnapshot(cachedProj);
-    _cacheScoreFloor = projectCacheScore(cachedProj);
+    _cacheGenerationFloor = cachedProj?.generation ?? 0;
+    projectGeneration = _cacheGenerationFloor;
 
     if (cachedSheets.length) state.sheets = cachedSheets;
     if (cachedProj) await applyCachedProjectMeta(cachedProj);

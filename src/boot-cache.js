@@ -2,12 +2,25 @@
 
 import { findSheetByKey, sheetKey } from "./sheet-persistence.js";
 
-/** Im wyższy wynik, tym pełniejszy snapshot projektu. */
+function sheetChars(snap) {
+  return snap?.sheets?.reduce((n, sh) => n + String(sh.text || "").length, 0) ?? 0;
+}
+
+export function isEmptyProjectSnap(snap) {
+  if (!snap) return true;
+  return !(snap.sheets?.length) || sheetChars(snap) === 0;
+}
+
+/**
+ * Im wyższy wynik, tym nowszy / pełniejszy snapshot.
+ * generation dominuje nad liczbą arkuszy (bez sheets * 1e9).
+ */
 export function projectCacheScore(snap) {
   if (!snap) return 0;
-  const sheets = snap.sheets?.length ?? 0;
-  const chars = snap.sheets?.reduce((n, sh) => n + String(sh.text || "").length, 0) ?? 0;
-  return sheets * 1_000_000_000 + chars + (snap.savedAt ?? 0);
+  const chars = sheetChars(snap);
+  if (!(snap.sheets?.length) && !chars) return 0;
+  const gen = snap.generation ?? 0;
+  return gen * 1_000_000_000_000 + chars + (snap.savedAt ?? 0);
 }
 
 /** Im wyższy wynik, tym pełniejsza biblioteka w cache. */
@@ -25,13 +38,13 @@ export function resolveBootCachePlan({ loadedFromDisk, sheetCount, hasLibrary = 
 }
 
 /**
- * Nie nadpisuj cache pustym ani słabszym snapshotem (np. po nieudanym odczycie dysku przy F5).
+ * Zapis cache gdy new.generation >= old, chyba że nowy pusty a stary nie.
+ * minGeneration — floor z bootu (cache już w pamięci).
  */
-export function shouldWriteProjectCache(newSnap, existingSnap) {
-  const newScore = projectCacheScore(newSnap);
-  const oldScore = projectCacheScore(existingSnap);
-  if (newScore === 0 && oldScore > 0) return false;
-  return newScore >= oldScore;
+export function shouldWriteProjectCache(newSnap, existingSnap, minGeneration = 0) {
+  if (isEmptyProjectSnap(newSnap) && !isEmptyProjectSnap(existingSnap)) return false;
+  const oldGen = Math.max(existingSnap?.generation ?? 0, minGeneration);
+  return (newSnap?.generation ?? 0) >= oldGen;
 }
 
 export function shouldWriteLibraryCache(newSnap, existingSnap, scoreFloor = 0) {

@@ -91,6 +91,17 @@ export async function getFileHandleByPath(rootDir, relPath, create = false) {
   return dir.getFileHandle(parts[parts.length - 1], create ? { create: true } : undefined);
 }
 
+/** Relink istniejącego pliku — nigdy nie twórz phantom handle. Brak pliku → null. */
+export async function relinkExistingFileHandle(dir, relPath, name, getByPath = getFileHandleByPath) {
+  try {
+    if (relPath) return await getByPath(dir, relPath, false);
+    if (name) return await dir.getFileHandle(name);
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /**
  * Rozwiązuje ścieżkę względną (w tym ../) względem folderu projektu przez getParent().
  */

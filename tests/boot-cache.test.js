@@ -65,6 +65,25 @@ describe("shouldWriteProjectCache", () => {
       )
     ).toBe(true);
   });
+
+  it("4 arkusze + wyższe generation nadpisują 5", () => {
+    const four = {
+      generation: 2,
+      sheets: ["a", "b", "c", "d"].map((id) => ({ id, text: "x" })),
+    };
+    const five = {
+      generation: 1,
+      sheets: ["a", "b", "c", "d", "e"].map((id) => ({ id, text: "x" })),
+    };
+    expect(shouldWriteProjectCache(four, five)).toBe(true);
+    expect(projectCacheScore(four)).toBeGreaterThan(projectCacheScore(five));
+  });
+
+  it("pusty nie nadpisuje pełnego nawet z wyższym generation", () => {
+    expect(
+      shouldWriteProjectCache({ generation: 9, sheets: [] }, { generation: 1, sheets: [{ id: "sch-1", text: "a" }] })
+    ).toBe(false);
+  });
 });
 
 describe("resolveReloadSheetsOutcome", () => {
