@@ -141,3 +141,70 @@ describe("saveFile / saveAs — clearLibDirty", () => {
     expect(lib.dirty).toBe(false);
   });
 });
+
+describe("save() — mutex i jeden przebieg", () => {
+  it("przy dir nie woła osobnego saveFile (arkusz zapisany raz)", async () => {
+    const sheetHandle = mockHandle("A.svg");
+    const libHandle = mockHandle("E-00_symbole.svg");
+    const sheet = { svg: tinySvg(), name: "A.svg", handle: sheetHandle, dirty: true };
+    const lib = { svg: tinySvg(), name: "E-00_symbole.svg", handle: libHandle, dirty: false };
+    const dir = grantedDir({ "A.svg": sheetHandle, "E-00_symbole.svg": libHandle });
+    const setStatus = vi.fn();
+    const state = { dir, lib, libHandle, sheets: [sheet], active: sheet };
+    await fileIoFor(state, { setStatus }).save();
+    expect(sheetHandle.createWritable).toHaveBeenCalledTimes(1);
+    expect(libHandle.createWritable).not.toHaveBeenCalled();
+    expect(setStatus).toHaveBeenCalledTimes(1);
+  });
+
+  it("przy saving drugi save() nie pisze", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const sheetHandle = mockHandle("A.svg");
+    sheetHandle.createWritable = vi.fn(async () => {
+      await gate;
+      return mockWritable();
+    });
+    const sheet = { svg: tinySvg(), name: "A.svg", handle: sheetHandle, dirty: true };
+    const lib = { svg: tinySvg(), name: "E-00_symbole.svg", handle: mockHandle("E-00_symbole.svg"), dirty: false };
+    const dir = grantedDir({ "A.svg": sheetHandle });
+    const state = { dir, lib, libHandle: lib.handle, sheets: [sheet], active: sheet };
+    const io = fileIoFor(state);
+    const first = io.save();
+    const second = io.save();
+    expect(io.isSaving()).toBe(true);
+    release();
+    await Promise.all([first, second]);
+    expect(sheetHandle.createWritable).toHaveBeenCalledTimes(1);
+    expect(io.isSaving()).toBe(false);
+  });
+
+  it("blokuje #btnSave na czas zapisu", async () => {
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    const sheetHandle = mockHandle("A.svg");
+    sheetHandle.createWritable = vi.fn(async () => {
+      await gate;
+      return mockWritable();
+    });
+    const sheet = { svg: tinySvg(), name: "A.svg", handle: sheetHandle, dirty: true };
+    const lib = { svg: tinySvg(), name: "E-00.svg", handle: mockHandle("E-00.svg"), dirty: false };
+    const dir = grantedDir({ "A.svg": sheetHandle });
+    const btn = { disabled: false };
+    const state = { dir, lib, libHandle: lib.handle, sheets: [sheet], active: sheet };
+    const io = fileIoFor(state, {
+      setSaveBusy: (on) => {
+        btn.disabled = !!on;
+      },
+    });
+    const p = io.save();
+    expect(btn.disabled).toBe(true);
+    release();
+    await p;
+    expect(btn.disabled).toBe(false);
+  });
+});

@@ -435,7 +435,7 @@ let finishShape = async () => {},
   applyObliqueStubToSelection = () => false,
   jointCandidates = () => [],
   nearestJoint = () => null;
-let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm;
+let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm, isSaving;
 let selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue;
 
 function wireRenderPipeline() {
@@ -657,8 +657,13 @@ function wireFileIo() {
       if (!h.bad) return null;
       return { bad: true, message: h.summary };
     },
+    setSaveBusy: (on) => {
+      const btn = document.getElementById("btnSave");
+      if (!btn) return;
+      btn.disabled = !!on || !state.active?.svg;
+    },
   });
-  ({ ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm } = f);
+  ({ ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm, isSaving } = f);
   document.getElementById("btnSave").onclick = () => {
     void save();
   };
@@ -1180,7 +1185,7 @@ function syncSaveButtons() {
   const btnSave = document.getElementById("btnSave");
   if (!btnSave) return;
   btnSave.title = saveActionTip({ hasDir: !!state.dir, fileName: state.active?.name });
-  btnSave.disabled = !state.active?.svg;
+  btnSave.disabled = !state.active?.svg || (typeof isSaving === "function" && isSaving());
 }
 function syncToolbarContext() {
   const onLib = state.active === state.lib;

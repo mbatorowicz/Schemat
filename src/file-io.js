@@ -22,7 +22,19 @@ export function createFileIo(deps) {
     getFileHandleByPath,
     onDirtyChange,
     validateBeforeSave,
+    setSaveBusy,
   } = deps;
+
+  let saving = false;
+
+  function isSaving() {
+    return saving;
+  }
+
+  function setSaving(on) {
+    saving = !!on;
+    if (typeof setSaveBusy === "function") setSaveBusy(saving);
+  }
 
   async function hasPerm(handle) {
     if (!handle?.queryPermission) return false;
@@ -215,14 +227,19 @@ export function createFileIo(deps) {
   }
 
   async function save() {
-    const state = getState();
-    if (typeof validateBeforeSave === "function") {
-      const v = validateBeforeSave(state);
-      if (v?.message) setStatus(v.message, { toast: !!v.bad, tone: v.bad ? "warning" : "info" });
+    if (saving) return;
+    setSaving(true);
+    try {
+      const state = getState();
+      if (typeof validateBeforeSave === "function") {
+        const v = validateBeforeSave(state);
+        if (v?.message) setStatus(v.message, { toast: !!v.bad, tone: v.bad ? "warning" : "info" });
+      }
+      if (!state.dir) return await saveFile();
+      return await saveProjectToDisk();
+    } finally {
+      setSaving(false);
     }
-    if (!state.dir) return saveFile();
-    await saveFile();
-    return saveProjectToDisk();
   }
 
   return {
@@ -234,5 +251,6 @@ export function createFileIo(deps) {
     saveAs,
     saveProjectToDisk,
     downloadSvg,
+    isSaving,
   };
 }
