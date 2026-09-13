@@ -81,6 +81,7 @@ import { createRenderPipeline } from "./render-pipeline.js";
 import { useColorAwareClone } from "./defs-assembler.js";
 import { definitionForUseElement, setUseHref, syncUseSymbolHrefs } from "./symbol-service.js";
 import { createProjectMigrator } from "./project-migrate.js";
+import { SETTINGS_DEFAULT, applySettingsForm } from "./project-settings.js";
 import { createNetlistRouting } from "./netlist-routing.js";
 import { createSelectionModel, paintVisible } from "./selection-model.js";
 import { createStageLayers } from "./stage-layers.js";
@@ -4946,19 +4947,6 @@ function todayStr() {
   const p = (n) => ("0" + n).slice(-2);
   return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
 }
-const SETTINGS_DEFAULT = {
-  orient: "landscape",
-  doc: "",
-  serial: "",
-  maker: "",
-  version: "1.0",
-  sheet: "",
-  norm: "",
-  date: "",
-  library: "",
-  /** SSOT połączeń: { [sheetKey]: ConnectionJson[] } */
-  sheetConnections: {},
-};
 let settingsCfg = Object.assign({}, SETTINGS_DEFAULT);
 async function loadSettings() {
   let s = null;
@@ -5000,16 +4988,16 @@ function closeSettings() {
 document.getElementById("btnSettings").onclick = openSettings;
 document.getElementById("setCancel").onclick = closeSettings;
 document.getElementById("setSave").onclick = () => {
-  settingsCfg = {
+  applySettingsForm(settingsCfg, {
     orient: document.getElementById("setOrient").value,
-    doc: document.getElementById("setDoc").value.trim(),
-    serial: document.getElementById("setSerial").value.trim(),
-    maker: document.getElementById("setMaker").value.trim(),
-    version: document.getElementById("setVersion").value.trim(),
-    sheet: document.getElementById("setSheet").value.trim(),
-    norm: document.getElementById("setNorm").value.trim(),
-    date: document.getElementById("setDate").value.trim() || todayStr(),
-  };
+    doc: document.getElementById("setDoc").value,
+    serial: document.getElementById("setSerial").value,
+    maker: document.getElementById("setMaker").value,
+    version: document.getElementById("setVersion").value,
+    sheet: document.getElementById("setSheet").value,
+    norm: document.getElementById("setNorm").value,
+    date: document.getElementById("setDate").value,
+  });
   saveSettingsCfg();
   closeSettings();
   if (state.dir) {
