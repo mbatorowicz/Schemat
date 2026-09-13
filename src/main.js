@@ -5109,10 +5109,7 @@ async function refreshGrantButton() {
       labelEl: document.getElementById("saveBadgeLabel"),
     });
   }
-  const view = await savePermBadge.sync();
-  if (!view.kind || view.kind !== "perm") {
-    if (state.dir && !(await needsPerm(state.dir))) await relinkHandles(state.dir);
-  }
+  await savePermBadge.sync();
 }
 function showGrantIfNeeded() {
   return refreshGrantButton();

@@ -157,13 +157,40 @@ describe("relinkLibraryHandles", () => {
     const out = await relinkLibraryHandles("dir", "lib.svg", {
       resolveShared: async () => null,
       getByPath: async () => {
-        throw new Error("missing");
+        throw new Error("disk broken");
       },
       setStatus,
     });
     expect(out).toEqual({});
     expect(warn).toHaveBeenCalled();
     expect(setStatus).toHaveBeenCalledWith(status.relinkLibraryFailed, WARN_TOAST);
+  });
+
+  it("nie tostuje legalnego ../lib ani NotFound", async () => {
+    const getByPath = vi.fn(async () => {
+      throw new Error("path escapes project");
+    });
+    const setStatus = vi.fn();
+    const viaParent = await relinkLibraryHandles("dir", "../lib/E-00_symbole.svg", {
+      resolveShared: async () => null,
+      getByPath,
+      setStatus,
+    });
+    expect(viaParent).toEqual({});
+    expect(getByPath).not.toHaveBeenCalled();
+    expect(setStatus).not.toHaveBeenCalled();
+
+    const missing = new Error("nope");
+    missing.name = "NotFoundError";
+    const viaLocal = await relinkLibraryHandles("dir", "E-00_symbole.svg", {
+      resolveShared: async () => null,
+      getByPath: async () => {
+        throw missing;
+      },
+      setStatus,
+    });
+    expect(viaLocal).toEqual({});
+    expect(setStatus).not.toHaveBeenCalled();
   });
 });
 
@@ -179,5 +206,10 @@ describe("main.js — persistCache / relinkHandles", () => {
     );
     expect(persist).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/);
     expect(relink).not.toMatch(/catch\s*\([^)]*\)\s*\{\s*\}/);
+    const refresh = main.slice(
+      main.indexOf("async function refreshGrantButton"),
+      main.indexOf("function showGrantIfNeeded")
+    );
+    expect(refresh).not.toContain("relinkHandles");
   });
 });

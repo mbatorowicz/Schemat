@@ -1,10 +1,26 @@
-import { getFileHandleByPath, resolveSharedLibrary } from "./project-files.js";
+import { getFileHandleByPath, normalizeRelPath, resolveSharedLibrary } from "./project-files.js";
 import { reportRecoverableError } from "./recoverable-error.js";
 import { status } from "./ui-wording.js";
 
+function pathHasParentSegment(relPath) {
+  return normalizeRelPath(relPath)
+    .split("/")
+    .some((p) => p === ".." || p === ".");
+}
+
+function isExpectedHandleMiss(err) {
+  const name = err?.name || "";
+  const msg = String(err?.message || "");
+  return (
+    name === "NotFoundError" ||
+    name === "NotAllowedError" ||
+    /path escapes|empty path/i.test(msg)
+  );
+}
+
 /**
  * Ponowne powiązanie biblioteki po F5 / przywróceniu grantu.
- * Błąd wyszukania albo ścieżki z settings: console.warn + toast, potem fallback.
+ * `../lib` tylko przez resolveSharedLibrary. Brak pliku = cisza (zostaje cache / idb).
  */
 export async function relinkLibraryHandles(
   dir,
@@ -17,11 +33,12 @@ export async function relinkLibraryHandles(
   } catch (e) {
     reportRecoverableError(e, status.relinkSharedLibraryFailed, setStatus);
   }
-  if (libraryPath) {
+  if (libraryPath && !pathHasParentSegment(libraryPath)) {
     try {
       const handle = await getByPath(dir, libraryPath);
       if (handle) return { handle };
     } catch (e) {
+      if (isExpectedHandleMiss(e)) return {};
       reportRecoverableError(e, status.relinkLibraryFailed, setStatus);
     }
   }
