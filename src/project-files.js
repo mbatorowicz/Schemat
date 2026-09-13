@@ -84,6 +84,7 @@ export async function walkDir(dir, opts = {}) {
 export async function getFileHandleByPath(rootDir, relPath, create = false) {
   const parts = normalizeRelPath(relPath).split("/").filter(Boolean);
   if (!parts.length) throw new Error("empty path");
+  if (parts.some((p) => p === ".." || p === ".")) throw new Error("path escapes project");
   let dir = rootDir;
   for (let i = 0; i < parts.length - 1; i++) {
     dir = await dir.getDirectoryHandle(parts[i]);
@@ -102,8 +103,20 @@ export async function relinkExistingFileHandle(dir, relPath, name, getByPath = g
   return null;
 }
 
+/** Jedyny legalny `..`: jeden poziom w górę i tylko plik biblioteki (lib/E-00…). */
+export function isAllowedLibraryParentPath(relPath) {
+  const parts = normalizeRelPath(relPath).split("/").filter(Boolean);
+  if (parts[0] !== ".." || parts.includes(".")) return false;
+  if (parts.slice(1).some((p) => p === "..")) return false;
+  const rest = parts.slice(1);
+  if (rest.length === 2 && rest[0] === LIBRARY_DIR && rest[1]) return true;
+  if (rest.length === 1 && LIBRARY_FILE_NAMES.includes(rest[0])) return true;
+  return false;
+}
+
 /**
- * Rozwiązuje ścieżkę względną (w tym ../) względem folderu projektu przez getParent().
+ * Rozwiązuje ścieżkę względną (w tym ../lib) względem folderu projektu przez getParent().
+ * Nie tworzy plików. `..` tylko dla wyszukania biblioteki.
  */
 export async function resolvePathViaParents(baseDir, relPath) {
   const norm = normalizeRelPath(relPath);
@@ -116,6 +129,7 @@ export async function resolvePathViaParents(baseDir, relPath) {
       return null;
     }
   }
+  if (!isAllowedLibraryParentPath(norm)) return null;
   const parts = norm.split("/").filter(Boolean);
   let dir = baseDir;
   const tail = [];

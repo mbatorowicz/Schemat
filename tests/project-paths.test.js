@@ -5,7 +5,12 @@ import {
   existingLibrarySvgNames,
   sheetRelPathSet,
 } from "../src/project-paths.js";
-import { relinkExistingFileHandle } from "../src/project-files.js";
+import {
+  getFileHandleByPath,
+  isAllowedLibraryParentPath,
+  relinkExistingFileHandle,
+  resolvePathViaParents,
+} from "../src/project-files.js";
 
 describe("project-paths", () => {
   it("defaultLibraryRelPath — plik w katalogu projektu", () => {
@@ -55,5 +60,47 @@ describe("relinkExistingFileHandle", () => {
     expect(await relinkExistingFileHandle(dir, "Ghost.svg", "Ghost.svg", getByPath)).toBe(null);
     expect(await relinkExistingFileHandle(dir, "", "Ghost.svg")).toBe(null);
     expect(dir.getFileHandle).toHaveBeenCalledWith("Ghost.svg");
+  });
+});
+
+describe("getFileHandleByPath — granice grantu", () => {
+  it("rzuca przy ../x i nie woła handle", async () => {
+    const dir = {
+      getDirectoryHandle: vi.fn(),
+      getFileHandle: vi.fn(),
+    };
+    await expect(getFileHandleByPath(dir, "../x")).rejects.toThrow(/escapes/);
+    await expect(getFileHandleByPath(dir, "foo/./bar.svg")).rejects.toThrow(/escapes/);
+    expect(dir.getFileHandle).not.toHaveBeenCalled();
+    expect(dir.getDirectoryHandle).not.toHaveBeenCalled();
+  });
+
+  it("przechodzi zwykłą ścieżkę w projekcie", async () => {
+    const file = { name: "A.svg" };
+    const sub = { getFileHandle: vi.fn(async () => file) };
+    const dir = { getDirectoryHandle: vi.fn(async () => sub) };
+    await expect(getFileHandleByPath(dir, "arkusze/A.svg")).resolves.toBe(file);
+  });
+});
+
+describe("resolvePathViaParents", () => {
+  it("pozwala tylko na ../lib biblioteki i nie tworzy pliku", async () => {
+    expect(isAllowedLibraryParentPath("../lib/E-00_symbole.svg")).toBe(true);
+    expect(isAllowedLibraryParentPath("../lib/symbole.svg")).toBe(true);
+    expect(isAllowedLibraryParentPath("../secret.txt")).toBe(false);
+    const file = { name: "E-00_symbole.svg" };
+    const libDir = {
+      getFileHandle: vi.fn(async (n, opts) => {
+        expect(opts).toBeUndefined();
+        return file;
+      }),
+    };
+    const parent = { getDirectoryHandle: vi.fn(async () => libDir) };
+    const dir = { getParent: vi.fn(async () => parent) };
+    const r = await resolvePathViaParents(dir, "../lib/E-00_symbole.svg");
+    expect(r.handle).toBe(file);
+    expect(parent.getDirectoryHandle).toHaveBeenCalledWith("lib");
+    expect(await resolvePathViaParents(dir, "../secret.txt")).toBe(null);
+    expect(dir.getParent).toHaveBeenCalledTimes(1);
   });
 });
