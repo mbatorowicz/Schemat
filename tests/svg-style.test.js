@@ -5,6 +5,7 @@ import {
   EDITOR_STYLE_SCOPE,
   finalizeSvgStyleText,
   isSafeSvgStyleSelector,
+  migrateSvgDocumentStyle,
   sanitizeSvgStyleText,
 } from "../src/svg-style.js";
 import { parseSvg } from "../src/svg-utils.js";
@@ -146,6 +147,30 @@ describe("parseSvg odtwarza styl dokumentu", () => {
       `<svg xmlns="http://www.w3.org/2000/svg"><defs><style>body{display:none}</style></defs><rect class="fr"/><path class="sym"/></svg>`
     );
     const css = p.svg.querySelector("style").textContent;
+    expect(css).toContain(".sym{");
+    expect(css).toContain(".fr{");
+  });
+});
+
+describe("migrateSvgDocumentStyle", () => {
+  it("zdejmuje svg .klasa i uzupełnia .fr", () => {
+    const svg = document.createElementNS(SVGNS, "svg");
+    const defs = document.createElementNS(SVGNS, "defs");
+    const style = document.createElementNS(SVGNS, "style");
+    style.textContent = "svg .sym{stroke:#111}";
+    defs.appendChild(style);
+    svg.appendChild(defs);
+    expect(migrateSvgDocumentStyle(svg, SVGNS)).toBe(true);
+    expect(style.textContent).toContain(".sym{");
+    expect(style.textContent).not.toMatch(/svg\s+\.sym/);
+    expect(style.textContent).toContain(".fr{");
+    expect(migrateSvgDocumentStyle(svg, SVGNS)).toBe(false);
+  });
+
+  it("tworzy style gdy go nie ma", () => {
+    const svg = document.createElementNS(SVGNS, "svg");
+    expect(migrateSvgDocumentStyle(svg, SVGNS)).toBe(true);
+    const css = svg.querySelector("defs style").textContent;
     expect(css).toContain(".sym{");
     expect(css).toContain(".fr{");
   });

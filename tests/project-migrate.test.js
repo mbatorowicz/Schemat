@@ -58,3 +58,45 @@ describe("migrateLibrarySymbolNames", () => {
     expect(sym.getAttribute("data-inst-prefix")).toBe("B");
   });
 });
+
+describe("migrateProject — stare style SVG", () => {
+  it("przerabia svg .sym w bibliotece i arkuszu, zapala dirty", () => {
+    const libSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const libDefs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const libStyle = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    libStyle.textContent = "svg .sym{stroke:#111}";
+    libDefs.appendChild(libStyle);
+    libSvg.appendChild(libDefs);
+
+    const sheetSvg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    const sheetDefs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+    const sheetStyle = document.createElementNS("http://www.w3.org/2000/svg", "style");
+    sheetStyle.textContent = "svg .fr{fill:none}";
+    sheetDefs.appendChild(sheetStyle);
+    sheetSvg.appendChild(sheetDefs);
+
+    const lib = { svg: libSvg, dirty: false };
+    const sheet = { svg: sheetSvg, dirty: false, id: "sch-1" };
+    const state = { lib, sheets: [sheet] };
+    const { migrateProject } = createProjectMigrator({
+      state,
+      SVGNS: "http://www.w3.org/2000/svg",
+      XLINK: "http://www.w3.org/1999/xlink",
+      normalizeLibLayout: () => {},
+      stripSymPrefixInSvg: () => false,
+      rewriteSymbolIdRefs: () => {},
+      migrateConnModel: () => false,
+      buildSymbolList: () => {},
+      flushLibrary: () => {},
+      markDirty: () => {},
+    });
+
+    expect(migrateProject()).toBe(true);
+    expect(libStyle.textContent).toContain(".sym{");
+    expect(libStyle.textContent).not.toMatch(/svg\s+\.sym/);
+    expect(sheetStyle.textContent).toContain(".fr{");
+    expect(sheetStyle.textContent).not.toMatch(/svg\s+\.fr/);
+    expect(lib.dirty).toBe(true);
+    expect(sheet.dirty).toBe(true);
+  });
+});

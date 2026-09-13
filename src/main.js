@@ -1494,6 +1494,7 @@ function importLoose(text, name) {
       render();
     }
   }
+  migrateProjectSymbolNames();
   setStatus(status.importedLoose(name));
   saveProject();
 }

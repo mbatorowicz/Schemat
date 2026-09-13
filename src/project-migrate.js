@@ -8,6 +8,10 @@ import { qsById } from "./dom-selectors.js";
 import { migrateSheetDisplayTitle } from "./sheet-catalog.js";
 import { inferSymbolDisplayName } from "./symbol-display.js";
 import { SYMBOL_NAME_ATTR, symbolDisplayName } from "./symbol-save.js";
+import { migrateSvgDocumentStyle } from "./svg-style.js";
+import { markLibDirty } from "./project-dirty.js";
+import { markSheetDirty } from "./sheet-persistence.js";
+
 export function createProjectMigrator(deps) {
   const {
     state,
@@ -139,6 +143,21 @@ export function createProjectMigrator(deps) {
     return changed;
   }
 
+  function migrateDocumentStyles() {
+    let changed = false;
+    if (state.lib?.svg && migrateSvgDocumentStyle(state.lib.svg, SVGNS)) {
+      markLibDirty(state.lib);
+      changed = true;
+    }
+    (state.sheets || []).forEach((sh) => {
+      if (sh.svg && migrateSvgDocumentStyle(sh.svg, SVGNS)) {
+        markSheetDirty(sh);
+        changed = true;
+      }
+    });
+    return changed;
+  }
+
   function migrateLibraryDisplayNames() {
     if (!state.lib?.svg) return false;
     let changed = false;
@@ -170,6 +189,7 @@ export function createProjectMigrator(deps) {
     if (migrateSheetEmbeddedSymbolIds()) changed = true;
     if (stripDuplicateEmbeddedSymbols()) changed = true;
     if (migrateInstanceRefs()) changed = true;
+    if (migrateDocumentStyles()) changed = true;
     if (migrateConnModel()) changed = true;
     if (changed) {
       buildSymbolList();

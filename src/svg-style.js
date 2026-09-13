@@ -210,6 +210,38 @@ export function finalizeSvgStyleText(css, opts = {}) {
   return [cleaned, extra].filter(Boolean).join("\n");
 }
 
+/**
+ * Idempotentna migracja <style> w dokumencie SVG (lib / arkusz).
+ * Stary zapis `svg .sym` → `.sym`; brakujące klasy edytora wracają.
+ */
+export function migrateSvgDocumentStyle(svg, svgNs) {
+  if (!svg) return false;
+  const ns = svgNs || svg.namespaceURI;
+  const doc = svg.ownerDocument;
+  if (!doc) return false;
+  let defs = svg.querySelector("defs");
+  if (!defs) {
+    defs = doc.createElementNS(ns, "defs");
+    svg.insertBefore(defs, svg.firstChild);
+  }
+  const styles = [...svg.querySelectorAll("style")];
+  if (!styles.length) {
+    const style = doc.createElementNS(ns, "style");
+    defs.insertBefore(style, defs.firstChild);
+    styles.push(style);
+  }
+  let changed = false;
+  for (const style of styles) {
+    const prev = style.textContent || "";
+    const next = finalizeSvgStyleText(prev);
+    if (next !== prev) {
+      style.textContent = next;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 /** Stroke/fill klas symboli jako var(--object-stroke) — jak dawniej w useColorAwareClone. */
 export function applyColorAwareCss(css) {
   return String(css || "")
