@@ -68,7 +68,8 @@ export function createNetlistUi(deps) {
     return state.lastSheet && state.sheets.includes(state.lastSheet) ? state.lastSheet : state.sheets[0] || null;
   }
 
-  function persistNow() {
+  /** Sync + cache + (na razie) JSON na dysk — dawniej persistNow. */
+  function commitNetlist() {
     const state = getState();
     const sheet = targetSheet();
     const settingsCfg = getSettingsCfg();
@@ -503,7 +504,7 @@ export function createNetlistUi(deps) {
     };
 
     document.getElementById("netlistEditorClose")?.addEventListener("click", () => {
-      persistNow();
+      commitNetlist();
       editorModal.close();
       refreshNetlistUI();
     });
@@ -524,7 +525,7 @@ export function createNetlistUi(deps) {
       state.selectedConnId = id;
       fillEditorForm(rec);
       fillEditorTable();
-      persistNow();
+      commitNetlist();
       refreshNetlistUI();
     });
     document.getElementById("neSaveRow")?.addEventListener("click", () => {
@@ -542,7 +543,7 @@ export function createNetlistUi(deps) {
       state.selectedConnId = rec.id;
       patchWireFromRecord(rec);
       fillEditorTable();
-      persistNow();
+      commitNetlist();
       refreshNetlistUI();
       setStatus("Zapisano połączenie " + rec.id + ".", { toast: true, tone: "success" });
     });
@@ -555,7 +556,7 @@ export function createNetlistUi(deps) {
       state.selectedConnId = "";
       fillEditorForm(null);
       fillEditorTable();
-      persistNow();
+      commitNetlist();
       refreshNetlistUI();
     });
     document.getElementById("neExportMd")?.addEventListener("click", () => {
@@ -604,6 +605,6 @@ export function createNetlistUi(deps) {
     sheetBasename,
     promptPromoteFields,
     selectConnectionFromElement,
-    persistNow,
+    commitNetlist,
   };
 }

@@ -5024,7 +5024,7 @@ let _cacheScoreFloor = 0,
 function markDirty() {
   if (_noSave) return;
   clearTimeout(_docT);
-  _docT = setTimeout(persistNow, 700);
+  _docT = setTimeout(persistCache, 700);
 }
 function projectSnapshot() {
   return {
@@ -5048,7 +5048,8 @@ function libSnapshot() {
   if (!state.lib?.svg) return null;
   return { name: state.lib.name, text: serializeSvg(state.lib.svg), savedAt: Date.now() };
 }
-function persistNow() {
+/** LS + IDB — dawniej persistNow. Nie zapisuje na dysk. */
+function persistCache() {
   if (_noSave) return;
   try {
     const snap = projectSnapshot();
@@ -5076,15 +5077,16 @@ function persistNow() {
   }
 }
 function flushDoc() {
-  persistNow();
+  persistCache();
 }
 function flushLibrary() {
-  persistNow();
+  persistCache();
 }
+/** Cache (LS+IDB), nie dysk — alias → persistCache. */
 function saveProject() {
   if (_noSave) return;
   clearTimeout(_docT);
-  persistNow();
+  persistCache();
 }
 function sheetsFromProjectSnapshot(proj) {
   if (!proj?.sheets?.length) return [];
@@ -5231,12 +5233,12 @@ async function loadPrefs() {
 window.addEventListener("pagehide", () => {
   clearTimeout(_prefsT);
   writePrefsNow();
-  persistNow();
+  persistCache();
 });
 window.addEventListener("beforeunload", (e) => {
   clearTimeout(_prefsT);
   writePrefsNow();
-  persistNow();
+  persistCache();
   if (countDirtySheets(state.sheets)) {
     e.preventDefault();
     e.returnValue = "";
@@ -5246,7 +5248,7 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "hidden") {
     clearTimeout(_prefsT);
     writePrefsNow();
-    persistNow();
+    persistCache();
   }
 });
 window.addEventListener("keydown", (e) => {
@@ -5650,7 +5652,7 @@ try {
     });
     setStatus(bootUi.message, { toast: bootUi.toast, tone: bootUi.tone });
     _noSave = false;
-    persistNow();
+    persistCache();
     savePrefs();
     await refreshGrantButton();
     if (state.netlist && typeof refreshNetlistUI === "function") refreshNetlistUI();
