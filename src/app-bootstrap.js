@@ -31,6 +31,7 @@ export function bootstrapEditorSync(ctx) {
     drawGrid,
     wireNetlistRouting,
     wireSelectionModel,
+    wireDrawMode,
     syncSelectionToolbar,
     syncToolbarContext,
     refreshNetlistUI,
@@ -48,6 +49,7 @@ export function bootstrapEditorSync(ctx) {
   wireRenderPipeline();
   initEditorScene(scene, { applyView, drawGrid });
   wireSceneDependentModules({ wireNetlistRouting, wireSelectionModel });
+  if (typeof wireDrawMode === "function") wireDrawMode();
   if (routeConnButton && ctx.getRouteSelectedConnection) {
     routeConnButton.onclick = () => {
       const fn = ctx.getRouteSelectedConnection();

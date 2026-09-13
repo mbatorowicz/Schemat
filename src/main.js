@@ -54,7 +54,6 @@ import {
   joinInstanceRef,
 } from "./instance-refs.js";
 import { createHistory } from "./history.js";
-import { resolveLibSymbol, resolveSheetSymbol, collectUsedSymbolIds } from "./symbol-resolver.js";
 import {
   markSheetDirty,
   countDirtySheets,
@@ -85,7 +84,14 @@ import {
 } from "./svg-dom.js";
 import { createRenderPipeline } from "./render-pipeline.js";
 import { useColorAwareClone, exportSymbolSvg } from "./defs-assembler.js";
-import { definitionForUseElement, setUseHref, syncUseSymbolHrefs } from "./symbol-service.js";
+import {
+  definitionForUseElement,
+  setUseHref,
+  syncUseSymbolHrefs,
+  resolveLibSymbol,
+  resolveSheetSymbol,
+  collectUsedSymbolIds,
+} from "./symbol-service.js";
 import { createProjectMigrator } from "./project-migrate.js";
 import { SETTINGS_DEFAULT, applySettingsForm } from "./project-settings.js";
 import { createNetlistRouting } from "./netlist-routing.js";
@@ -506,7 +512,6 @@ function wireNetlistRouting() {
   const live = createNetlistLiveValidator({ refreshNetlistUI, debounceMs: 180 });
   scheduleNetlistRefresh = live.scheduleRefresh;
   ui.wireNetlistDom();
-  wireDrawMode();
 }
 
 function wireDrawMode() {
@@ -5225,6 +5230,7 @@ try {
     drawGrid,
     wireNetlistRouting,
     wireSelectionModel,
+    wireDrawMode,
     syncSelectionToolbar,
     syncToolbarContext,
     refreshNetlistUI,

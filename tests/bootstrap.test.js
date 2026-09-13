@@ -83,4 +83,26 @@ describe("app-bootstrap", () => {
     btn.onclick();
     expect(toggle).toHaveBeenCalledOnce();
   });
+
+  it("wołuje wireDrawMode po wireNetlistRouting, nie w środku netlisty", () => {
+    const order = [];
+    bootstrapEditorSync({
+      injectIcons: () => {},
+      initConnMetaModal: () => {},
+      wireHistory: () => {},
+      wireConnModel: () => {},
+      wireProjectMigrate: () => {},
+      wireRenderPipeline: () => {},
+      scene: { build: () => {} },
+      applyView: () => {},
+      drawGrid: () => {},
+      wireNetlistRouting: () => order.push("netlist"),
+      wireSelectionModel: () => order.push("selection"),
+      wireDrawMode: () => order.push("draw"),
+      syncSelectionToolbar: () => {},
+      syncToolbarContext: () => {},
+      refreshNetlistUI: () => {},
+    });
+    expect(order).toEqual(["netlist", "selection", "draw"]);
+  });
 });
