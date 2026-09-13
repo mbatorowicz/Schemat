@@ -28,7 +28,7 @@ import {
 } from "./instance-labels.js";
 import { wireColor, wireCssRules } from "./wire-theme.js";
 import { NetlistModel } from "./netlist-model.js";
-import { wireConnId, isWireGeometry, findWireByConnId } from "./wire-geometry.js";
+import { isWireGeometry, findWireByConnId } from "./wire-geometry.js";
 import {
   clearWireConnHighlight,
   authoredStrokeWidth,
@@ -139,15 +139,8 @@ import {
   DEFAULT_WALK_DEPTH,
 } from "./project-paths.js";
 import { resolveToolbarGroups } from "./toolbar-context.js";
-import {
-  resolveSelectionPropsMode,
-  readSelectionPropsState,
-  selectionPropsFocusField,
-  selectionInstanceUse,
-  leadPropsFromConn,
-} from "./selection-props.js";
-import { selectionPropsEls } from "./selection-props-ui.js";
-import { applyConnectionFieldLabels, setConnectionPropsVisible } from "./connection-fields.js";
+import { resolveSelectionPropsMode, selectionInstanceUse, leadPropsFromConn } from "./selection-props.js";
+import { createSelectionPropsUi } from "./selection-props-ui.js";
 import {
   W,
   saveActionTip,
@@ -1750,136 +1743,6 @@ function fillSelPropSymOptions(symSel, currentId) {
   if (cur && [...symSel.options].some((o) => o.value === cur)) symSel.value = cur;
   else if (prev && [...symSel.options].some((o) => o.value === prev)) symSel.value = prev;
 }
-function syncSelectionProps(mode) {
-  const {
-    refInp,
-    numInp,
-    pinInp,
-    descInp,
-    desc2Inp,
-    textInp,
-    lenInp,
-    dirInp,
-    symSel,
-    netInp,
-    wireInp,
-    lengthInp,
-    notesInp,
-    refField,
-    numField,
-    pinField,
-    descField,
-    desc2Field,
-    textField,
-    lenField,
-    dirField,
-    symField,
-    netField,
-    wireField,
-    lengthField,
-    notesField,
-  } = selectionPropsEls();
-  const propsInputs = [
-    refInp,
-    numInp,
-    pinInp,
-    descInp,
-    desc2Inp,
-    textInp,
-    lenInp,
-    dirInp,
-    symSel,
-    netInp,
-    wireInp,
-    lengthInp,
-    notesInp,
-  ].filter(Boolean);
-  const editing = propsInputs.some((inp) => document.activeElement === inp);
-  if (!mode) {
-    if (!editing) {
-      if (refInp) refInp.value = "";
-      if (numInp) numInp.value = "";
-      if (pinInp) pinInp.value = "";
-      if (descInp) descInp.value = "";
-      if (desc2Inp) desc2Inp.value = "";
-      if (textInp) textInp.value = "";
-      if (lenInp) lenInp.value = "";
-      if (netInp) netInp.value = "";
-      if (wireInp) wireInp.value = "";
-      if (lengthInp) lengthInp.value = "";
-      if (notesInp) notesInp.value = "";
-    }
-    [refField, numField, pinField, descField, desc2Field, textField, lenField, dirField, symField].forEach((f) => {
-      if (f) f.classList.add("context-hidden");
-    });
-    setConnectionPropsVisible({ netField, wireField, lengthField, notesField }, false);
-    state._selPropTextEl = null;
-    return;
-  }
-  const useEl = mode === "use" ? selectionUseTarget() : null;
-  const el = mode === "use" ? useEl : state.selection.length === 1 ? state.selection[0] : null;
-  const labelEl = connLabelEl();
-  const refNow = useEl ? useEl.getAttribute("data-ref") || "" : "";
-  const descLbl = mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc") : null;
-  const desc2Lbl = mode === "use" && useEl?.parentNode ? instanceTextByLabel(useEl.parentNode, refNow, "desc2") : null;
-  const lead =
-    mode === "conn" && el && typeof isConnLead === "function" && isConnLead(el)
-      ? leadPropsFromConn(el, connParts(el), { num, fmt })
-      : null;
-  const st = readSelectionPropsState({
-    mode,
-    el,
-    connLabelEl: labelEl,
-    descText: descLbl ? descLbl.textContent || "" : useEl ? libDescForUse(useEl) : "",
-    desc2Text: desc2Lbl ? desc2Lbl.textContent || "" : useEl ? libDesc2ForUse(useEl) : "",
-    getHref: (node) => node.getAttribute("href") || node.getAttributeNS(XLINK, "href") || "",
-    lead,
-  });
-  if (!editing) {
-    if (mode === "use") {
-      if (refInp) refInp.value = st.prefix;
-      if (numInp) numInp.value = st.num;
-      if (descInp) descInp.value = st.desc;
-      if (desc2Inp) desc2Inp.value = st.desc2;
-    } else if (refInp) refInp.value = st.ref;
-    if (pinInp) pinInp.value = st.pin;
-    if (textInp) textInp.value = st.text;
-    if (lenInp) lenInp.value = st.len;
-    if (dirInp && st.dir) dirInp.value = st.dir;
-    if (mode === "wire") {
-      if (netInp) netInp.value = st.net;
-      if (wireInp) wireInp.value = st.wire;
-      if (lengthInp) lengthInp.value = st.length;
-      if (notesInp) notesInp.value = st.notes;
-    }
-    if (mode === "use") fillSelPropSymOptions(symSel, st.symId);
-  } else if (mode === "use" && symSel && !symSel.options.length) {
-    fillSelPropSymOptions(symSel, st.symId);
-  }
-  if (refField) refField.classList.toggle("context-hidden", mode !== "use" && mode !== "conn");
-  if (numField) numField.classList.toggle("context-hidden", mode !== "use");
-  if (pinField) pinField.classList.toggle("context-hidden", mode !== "conn");
-  if (lenField) lenField.classList.toggle("context-hidden", !(mode === "conn" && st.isLead));
-  if (dirField) dirField.classList.toggle("context-hidden", !(mode === "conn" && st.isLead));
-  if (descField) descField.classList.toggle("context-hidden", mode !== "use");
-  if (desc2Field) desc2Field.classList.toggle("context-hidden", mode !== "use");
-  if (textField) textField.classList.toggle("context-hidden", mode !== "text");
-  if (symField) symField.classList.toggle("context-hidden", mode !== "use");
-  setConnectionPropsVisible({ netField, wireField, lengthField, notesField }, mode === "wire");
-  if (mode === "text") state._selPropTextEl = selectionTextTarget();
-  else state._selPropTextEl = null;
-}
-function focusSelectionPropsField(mode, opts) {
-  const id = selectionPropsFocusField(mode, opts);
-  if (!id) return;
-  syncToolbarContext();
-  requestAnimationFrame(() => {
-    const inp = document.getElementById(id);
-    if (!inp) return;
-    inp.focus();
-    if (typeof inp.select === "function") inp.select();
-  });
-}
 async function promoteToLibrary(kind, value, useEl) {
   const symId = (
     useEl.getAttribute("data-sym") ||
@@ -1920,74 +1783,8 @@ async function promoteToLibrary(kind, value, useEl) {
   return true;
 }
 
-async function commitSelectionProps() {
-  const onSheet = !!(state.active && state.active !== state.lib);
-  const mode = resolveSelectionPropsMode({
-    onSheet,
-    selection: state.selection,
-    connLabelSel: state.connLabelSel,
-  });
-  if (!mode) return;
-  const {
-    refInp,
-    numInp,
-    pinInp,
-    descInp,
-    desc2Inp,
-    textInp,
-    lenInp,
-    dirInp,
-    symSel,
-    netInp,
-    wireInp,
-    lengthInp,
-    notesInp,
-  } = selectionPropsEls();
-
-  if (mode === "wire") {
-    const el = state.selection[0];
-    if (!el) return;
-    const connId = wireConnId(el);
-    const nextNet = ((netInp && netInp.value) || "").trim() || "—";
-    const nextWire = ((wireInp && wireInp.value) || "").trim();
-    const nextLength = ((lengthInp && lengthInp.value) || "").trim();
-    const nextNotes = ((notesInp && notesInp.value) || "").trim();
-    const prevNet = (el.getAttribute("data-net") || "").trim();
-    const prevWire = (el.getAttribute("data-wire") || "").trim();
-    const prevLength = (el.getAttribute("data-length") || "").trim();
-    const prevNotes = (el.getAttribute("data-notes") || "").trim();
-    if (nextNet === (prevNet || "—") && nextWire === prevWire && nextLength === prevLength && nextNotes === prevNotes) {
-      return;
-    }
-    pushUndo();
-    const existing = state.netlist?.connections?.find((c) => c.id === connId);
-    const record = NetlistModel.normalizeConnection({
-      ...(existing || { id: connId, from: el.getAttribute("data-from"), to: el.getAttribute("data-to") }),
-      net: nextNet,
-      wire: nextWire || existing?.wire || "do ustalenia",
-      length: nextLength,
-      notes: nextNotes,
-    });
-    applyConnectionRecord(record, {
-      el,
-      routeKind: el.getAttribute("data-route") || "manual",
-      strokeWidth: state.routeOpts?.strokeWidth || "",
-      persist: true,
-      upsert: !!existing || !!connId,
-    });
-    markActiveDirty();
-    render();
-    buildElementList();
-    syncElementListSelection();
-    syncSelectionProps("wire");
-    if (typeof refreshNetlistUI === "function") refreshNetlistUI();
-    setStatus("Zaktualizowano opis połączenia" + (connId ? " " + connId : "") + ".", {
-      toast: true,
-      tone: "success",
-    });
-    saveProject();
-    return;
-  }
+async function commitNonWire(mode, els) {
+  const { refInp, numInp, pinInp, descInp, desc2Inp, textInp, lenInp, dirInp, symSel } = els || {};
 
   if (mode === "text") {
     const textEl = selectionTextTarget();
@@ -2232,87 +2029,36 @@ async function commitSelectionProps() {
   setStatus(status.connMeta(ref, pin));
   saveProject();
 }
-function initSelectionPropsForm() {
-  applyConnectionFieldLabels(document);
-  const {
-    refInp,
-    numInp,
-    pinInp,
-    descInp,
-    desc2Inp,
-    textInp,
-    lenInp,
-    dirInp,
-    symSel,
-    netInp,
-    wireInp,
-    lengthInp,
-    notesInp,
-  } = selectionPropsEls();
-  const wireCommit = (inp) => {
-    if (!inp) return;
-    inp.addEventListener("focus", () => {
-      if (inp === textInp) {
-        const el = selectionTextTarget();
-        state._selPropTextEl = el;
-        state._selPropOrig = el ? el.textContent : "";
-        if (el && !state._selPropUndoPushed) {
-          pushUndo();
-          state._selPropUndoPushed = true;
-        }
-      } else {
-        state._selPropOrig = inp.value;
-      }
-    });
-    inp.addEventListener("keydown", (e) => {
-      e.stopPropagation();
-      if (e.key === "Enter") {
-        e.preventDefault();
-        commitSelectionProps();
-        inp.blur();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        if (inp === textInp && state._selPropTextEl && state._selPropOrig != null) {
-          state._selPropTextEl.textContent = state._selPropOrig;
-          if (isConnLabelMode()) state.connLabelSel.setAttribute("data-pin", state._selPropOrig);
-          inp.value = state._selPropOrig;
-          render();
-        } else if (state._selPropOrig != null) {
-          inp.value = state._selPropOrig;
-        }
-        state._selPropUndoPushed = false;
-        inp.blur();
-      }
-    });
-    if (inp === textInp) {
-      inp.addEventListener("input", () => {
-        const el = state._selPropTextEl || selectionTextTarget();
-        if (!el) return;
-        el.textContent = inp.value;
-        if (isConnLabelMode()) state.connLabelSel.setAttribute("data-pin", inp.value);
-        updateHostOnly();
-        highlightActive();
-        markActiveDirty();
-      });
-    }
-    inp.addEventListener("change", () => {
-      commitSelectionProps();
-    });
-  };
-  wireCommit(refInp);
-  wireCommit(numInp);
-  wireCommit(pinInp);
-  wireCommit(descInp);
-  wireCommit(desc2Inp);
-  wireCommit(textInp);
-  wireCommit(lenInp);
-  wireCommit(dirInp);
-  wireCommit(symSel);
-  wireCommit(netInp);
-  wireCommit(wireInp);
-  wireCommit(lengthInp);
-  wireCommit(notesInp);
-}
+
+const { syncSelectionProps, focusSelectionPropsField, initSelectionPropsForm } = createSelectionPropsUi({
+  state,
+  XLINK,
+  num,
+  fmt,
+  pushUndo: () => pushUndo(),
+  render: () => render(),
+  markActiveDirty: () => markActiveDirty(),
+  buildElementList: () => buildElementList(),
+  syncElementListSelection: () => syncElementListSelection(),
+  refreshNetlistUI: () => refreshNetlistUI(),
+  saveProject: () => saveProject(),
+  setStatus,
+  applyConnectionRecord: (...a) => applyConnectionRecord(...a),
+  syncToolbarContext,
+  selectionUseTarget,
+  selectionTextTarget,
+  connLabelEl,
+  isConnLabelMode,
+  updateHostOnly,
+  highlightActive,
+  instanceTextByLabel,
+  libDescForUse,
+  libDesc2ForUse,
+  fillSelPropSymOptions,
+  isConnLead: (...a) => isConnLead(...a),
+  connParts: (...a) => connParts(...a),
+  commitNonWire,
+});
 
 function initRouteOptsUi() {
   bindRouteOptsUi(state);
