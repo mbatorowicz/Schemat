@@ -370,18 +370,8 @@ export function createConnModel(ctx) {
   }
 
   async function promptConnMeta(node) {
-    if (askConnMeta) return askConnMeta(node);
-    let ref = "";
-    let pin = "";
-    if (isSchematicSheet(node)) {
-      ref = (prompt("Oznaczenie listwy/elementu:", lastConnRefOnSheet(node)) || "").trim().replace(/^-/, "");
-      if (!ref) return null;
-      pin = (prompt("Numer przyłącza (pin):", nextConnPinOnSheet(node, ref)) || "").trim();
-    } else {
-      pin = (prompt("Numer przyłącza (pin):", "1") || "").trim();
-    }
-    if (!pin) return null;
-    return { ref, pin };
+    if (typeof askConnMeta !== "function") return null;
+    return askConnMeta(node);
   }
 
   function mkConn({ kind, ix, iy, ox, oy, pin, ref }) {

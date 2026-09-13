@@ -296,10 +296,7 @@ export function createAskTextDialog(opts = {}) {
     const titleEl = document.getElementById("askTextDialogTitle");
     const labelEl = document.getElementById("askTextDialogLabel");
     const input = document.getElementById("askTextDialogInput");
-    if (!bg || !input) {
-      const v = typeof window !== "undefined" ? window.prompt(title, cfg.defaultValue || "") : null;
-      return Promise.resolve(v);
-    }
+    if (!bg || !input) return Promise.resolve(null);
     if (titleEl) titleEl.textContent = title || "Wartość";
     if (labelEl) labelEl.textContent = cfg.label || title || "Wartość";
     input.value = cfg.defaultValue != null ? String(cfg.defaultValue) : "";

@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { createConnModel } from "../src/conn-model.js";
 
 function stubCtx() {
@@ -43,5 +43,22 @@ describe("conn-model", () => {
     const lead = stubCtx().mkEl("g", { "data-role": "conn", "data-kind": "lead" });
     expect(m.connKind(point)).toBe("point");
     expect(m.connKind(lead)).toBe("lead");
+  });
+
+  it("bez askConnMeta nie woła prompt i zwraca null", async () => {
+    const promptSpy = vi.fn();
+    vi.stubGlobal("prompt", promptSpy);
+    const m = createConnModel(stubCtx());
+    expect(await m.promptConnMeta({ id: "sch-1" })).toBe(null);
+    expect(promptSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it("z mockiem askConnMeta zwraca { ref, pin }", async () => {
+    const ctx = stubCtx();
+    ctx.askConnMeta = vi.fn(async () => ({ ref: "X1", pin: "2" }));
+    const m = createConnModel(ctx);
+    await expect(m.promptConnMeta({ id: "sch-1" })).resolves.toEqual({ ref: "X1", pin: "2" });
+    expect(ctx.askConnMeta).toHaveBeenCalled();
   });
 });
