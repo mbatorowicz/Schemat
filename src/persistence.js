@@ -59,16 +59,19 @@ export function pickJsonCache(fromLs, fromIdb, scoreFn = projectCacheScore) {
 
 export function writeJsonCache(idbKey, lsKey, value) {
   const json = JSON.stringify(value);
+  let ok = true;
   try {
     localStorage.setItem(lsKey, json);
   } catch {
+    ok = false;
     try {
       localStorage.removeItem(lsKey);
     } catch {
       /* ignore */
     }
   }
-  return idbSet(idbKey, value).catch(() => {});
+  idbSet(idbKey, value).catch(() => {});
+  return ok ? { ok: true } : { ok: false, reason: "quota" };
 }
 
 export async function restoreLibrarySnapshot() {
@@ -89,7 +92,7 @@ export async function restoreSettingsSnapshot() {
 
 /** Usuwa cache edytora (gdy pliki na dysku są źródłem prawdy). */
 export async function clearEditorCache() {
-  const keys = ["libDoc", "project", "prefs"];
+  const keys = ["libDoc", "project", "prefs", "settings"];
   for (const key of keys) {
     try {
       await idbSet(key, null);
@@ -100,6 +103,8 @@ export async function clearEditorCache() {
   try {
     localStorage.removeItem("edytor.lib");
     localStorage.removeItem("edytor.project");
+    localStorage.removeItem("edytor.prefs");
+    localStorage.removeItem("edytor.settings");
   } catch {
     /* ignore */
   }

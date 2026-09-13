@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import "fake-indexeddb/auto";
-import { describe, it, expect, beforeEach } from "vitest";
-import { pickJsonCache, readJsonCache, writeJsonCache, idbSet } from "../src/persistence.js";
-import { shouldWriteProjectCache, projectCacheScore } from "../src/boot-cache.js";
+import { afterEach, describe, it, expect, beforeEach, vi } from "vitest";
+import { pickJsonCache, readJsonCache, writeJsonCache, idbSet, clearEditorCache } from "../src/persistence.js";
+import { shouldWriteProjectCache } from "../src/boot-cache.js";
 
 describe("pickJsonCache", () => {
   it("preferuje pełniejszy snapshot nad pustym localStorage", () => {
@@ -48,5 +48,34 @@ describe("readJsonCache", () => {
     expect(shouldWriteProjectCache({ sheets: [{ id: "b", text: "yy" }] }, { sheets: [{ id: "a", text: "x" }] })).toBe(
       true
     );
+  });
+});
+
+describe("clearEditorCache / quota", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it("clear zostawia puste klucze settings/prefs", async () => {
+    localStorage.setItem("edytor.settings", '{"x":1}');
+    localStorage.setItem("edytor.prefs", '{"y":1}');
+    localStorage.setItem("edytor.project", "{}");
+    localStorage.setItem("edytor.lib", "{}");
+    await clearEditorCache();
+    expect(localStorage.getItem("edytor.settings")).toBeNull();
+    expect(localStorage.getItem("edytor.prefs")).toBeNull();
+    expect(localStorage.getItem("edytor.project")).toBeNull();
+    expect(localStorage.getItem("edytor.lib")).toBeNull();
+  });
+
+  it("write z pełnym mockiem quota → ok: false", () => {
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      const e = new Error("exceeded");
+      e.name = "QuotaExceededError";
+      throw e;
+    });
+    const res = writeJsonCache("project", "edytor.project", { sheets: [{ text: "x" }] });
+    expect(res).toEqual({ ok: false, reason: "quota" });
   });
 });

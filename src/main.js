@@ -5075,6 +5075,7 @@ function libSnapshot() {
 /** LS + IDB — dawniej persistNow. Nie zapisuje na dysk. */
 function persistCache() {
   if (_noSave) return;
+  let quotaFail = false;
   try {
     const snap = projectSnapshot();
     let existing = null;
@@ -5083,7 +5084,8 @@ function persistCache() {
       existing = raw ? JSON.parse(raw) : null;
     } catch (e) {}
     if (shouldWriteProjectCache(snap, existing, _cacheGenerationFloor)) {
-      writeJsonCache("project", "edytor.project", snap);
+      const w = writeJsonCache("project", "edytor.project", snap);
+      if (w && w.ok === false) quotaFail = true;
     }
   } catch (e) {}
   if (state.lib?.svg) {
@@ -5095,8 +5097,14 @@ function persistCache() {
         const raw = localStorage.getItem("edytor.lib");
         existing = raw ? JSON.parse(raw) : null;
       } catch (e) {}
-      if (shouldWriteLibraryCache(s, existing, _libCacheScoreFloor)) writeJsonCache("libDoc", "edytor.lib", s);
+      if (shouldWriteLibraryCache(s, existing, _libCacheScoreFloor)) {
+        const w = writeJsonCache("libDoc", "edytor.lib", s);
+        if (w && w.ok === false) quotaFail = true;
+      }
     }
+  }
+  if (quotaFail) {
+    setStatus("Nie zapisano kopii roboczej (brak miejsca w przeglądarce).", { toast: true, tone: "warning" });
   }
 }
 function flushDoc() {
