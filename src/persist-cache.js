@@ -46,7 +46,7 @@ export function persistEditorCache({
     }
   }
   if (quotaFail && typeof setStatus === "function") {
-    setStatus("Nie zapisano kopii roboczej (brak miejsca w przeglądarce).", QUOTA_TOAST);
+    setStatus(status.cacheQuota, QUOTA_TOAST);
   }
   return { quotaFail };
 }

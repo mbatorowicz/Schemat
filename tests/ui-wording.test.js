@@ -76,4 +76,34 @@ describe("ui-wording SSOT", () => {
     expect(status.importedLoose("a.svg")).toContain("a.svg");
     expect(status.projectOpenFailed("x")).toContain("x");
   });
+
+  it("zbiera statusy zapisu, quota i błędu bootu", () => {
+    const all = collectWordingStrings();
+    [status.saveNeedProject, status.saveNeedPerm, status.cacheQuota, status.savedProject()].forEach((s) =>
+      expect(all).toContain(s)
+    );
+    expect(status.savedLibrary("a.svg")).toBe("Zapisano bibliotekę a.svg");
+    expect(status.savedSheet("b.svg", status.missingSymbolsWarn(["X"]))).toContain("brak symboli X");
+    expect(status.savedAs("c.svg")).toContain("c.svg");
+    expect(status.downloaded("d.svg")).toBe("Pobrano d.svg.");
+    expect(status.savedProject({ savedLib: true, savedSheets: 2, settingsOk: true })).toBe(
+      "Zapisano projekt (biblioteka, 2 schematów, projekt.json)"
+    );
+    expect(status.savedProject({ savedSheets: 1 })).toBe("Zapisano projekt (1 schemat)");
+    expect(status.accessRestored(3, status.netlistCountSuffix(4))).toContain("3 schemat");
+    expect(status.initFailed("x")).toContain("x");
+    expect(status.loadFailed("y")).toContain("y");
+  });
+
+  it("zapis i boot nie składają setStatus z gołych stringów", () => {
+    const fileIo = readFileSync(join(root, "src/file-io.js"), "utf8");
+    const persist = readFileSync(join(root, "src/persist-cache.js"), "utf8");
+    const main = readFileSync(join(root, "src/main.js"), "utf8");
+    expect(fileIo).not.toMatch(/setStatus\(\s*["'`]/);
+    expect(persist).not.toMatch(/setStatus\(\s*["'`]/);
+    expect(main).toContain("status.accessRestored");
+    expect(main).toContain("status.initFailed");
+    expect(main).toContain("status.loadFailed");
+    expect(main).not.toContain("Przywrócono dostęp i zsynchronizowano");
+  });
 });

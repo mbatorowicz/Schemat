@@ -91,6 +91,16 @@ describe("persistEditorCache", () => {
     expect(setStatus).toHaveBeenCalledWith(status.cacheProjectFailed, WARN_TOAST);
   });
 
+  it("quota → toast z ui-wording", () => {
+    const setStatus = vi.fn();
+    persistEditorCache({
+      projectSnapshot: () => ({ generation: 1, sheets: [{ text: "x" }] }),
+      writeProjectCache: () => ({ ok: false, reason: "quota" }),
+      setStatus,
+    });
+    expect(setStatus).toHaveBeenCalledWith(status.cacheQuota, { toast: true, tone: "warning" });
+  });
+
   it("uszkodzony cache biblioteki: warn + toast", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const setStatus = vi.fn();

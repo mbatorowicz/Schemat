@@ -323,6 +323,43 @@ export const status = {
   cacheLibraryUnreadable: "Nie udało się odczytać kopii roboczej biblioteki.",
   relinkSharedLibraryFailed: "Nie udało się ponownie powiązać wspólnej biblioteki.",
   relinkLibraryFailed: "Nie udało się ponownie powiązać biblioteki.",
+  missingSymbolsWarn(ids) {
+    return ids?.length ? ` (ostrzeżenie: brak symboli ${ids.join(", ")})` : "";
+  },
+  savedLibrary(name, warn = "") {
+    return `Zapisano bibliotekę ${name}${warn}`;
+  },
+  savedSheet(name, warn = "") {
+    return `Zapisano schemat ${name}${warn}`;
+  },
+  savedAs(name, warn = "") {
+    return `Zapisano jako ${name}${warn}`;
+  },
+  downloaded(name) {
+    return `Pobrano ${name}.`;
+  },
+  saveNeedProject: "Otwórz projekt (folder), aby zapisać całość.",
+  saveNeedPerm: "Brak uprawnień zapisu do folderu projektu.",
+  savedProject({ savedLib = false, savedSheets = 0, settingsOk = false } = {}) {
+    const bits = [];
+    if (savedLib) bits.push("biblioteka");
+    if (savedSheets) bits.push(savedSheets + " schemat" + (savedSheets === 1 ? "" : "ów"));
+    if (settingsOk) bits.push("projekt.json");
+    return bits.length ? `Zapisano projekt (${bits.join(", ")})` : "Zapisano projekt (brak zmian do zapisu)";
+  },
+  cacheQuota: "Nie zapisano kopii roboczej (brak miejsca w przeglądarce).",
+  netlistCountSuffix(n) {
+    return ` Spis: ${n} połączeń.`;
+  },
+  accessRestored(count, netMsg = "") {
+    return `Przywrócono dostęp i zsynchronizowano ${count} schemat(ów) z dysku.${netMsg}`;
+  },
+  initFailed(err) {
+    return `Błąd inicjalizacji: ${err}`;
+  },
+  loadFailed(err) {
+    return `Błąd wczytywania: ${err}`;
+  },
 };
 
 export function emptyListCopy(kind) {
@@ -388,6 +425,10 @@ export function collectWordingStrings() {
     status.cacheLibraryUnreadable,
     status.relinkSharedLibraryFailed,
     status.relinkLibraryFailed,
+    status.saveNeedProject,
+    status.saveNeedPerm,
+    status.cacheQuota,
+    status.savedProject(),
     W.list.renameHint,
     W.list.renameAria,
   ];

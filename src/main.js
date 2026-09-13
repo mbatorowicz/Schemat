@@ -5084,9 +5084,9 @@ async function restoreFolderAccess() {
     any = true;
   }
   await refreshGrantButton();
-  const netMsg = state.netlist ? " Spis: " + state.netlist.connections.length + " połączeń." : "";
+  const netMsg = state.netlist ? status.netlistCountSuffix(state.netlist.connections.length) : "";
   if (reloaded)
-    setStatus("Przywrócono dostęp i zsynchronizowano " + reloaded + " schemat(ów) z dysku." + netMsg, {
+    setStatus(status.accessRestored(reloaded, netMsg), {
       toast: true,
       tone: "success",
     });
@@ -5198,7 +5198,7 @@ try {
   });
 } catch (e) {
   console.error("Błąd inicjalizacji edytora:", e);
-  setStatus("Błąd inicjalizacji: " + (e.message || e), { toast: true, tone: "danger" });
+  setStatus(status.initFailed(e.message || e), { toast: true, tone: "danger" });
 }
 (async function boot() {
   try {
@@ -5298,7 +5298,7 @@ try {
     if (state.netlist && typeof refreshNetlistUI === "function") refreshNetlistUI();
   } catch (e) {
     console.error("Błąd wczytywania projektu:", e);
-    setStatus("Błąd wczytywania: " + (e.message || e), { toast: true, tone: "danger" });
+    setStatus(status.loadFailed(e.message || e), { toast: true, tone: "danger" });
     _noSave = false;
     setBootLock(false);
   }

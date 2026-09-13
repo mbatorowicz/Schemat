@@ -3,6 +3,7 @@ import { clearSheetDirty } from "./sheet-persistence.js";
 import { clearLibDirty, clearSettingsDirty } from "./project-dirty.js";
 import { auditSymbolsOnSheet } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
+import { status } from "./ui-wording.js";
 
 /**
  * Zapis plików i uprawnienia File System Access API — wydzielone z main.js.
@@ -91,8 +92,8 @@ export function createFileIo(deps) {
         if (act === state.lib) clearLibDirty(act);
         else clearSheetDirty(act);
         if (typeof onDirtyChange === "function") onDirtyChange();
-        const warn = r?.missing?.length ? " (ostrzeżenie: brak symboli " + r.missing.join(", ") + ")" : "";
-        setStatus((act === state.lib ? "Zapisano bibliotekę " : "Zapisano schemat ") + act.name + warn, {
+        const warn = status.missingSymbolsWarn(r?.missing);
+        setStatus(act === state.lib ? status.savedLibrary(act.name, warn) : status.savedSheet(act.name, warn), {
           toast: true,
           tone: warn ? "warning" : "success",
         });
@@ -132,8 +133,8 @@ export function createFileIo(deps) {
         }
         buildSymbolList();
         syncListSelection();
-        const warn = r?.missing?.length ? " (ostrzeżenie: brak symboli " + r.missing.join(", ") + ")" : "";
-        setStatus("Zapisano jako " + h.name + warn);
+        const warn = status.missingSymbolsWarn(r?.missing);
+        setStatus(status.savedAs(h.name, warn));
         flushDoc();
         return;
       } catch (e) {
@@ -144,17 +145,17 @@ export function createFileIo(deps) {
     downloadSvg(text, act.name || "plik.svg");
     if (act === state.lib) clearLibDirty(act);
     else clearSheetDirty(act);
-    setStatus("Pobrano " + (act.name || "plik.svg") + ".");
+    setStatus(status.downloaded(act.name || "plik.svg"));
   }
 
   async function saveProjectToDisk() {
     const state = getState();
     if (!state.dir) {
-      setStatus("Otwórz projekt (folder), aby zapisać całość.");
+      setStatus(status.saveNeedProject);
       return false;
     }
     if (!(await ensurePerm(state.dir))) {
-      setStatus("Brak uprawnień zapisu do folderu projektu.");
+      setStatus(status.saveNeedPerm);
       return false;
     }
 
@@ -215,15 +216,8 @@ export function createFileIo(deps) {
     if (buildSymbolList) buildSymbolList();
     if (syncListSelection) syncListSelection();
 
-    let msg = "Zapisano projekt";
-    const bits = [];
-    if (savedLib) bits.push("biblioteka");
-    if (savedSheets) bits.push(savedSheets + " schemat" + (savedSheets === 1 ? "" : "ów"));
-    if (settingsOk) bits.push("projekt.json");
-    if (bits.length) msg += " (" + bits.join(", ") + ")";
-    else msg += " (brak zmian do zapisu)";
     if (typeof onDirtyChange === "function") onDirtyChange();
-    setStatus(msg, { toast: true, tone: "success" });
+    setStatus(status.savedProject({ savedLib, savedSheets, settingsOk }), { toast: true, tone: "success" });
     return true;
   }
 
