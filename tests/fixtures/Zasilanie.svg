@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1485 1050" width="1485" height="1050">
+  <g id="sch-1" data-sheet-title="Zasilanie">
+    <use href="#G1" data-sym="G1" x="120" y="160"/>
+    <use href="#F1" data-sym="F1" x="260" y="160"/>
+  </g>
+</svg>
