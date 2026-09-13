@@ -11,36 +11,16 @@ import {
 } from "./symbol-service.js";
 import { SVGNS, XLINK } from "./svg-constants.js";
 import { sanitizeSvgDom, serializeSvg, fmt as fmtDefault } from "./svg-utils.js";
+import { applyColorAwareCss, sanitizeSvgStyleText } from "./svg-style.js";
 
 /** Klon z CSS stroke/fill jako var(--object-stroke) dla edycji kolorów symboli. */
 export function useColorAwareClone(node) {
-  const clone = node.cloneNode(true);
-  if (clone.tagName && clone.tagName.toLowerCase() === "style") {
-    clone.textContent = (clone.textContent || "")
-      .replace(/stroke\s*:\s*([^;}\n]+)/g, (all, v) => {
-        const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0 ? all : "stroke:var(--object-stroke," + value + ")";
-      })
-      .replace(/(\.node\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
-        const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0
-          ? all
-          : prefix + "fill:var(--object-stroke," + value + ")";
-      })
-      .replace(/(\.pin\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
-        const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0
-          ? all
-          : prefix + "fill:var(--object-stroke," + value + ")";
-      })
-      .replace(/(\.did\s*\{[^}]*?)fill\s*:\s*([^;}\n]+)/g, (all, prefix, v) => {
-        const value = v.trim();
-        return value === "none" || value.indexOf("var(") >= 0
-          ? all
-          : prefix + "fill:var(--object-stroke," + value + ")";
-      });
+  if (node?.tagName && node.tagName.toLowerCase() === "style") {
+    const clone = document.createElementNS(node.namespaceURI || SVGNS, "style");
+    clone.textContent = applyColorAwareCss(sanitizeSvgStyleText(node.textContent || ""));
     return clone;
   }
+  const clone = node.cloneNode(true);
   [clone, ...clone.querySelectorAll("*")].forEach((n) => {
     const attr = n.getAttribute && n.getAttribute("stroke");
     if (attr && attr !== "none" && attr.indexOf("var(") < 0)

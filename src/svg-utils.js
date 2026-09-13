@@ -1,3 +1,5 @@
+import { sanitizeSvgStyleText } from "./svg-style.js";
+
 export function num(el, attr, def = 0) {
   const v = el && el.getAttribute ? el.getAttribute(attr) : null;
   return v === null || v === "" ? def : parseFloat(v);
@@ -107,6 +109,9 @@ export function sanitizeSvgDom(root) {
   if (root.hasAttribute("href")) neutralizeHref(root, "href");
   if (root.hasAttributeNS?.(XLINK_NS, "href") || root.hasAttribute("xlink:href")) {
     neutralizeHref(root, "href", XLINK_NS);
+  }
+  if (tag === "style") {
+    root.textContent = sanitizeSvgStyleText(root.textContent || "");
   }
   [...root.children].forEach((child) => sanitizeSvgDom(child));
   return root;

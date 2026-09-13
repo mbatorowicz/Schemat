@@ -17,6 +17,7 @@ import { libSymbolGroups } from "./symbol-resolver.js";
 import { sheetBasename as linkedSheetBasename } from "./project-files.js";
 import { SVGNS, XLINK } from "./svg-constants.js";
 import { fmt } from "./svg-utils.js";
+import { sanitizeSvgStyleText } from "./svg-style.js";
 
 export { syncSidebarEmptyStates } from "./sidebar-empty.js";
 export { emptyListCopy } from "./ui-wording.js";
@@ -332,8 +333,8 @@ export function createSidebarLists(deps) {
     };
     const style = state.lib && state.lib.svg && state.lib.svg.querySelector("defs style");
     if (style) {
-      const st = document.importNode(style, true);
-      st.textContent = rewrite(st.textContent);
+      const st = document.createElementNS(style.namespaceURI || SVGNS, "style");
+      st.textContent = rewrite(sanitizeSvgStyleText(style.textContent || ""));
       host.appendChild(st);
     }
     state.symbols.forEach((sym) => {
