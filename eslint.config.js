@@ -13,7 +13,7 @@ export default [
       },
     },
     rules: {
-      "no-unused-vars": "off",
+      "no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrors: "none" }],
       "no-empty": ["error", { allowEmptyCatch: true }],
       "no-useless-escape": "off",
     },

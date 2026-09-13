@@ -13,7 +13,7 @@ import { qsaByData } from "./dom-selectors.js";
 const CONN_CONTACT_DIRS = { N: [0, -1], E: [1, 0], S: [0, 1], W: [-1, 0] };
 
 export function createConnModel(ctx) {
-  const { state, num, fmt, mkEl, setPositionedElement, styleText, isSchematicSheet, askConnMeta } = ctx;
+  const { state, num, fmt, mkEl, setPositionedElement, styleText, askConnMeta } = ctx;
 
   function isConnGroup(el) {
     return !!el && el.tagName && el.tagName.toLowerCase() === "g" && el.getAttribute("data-role") === "conn";

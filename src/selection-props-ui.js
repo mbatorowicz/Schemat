@@ -70,7 +70,6 @@ export function createSelectionPropsUi(deps) {
     selectionTextTarget,
     connLabelEl,
     isConnLabelMode,
-    updateConnLabel,
     updateHostOnly,
     highlightActive,
     instanceTextByLabel,

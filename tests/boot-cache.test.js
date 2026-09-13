@@ -6,7 +6,6 @@ import {
   prefsSheetKey,
   shouldWriteProjectCache,
   projectCacheScore,
-  libraryCacheScore,
 } from "../src/boot-cache.js";
 
 describe("projectCacheScore", () => {

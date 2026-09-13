@@ -153,12 +153,6 @@ export function kindDisplay(kind) {
   return KIND_LABELS[kind] || kind;
 }
 
-function symId(el) {
-  const href =
-    el.getAttribute("href") || (el.getAttributeNS && el.getAttributeNS("http://www.w3.org/1999/xlink", "href")) || "";
-  return href.replace(/^#/, "");
-}
-
 function shortText(s, max = 28) {
   const t = (s || "").replace(/\s+/g, " ").trim();
   if (!t) return "";

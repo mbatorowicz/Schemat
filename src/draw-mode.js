@@ -64,7 +64,6 @@ export function createDrawMode(deps) {
     SVGNS,
     XLINK,
     num,
-    rotatePoint,
     definitionForUseElement,
     isConnGroup,
     pushConnContactCandidates,
@@ -77,20 +76,7 @@ export function createDrawMode(deps) {
     styleNode,
     applyConnectionRecord,
     prompt: promptFn = typeof window !== "undefined" ? window.prompt.bind(window) : () => null,
-    askText,
   } = deps;
-
-  async function askSignal(defaultNet) {
-    if (typeof askText === "function") {
-      const v = await askText("Sygnał połączenia", { defaultValue: defaultNet || "—", label: "Sygnał" });
-      return (v == null ? defaultNet : v) || "—";
-    }
-    if (typeof promptFn === "function") {
-      const v = promptFn("Sygnał połączenia:", defaultNet || "—");
-      return (v == null ? defaultNet : v) || "—";
-    }
-    return defaultNet || "—";
-  }
 
   function attachProposal(el, proposal) {
     const norm = NetlistModel.normalizeConnection(proposal);

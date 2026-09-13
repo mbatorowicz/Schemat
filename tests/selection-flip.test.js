@@ -37,7 +37,7 @@ describe("selection-flip", () => {
     g.append(use, conn, label, mark);
 
     const out = collectFlipTargets([use], g, {
-      expandToInstanceMembers: (_node, els) => [use, conn],
+      expandToInstanceMembers: (_node, _els) => [use, conn],
       instanceRefOf: (el) => el.getAttribute("data-ref") || el.getAttribute("data-owner-ref") || "",
       rotateOwnedLabels: true,
     });

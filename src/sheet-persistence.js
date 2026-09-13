@@ -1,6 +1,5 @@
 /** Ochrona arkuszy przed utratą danych przy przeładowaniu i zapisie. */
 import { canonicalSymbolId } from "./symbol-aliases.js";
-import { libSymbolGroups } from "./symbol-resolver.js";
 import { qsById } from "./dom-selectors.js";
 
 export function sheetKey(sheet) {

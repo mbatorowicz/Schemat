@@ -54,7 +54,7 @@ import {
   joinInstanceRef,
 } from "./instance-refs.js";
 import { createHistory } from "./history.js";
-import { resolveLibSymbol, resolveSheetSymbol, resolveSymbol, collectUsedSymbolIds } from "./symbol-resolver.js";
+import { resolveLibSymbol, resolveSheetSymbol, collectUsedSymbolIds } from "./symbol-resolver.js";
 import {
   markSheetDirty,
   countDirtySheets,
@@ -64,7 +64,6 @@ import {
 } from "./sheet-persistence.js";
 import { countDirtyAll, markActiveTargetDirty, markSettingsDirty } from "./project-dirty.js";
 import {
-  readFontSizePx,
   applyTextStyle,
   applyPrimaryColor,
   applyStrokeWidth,
@@ -151,8 +150,6 @@ import { selectionPropsEls } from "./selection-props-ui.js";
 import { applyConnectionFieldLabels, setConnectionPropsVisible } from "./connection-fields.js";
 import {
   W,
-  saveFileLabel,
-  saveFileTip,
   saveActionTip,
   resourceNameLabel,
   resourceNamePlaceholder,
@@ -427,22 +424,16 @@ let buildSymbolList = () => {},
   buildElementList = () => {},
   syncListSelection = () => {},
   syncElementListSelection = () => {};
-let validateSymbolConnections = () => [],
-  renderElementProps = () => {},
-  compareListText = (a, b) => String(a).localeCompare(String(b), "pl");
+let compareListText = (a, b) => String(a).localeCompare(String(b), "pl");
 let renameSelectedListItem = () => false;
 let startDraw = () => {},
-  startLineDraw = () => {},
   addDrawPoint = () => {},
   drawPreview = () => {};
 let finishShape = async () => {},
-  finishLineDraw = () => {},
   exitDraw = () => {},
-  applyObliqueStubToSelection = () => false,
-  jointCandidates = () => [],
   nearestJoint = () => null;
-let ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm, isSaving;
-let selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue;
+let ensurePerm, writeHandle, save, saveAs, hasPerm, isSaving;
+let selectedRecords, strokeRecords, fillRecords, textRecords, commonValue;
 
 function wireRenderPipeline() {
   const p = createRenderPipeline({
@@ -559,18 +550,7 @@ function wireDrawMode() {
     applyConnectionRecord: (...a) => applyConnectionRecord(...a),
     askText,
   });
-  ({
-    startDraw,
-    startLineDraw,
-    addDrawPoint,
-    drawPreview,
-    finishShape,
-    finishLineDraw,
-    exitDraw,
-    applyObliqueStubToSelection,
-    jointCandidates,
-    nearestJoint,
-  } = d);
+  ({ startDraw, addDrawPoint, drawPreview, finishShape, exitDraw, nearestJoint } = d);
 }
 
 function renameSheetTitleFromList(sh, title) {
@@ -637,8 +617,6 @@ function wireSidebarLists() {
     buildElementList,
     syncListSelection,
     syncElementListSelection,
-    validateSymbolConnections,
-    renderElementProps,
     compareListText,
     renameSelectedListItem,
   } = s);
@@ -672,7 +650,7 @@ function wireFileIo() {
       btn.disabled = !!on || !state.active?.svg;
     },
   });
-  ({ ensurePerm, writeHandle, saveFile, save, saveAs, saveProjectToDisk, hasPerm, isSaving } = f);
+  ({ ensurePerm, writeHandle, save, saveAs, hasPerm, isSaving } = f);
   document.getElementById("btnSave").onclick = () => {
     void save();
   };
@@ -693,7 +671,7 @@ function wireSelectionModel() {
     connFillTarget,
     connStyleSampleEl,
   });
-  ({ selectedRecords, strokeRecords, strokeTarget, fillRecords, fillTarget, textRecords, commonValue } = s);
+  ({ selectedRecords, strokeRecords, fillRecords, textRecords, commonValue } = s);
 }
 function appendWireSelectionHighlight(cel, active) {
   appendWireStrokeOverlay(scene.sel, cel, { active, fmt, SVGNS });
@@ -839,15 +817,6 @@ document.getElementById("fileInput").onchange = (e) => {
   f.text().then((t) => importLoose(t, f.name));
 };
 
-function resolveLibSymbolNode(id) {
-  return resolveLibSymbol(state.lib?.svg, id);
-}
-function resolveSheetSymbolNode(id, sheetSvg) {
-  return resolveSheetSymbol(sheetSvg || state.srcSvg, id);
-}
-function resolveSymbolNode(id, sheetSvg) {
-  return resolveSymbol(state.lib?.svg, sheetSvg || state.srcSvg, id);
-}
 function migrateProjectSymbolNames() {
   if (!migrateProject) return false;
   return migrateProject();
@@ -872,18 +841,6 @@ function adoptLibraryFromParsed(parsed, name, handle) {
   prepareLibrarySvg(parsed, SVGNS);
   state.lib = createLibraryRecord(parsed, name, handle);
   return true;
-}
-function selectedUseOnSheet() {
-  const node = currentSymNode();
-  if (!node || state.active === state.lib) return null;
-  const pick = (el) => (el && el.tagName && el.tagName.toLowerCase() === "use" && el.parentNode === node ? el : null);
-  return pick(state.activeEl) || (state.selection.length === 1 ? pick(state.selection[0]) : null);
-}
-function selectedConnOnSheet() {
-  if (state.selection.length !== 1) return null;
-  const el = state.selection[0],
-    node = currentSymNode();
-  return el && node && isConnGroup(el) && el.parentNode === node ? el : null;
 }
 function applyStaticWording() {
   const set = (id, text) => {
@@ -3181,7 +3138,7 @@ stage.addEventListener("pointermove", (ev) => {
     applyView();
   }
 });
-stage.addEventListener("pointerup", (ev) => {
+stage.addEventListener("pointerup", (_ev) => {
   if (dragging) {
     dragging = null;
     buildHandles(currentSymNode());
@@ -3330,7 +3287,7 @@ let isConnGroup,
   connStyleSampleEl;
 let applyConnStyle, updateConnContacts, updateConnGeometry, updateConnLabel, syncConnJointAnchor;
 let setConnOuter, setConnOuterFree, setConnPointCenter, moveConn, pushConnContactCandidates, connEndpointCoords;
-let promptConnMeta, mkConn, finishConnDraw, migrateConnModelImpl, dirFromDelta, connDirVector;
+let mkConn, finishConnDraw, migrateConnModelImpl, dirFromDelta, connDirVector;
 let lastConnRefOnSheet, nextConnPinOnSheet;
 
 function isSchematicSheet(node) {
@@ -3369,7 +3326,6 @@ function wireConnModel() {
     moveConn,
     pushConnContactCandidates,
     connEndpointCoords,
-    promptConnMeta,
     mkConn,
     finishConnDraw,
     migrateConnModel: migrateConnModelImpl,
@@ -3403,9 +3359,6 @@ function connLabelEl() {
 }
 function isConnLabelMode() {
   return !!state.connLabelSel;
-}
-function isConnLabelManual(g) {
-  return g && g.getAttribute("data-label-manual") === "1";
 }
 function setConnLabelManual(g) {
   if (g) g.setAttribute("data-label-manual", "1");
@@ -4524,9 +4477,6 @@ function fitView() {
 }
 
 // ---- zapis (per aktywny cel; schemat samowystarczalny) ----
-function serializeOut() {
-  return serializeSvg(state.srcSvg);
-}
 function collectUsedSymbols(rootNode, sheetSvg) {
   return collectUsedSymbolIds(rootNode, state.lib?.svg, sheetSvg);
 }
@@ -4669,10 +4619,6 @@ function symbolDependsOn(id, target, seen = new Set()) {
 function refBaseForSymbol(id, symNode) {
   const sym = symNode || resolveLibSymbol(state.lib?.svg, id);
   return refBaseForSymbolCore(id, sym);
-}
-function symbolOznaczenieLabel(sym) {
-  if (!sym) return "";
-  return symbolDesignation(sym.node, sym.id);
 }
 function nextInstanceRef(node, symbolId) {
   const used = new Set(
@@ -4888,19 +4834,6 @@ const DEFAULT_STYLE =
   "\n";
 function baseDocText() {
   return emptySvgMarkup(DEFAULT_STYLE);
-}
-function ensureStyle() {
-  if (!state.srcSvg) return;
-  let defs = state.srcSvg.querySelector("defs");
-  if (!defs) {
-    defs = document.createElementNS(SVGNS, "defs");
-    state.srcSvg.insertBefore(defs, state.srcSvg.firstChild);
-  }
-  if (!defs.querySelector("style")) {
-    const st = document.createElementNS(SVGNS, "style");
-    st.textContent = DEFAULT_STYLE;
-    defs.insertBefore(st, defs.firstChild);
-  }
 }
 
 // ---- nowy schemat (arkusz A4) ----

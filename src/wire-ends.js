@@ -1,7 +1,7 @@
 /**
  * Końce trasy przyczepione do złączy (data-from / data-to).
  */
-import { wireEndpoints, isWireGeometry, applyConnMetaToWire } from "./wire-geometry.js";
+import { wireEndpoints, isWireGeometry } from "./wire-geometry.js";
 import { formatPointsAttr } from "./polyline-edit.js";
 import { syncWireMarks } from "./wire-markers.js";
 

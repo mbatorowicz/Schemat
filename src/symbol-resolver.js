@@ -3,7 +3,6 @@
  * Osadzone <defs> w arkuszu — tylko fallback offline.
  */
 import { canonicalSymbolId, parseSymbolIdAliases } from "./symbol-aliases.js";
-import { qsById } from "./dom-selectors.js";
 
 const XLINK = "http://www.w3.org/1999/xlink";
 

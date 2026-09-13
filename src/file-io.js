@@ -1,5 +1,5 @@
 import { serializeSvg } from "./svg-utils.js";
-import { inlineSheetDefsSafe, clearSheetDirty } from "./sheet-persistence.js";
+import { clearSheetDirty } from "./sheet-persistence.js";
 import { clearLibDirty, clearSettingsDirty } from "./project-dirty.js";
 import { auditSymbolsOnSheet } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";

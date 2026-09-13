@@ -1,6 +1,6 @@
 /** Wnioskowanie nazwy symbolu wyłącznie z danych pliku — bez katalogu przykładowych nazw. */
 
-import { SYMBOL_NAME_ATTR, symbolDisplayName, symbolDesignation } from "./symbol-save.js";
+import { symbolDisplayName, symbolDesignation } from "./symbol-save.js";
 
 export function looksLikeReadableSymbolId(id) {
   const s = String(id || "").trim();

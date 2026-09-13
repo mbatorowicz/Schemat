@@ -118,7 +118,6 @@ describe("orthogonal-router", () => {
     });
     expect(path2).toBeTruthy();
     expect(pathHitsRect(path2, { x: 18, y: 45, width: 4, height: 10 })).toBe(false);
-    const midYs = path2.filter((p) => p.x > 10 && p.x < 50).map((p) => p.y);
     // równoległy przebieg z offsetem ≠ 50 albo omija łukiem
     expect(path2.some((p) => Math.abs(p.y - 50) >= 5) || countTurns(path2) >= 1).toBe(true);
     expect(path === null || !pathHitsRect(path, corridor)).toBe(true);

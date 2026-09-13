@@ -214,7 +214,7 @@ export function saveFileLabel({ onLib, onSheet }) {
   return W.save.fileGeneric;
 }
 
-export function saveFileTip({ onLib, onSheet, fileName }) {
+export function saveFileTip({ fileName }) {
   const base = W.saveTip.file;
   return fileName ? `${base} (${fileName})` : base;
 }

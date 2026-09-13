@@ -3,8 +3,7 @@
  */
 
 import { NetlistModel } from "./netlist-model.js";
-import { qsById, qsByData } from "./dom-selectors.js";
-import { fmt } from "./svg-utils.js";
+import { qsById } from "./dom-selectors.js";
 import { readUseOrient, mapLocalToSheet, flipDirWithOrient, rotateDir } from "./instance-orient.js";
 import { definitionForUseElement } from "./symbol-service.js";
 import { hostRootFrom } from "./stage-layers.js";
@@ -46,7 +45,6 @@ import { formatPointsAttr } from "./polyline-edit.js";
 import { pinWireEnds } from "./wire-ends.js";
 const pinKey = NetlistModel.pinKey;
 const pinAliases = NetlistModel.pinAliases;
-const endpointKey = NetlistModel.endpointKey;
 
 function pointsToAttr(points) {
   const pairs = (points || []).map((p) => {
@@ -63,7 +61,6 @@ export function createNetlistRouting(ctx) {
     num,
     mkEl,
     currentSymNode,
-    childPair,
     bboxInRoot,
     isConnPoint,
     connEndpointCoords,
@@ -293,7 +290,6 @@ export function createNetlistRouting(ctx) {
         reason: [aLoc.ok ? "" : aLoc.reason, bLoc.ok ? "" : bLoc.reason].filter(Boolean).join("; "),
       };
     }
-    const aRough = endpointFromLocate(aLoc, null);
     const bRough = endpointFromLocate(bLoc, null);
     const from = endpointFromLocate(aLoc, { x: bRough.x, y: bRough.y });
     const to = endpointFromLocate(bLoc, { x: from.x, y: from.y });
