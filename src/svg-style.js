@@ -1,9 +1,18 @@
 /**
  * CSS z <style> w SVG nie jest scoped w HTML — surowy klon styluje cały edytor.
- * Zostaw tylko selektory klasy/#id (m.in. #SymbolId) i bezpieczne deklaracje.
+ * Klasy/#id zostaw bez prefiksu `svg ` (inaczej <use> w shadow tree traci .sym/.fr).
+ * Selektory typu (path, text…) na klonie ogranicz do sceny, nie do ikon toolbara.
  */
 
-const SIMPLE = "[.#][A-Za-z_][\\w-]*";
+import { connAllCss } from "./conn-theme.js";
+import { wireCssRules } from "./wire-theme.js";
+
+export const EDITOR_STYLE_SCOPE = "#stage, #sidebarSymbolDefs";
+
+const SVG_TYPE = "svg|g|path|line|rect|circle|ellipse|polyline|polygon|text|tspan|use|image|marker";
+const SVG_TYPE_SET = new Set(SVG_TYPE.split("|"));
+const CLASS_OR_ID = "[.#][A-Za-z_][\\w-]*";
+const SIMPLE = `(?:(?:${SVG_TYPE})(?:${CLASS_OR_ID})*|${CLASS_OR_ID})`;
 const COMPOUND = `(?:${SIMPLE})+`;
 const COMB = "(?:\\s*[>+~]\\s*|\\s+)";
 const SAFE_SELECTOR = new RegExp(`^${COMPOUND}(?:${COMB}${COMPOUND})*$`);
@@ -41,7 +50,11 @@ export function isSafeSvgStyleSelector(sel) {
   if (!rest || /[:[\]@*|\\]/.test(rest)) return false;
   if (!SAFE_SELECTOR.test(rest)) return false;
   const ids = rest.match(/#[A-Za-z_][\w-]*/g) || [];
-  return !ids.some((id) => DENIED_STYLE_IDS.has(id.slice(1).toLowerCase()));
+  return !ids.some((id) => {
+    const name = id.slice(1).toLowerCase();
+    if ((name === "stage" || name === "sidebarsymboldefs") && rest !== id) return false;
+    return DENIED_STYLE_IDS.has(name);
+  });
 }
 
 function stripCssComments(css) {
@@ -116,8 +129,34 @@ export function sanitizeSvgStyleDecls(block) {
   return parts.join(";");
 }
 
-/** Ogranicz selektory i wartości; każdą regułę scope'uj do `svg`, żeby nie stylować chrome. */
-export function sanitizeSvgStyleText(css) {
+function startsWithSvgType(sel) {
+  const m = String(sel || "").match(/^[a-zA-Z][\w-]*/);
+  return !!(m && SVG_TYPE_SET.has(m[0].toLowerCase()));
+}
+
+function rewriteSelector(sel, scopeTypes) {
+  const s = String(sel || "")
+    .trim()
+    .replace(/^svg\s+/i, "")
+    .trim();
+  if (!s) return [];
+  if (!scopeTypes) return [s];
+  if (s.toLowerCase() === "svg") {
+    return String(scopeTypes)
+      .split(",")
+      .map((sc) => sc.trim())
+      .filter(Boolean);
+  }
+  if (!startsWithSvgType(s)) return [s];
+  return String(scopeTypes)
+    .split(",")
+    .map((sc) => sc.trim() + " " + s)
+    .filter((x) => x.trim().length > s.length);
+}
+
+/** Ogranicz selektory i wartości. Nie dodawaj `svg ` — psuje style w <use>. */
+export function sanitizeSvgStyleText(css, opts = {}) {
+  const scopeTypes = opts.scopeTypes || "";
   const body = stripAtRules(stripCssComments(css));
   const out = [];
   const re = /([^{}]+)\{([^{}]*)\}/g;
@@ -125,20 +164,50 @@ export function sanitizeSvgStyleText(css) {
   while ((m = re.exec(body))) {
     const sels = m[1]
       .split(",")
-      .map((s) =>
-        s
-          .trim()
-          .replace(/^svg\s+/i, "")
-          .trim()
-      )
-      .filter(isSafeSvgStyleSelector)
-      .map((s) => "svg " + s);
+      .flatMap((s) => rewriteSelector(s, scopeTypes))
+      .filter(isSafeSvgStyleSelector);
     if (!sels.length) continue;
     const decls = sanitizeSvgStyleDecls(m[2]);
     if (!decls) continue;
     out.push(`${sels.join(",")}{${decls}}`);
   }
   return out.join("\n");
+}
+
+export function essentialSvgStyleText() {
+  return (
+    ".fr{fill:none;stroke:#0f172a;stroke-width:2;}\n" +
+    ".fr2{fill:none;stroke:#0f172a;stroke-width:1;}\n" +
+    ".ttl{font:700 22px Arial,sans-serif;fill:#0f172a;}\n" +
+    ".sub{font:400 11px Arial,sans-serif;fill:#475569;}\n" +
+    ".tb{font:400 11px Arial,sans-serif;fill:#0f172a;}\n" +
+    ".tbb{font:700 11px Arial,sans-serif;fill:#0f172a;}\n" +
+    ".cap{font:700 12px Arial,sans-serif;fill:#0f172a;}\n" +
+    ".capd{font:400 10px Arial,sans-serif;fill:#475569;}\n" +
+    ".cat{font:700 9px Arial,sans-serif;fill:#94a3b8;}\n" +
+    ".cell{fill:#ffffff;stroke:#cbd5e1;stroke-width:1;}\n" +
+    ".sym{fill:none;stroke:#0f172a;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}\n" +
+    ".symt{fill:none;stroke:#0f172a;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;}\n" +
+    connAllCss() +
+    ".dash{stroke-dasharray:4 3;}\n" +
+    ".node{fill:#0f172a;}\n" +
+    ".pin{font:400 9px Arial,sans-serif;fill:var(--object-stroke,#334155);}\n" +
+    ".did{font:700 12px Arial,sans-serif;fill:var(--object-stroke,#0f172a);}\n" +
+    wireCssRules() +
+    "\n"
+  );
+}
+
+function hasEssentialClasses(css) {
+  return /\.sym\b/.test(css) && /\.fr\b/.test(css);
+}
+
+/** Po czyszczeniu: zdejmij `svg .klasa` i uzupełnij brakujące .sym/.fr (odtworzenie po złym zapisie). */
+export function finalizeSvgStyleText(css, opts = {}) {
+  const cleaned = sanitizeSvgStyleText(css, opts);
+  if (hasEssentialClasses(cleaned)) return cleaned;
+  const extra = sanitizeSvgStyleText(essentialSvgStyleText(), opts);
+  return [cleaned, extra].filter(Boolean).join("\n");
 }
 
 /** Stroke/fill klas symboli jako var(--object-stroke) — jak dawniej w useColorAwareClone. */

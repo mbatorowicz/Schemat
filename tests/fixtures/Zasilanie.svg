@@ -1,6 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1485 1050" width="1485" height="1050">
+  <defs>
+    <style>
+      .fr{fill:none;stroke:#0f172a;stroke-width:2;}
+      .ttl{font:700 22px Arial,sans-serif;fill:#0f172a;}
+      .sym{fill:none;stroke:#0f172a;stroke-width:1.5;}
+    </style>
+  </defs>
   <g id="sch-1" data-sheet-title="Zasilanie">
+    <rect class="fr" x="12" y="12" width="1461" height="1026"/>
+    <text class="ttl" x="34" y="52">Zasilanie</text>
     <use href="#G1" data-sym="G1" x="120" y="160"/>
     <use href="#F1" data-sym="F1" x="260" y="160"/>
   </g>

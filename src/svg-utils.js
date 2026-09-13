@@ -1,4 +1,4 @@
-import { sanitizeSvgStyleText } from "./svg-style.js";
+import { finalizeSvgStyleText, sanitizeSvgStyleText } from "./svg-style.js";
 
 export function num(el, attr, def = 0) {
   const v = el && el.getAttribute ? el.getAttribute(attr) : null;
@@ -117,11 +117,19 @@ export function sanitizeSvgDom(root) {
   return root;
 }
 
+function documentUsesEditorClasses(svg) {
+  return !!svg.querySelector(".fr, .fr2, .sym, .symt, .ttl, .pin, .did, .node");
+}
+
 export function parseSvg(text) {
   const doc = new DOMParser().parseFromString(sanitizeSvgText(text), "image/svg+xml");
   const svg = doc.querySelector("svg");
   if (!svg) return null;
   sanitizeSvgDom(svg);
+  if (documentUsesEditorClasses(svg)) {
+    const style = svg.querySelector("style");
+    if (style) style.textContent = finalizeSvgStyleText(style.textContent || "");
+  }
   return { doc, svg };
 }
 

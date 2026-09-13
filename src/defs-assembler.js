@@ -11,13 +11,15 @@ import {
 } from "./symbol-service.js";
 import { SVGNS, XLINK } from "./svg-constants.js";
 import { sanitizeSvgDom, serializeSvg, fmt as fmtDefault } from "./svg-utils.js";
-import { applyColorAwareCss, sanitizeSvgStyleText } from "./svg-style.js";
+import { applyColorAwareCss, EDITOR_STYLE_SCOPE, finalizeSvgStyleText } from "./svg-style.js";
 
 /** Klon z CSS stroke/fill jako var(--object-stroke) dla edycji kolorów symboli. */
 export function useColorAwareClone(node) {
   if (node?.tagName && node.tagName.toLowerCase() === "style") {
     const clone = document.createElementNS(node.namespaceURI || SVGNS, "style");
-    clone.textContent = applyColorAwareCss(sanitizeSvgStyleText(node.textContent || ""));
+    clone.textContent = applyColorAwareCss(
+      finalizeSvgStyleText(node.textContent || "", { scopeTypes: EDITOR_STYLE_SCOPE })
+    );
     return clone;
   }
   const clone = node.cloneNode(true);

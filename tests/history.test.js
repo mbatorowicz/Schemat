@@ -161,6 +161,20 @@ describe("captureActiveSnapshot (M8)", () => {
     expect(snapBytes).toBeLessThan(fullBytes / 5);
   });
 
+  it("undo na arkuszu przywraca styl defs", () => {
+    const state = makeState(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><defs><style>.sym{stroke:#111}.fr{fill:none}</style></defs>` +
+        `<g id="sch-1"><text>A</text></g></svg>`
+    );
+    const { h } = historyFor(state);
+    h.pushUndo();
+    state.srcSvg.querySelector("defs style").textContent = "body{}";
+    state.srcSvg.querySelector("text").textContent = "B";
+    h.doUndo();
+    expect(state.srcSvg.querySelector("text").textContent).toBe("A");
+    expect(state.srcSvg.querySelector("defs style").textContent).toContain(".sym");
+  });
+
   it("undo na arkuszu nie kasuje defs symboli", () => {
     const state = makeState(
       `<svg xmlns="http://www.w3.org/2000/svg"><defs><g id="SK"><rect width="4" height="2"/></g></defs>` +

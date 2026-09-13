@@ -147,6 +147,8 @@ export function applyActiveSnapshot(snap, { state, parseSvg }) {
   if (snap.kind === "sheet") {
     const next = parseGroupMarkup(parseSvg, snap.bodyMarkup);
     if (!next) return false;
+    applyRootAttrs(svg, snap.attrs);
+    applyDefsStyle(svg, snap.style);
     const prev = (snap.bodyId && qsById(svg, snap.bodyId)) || null;
     replaceOrInsert(svg, prev, next, null);
     return true;
