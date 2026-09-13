@@ -1,5 +1,6 @@
 import { serializeSvg } from "./svg-utils.js";
 import { inlineSheetDefsSafe, clearSheetDirty } from "./sheet-persistence.js";
+import { clearLibDirty } from "./project-dirty.js";
 import { auditSymbolsOnSheet } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
 
@@ -75,7 +76,8 @@ export function createFileIo(deps) {
     if (act.handle && (await ensurePerm(act.handle))) {
       try {
         await writeHandle(act.handle, serializeSvg(act.svg));
-        if (act !== state.lib) clearSheetDirty(act);
+        if (act === state.lib) clearLibDirty(act);
+        else clearSheetDirty(act);
         if (typeof onDirtyChange === "function") onDirtyChange();
         const warn = r?.missing?.length ? " (ostrzeżenie: brak symboli " + r.missing.join(", ") + ")" : "";
         setStatus((act === state.lib ? "Zapisano bibliotekę " : "Zapisano schemat ") + act.name + warn, {
@@ -112,8 +114,10 @@ export function createFileIo(deps) {
           state.libHandle = h;
           idbSet("libHandle", h).catch(() => {});
           flushLibrary();
+          clearLibDirty(act);
+        } else {
+          clearSheetDirty(act);
         }
-        if (act !== state.lib) clearSheetDirty(act);
         buildSymbolList();
         syncListSelection();
         const warn = r?.missing?.length ? " (ostrzeżenie: brak symboli " + r.missing.join(", ") + ")" : "";
@@ -126,7 +130,8 @@ export function createFileIo(deps) {
       }
     }
     downloadSvg(text, act.name || "plik.svg");
-    if (act !== state.lib) clearSheetDirty(act);
+    if (act === state.lib) clearLibDirty(act);
+    else clearSheetDirty(act);
     setStatus("Pobrano " + (act.name || "plik.svg") + ".");
   }
 
@@ -145,22 +150,26 @@ export function createFileIo(deps) {
     let savedLib = false;
 
     if (state.lib?.svg) {
-      try {
-        let h = state.lib.handle || state.libHandle;
-        if (!h) {
-          const libName = state.lib.name || "E-00_symbole.svg";
-          h = await state.dir.getFileHandle(libName, { create: true });
-          state.lib.handle = h;
-          state.libHandle = h;
-          idbSet("libHandle", h).catch(() => {});
+      const hasLibHandle = !!(state.lib.handle || state.libHandle);
+      if (state.lib.dirty || !hasLibHandle) {
+        try {
+          let h = state.lib.handle || state.libHandle;
+          if (!h) {
+            const libName = state.lib.name || "E-00_symbole.svg";
+            h = await state.dir.getFileHandle(libName, { create: true });
+            state.lib.handle = h;
+            state.libHandle = h;
+            idbSet("libHandle", h).catch(() => {});
+          }
+          if (await ensurePerm(h)) {
+            await writeHandle(h, serializeSvg(state.lib.svg));
+            flushLibrary();
+            clearLibDirty(state.lib);
+            savedLib = true;
+          }
+        } catch (e) {
+          console.warn(e);
         }
-        if (await ensurePerm(h)) {
-          await writeHandle(h, serializeSvg(state.lib.svg));
-          flushLibrary();
-          savedLib = true;
-        }
-      } catch (e) {
-        console.warn(e);
       }
     }
 

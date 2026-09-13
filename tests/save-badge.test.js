@@ -5,6 +5,7 @@ import {
   clearLibDirty,
   markSettingsDirty,
   clearSettingsDirty,
+  markActiveTargetDirty,
   getDirtyMap,
   countDirtyAll,
 } from "../src/project-dirty.js";
@@ -83,6 +84,32 @@ describe("getDirtyMap / countDirtyAll", () => {
     clearLibDirty(lib);
     clearSettingsDirty();
     expect(countDirtyAll(state)).toBe(1);
+  });
+
+  it("edycja biblioteki (active === lib) zapala libDirty i badge", () => {
+    const lib = { dirty: false };
+    const sheet = { dirty: false };
+    const state = { sheets: [sheet], lib, active: lib };
+    markActiveTargetDirty(state);
+    expect(lib.dirty).toBe(true);
+    expect(sheet.dirty).toBe(false);
+    expect(countDirtyAll(state)).toBe(1);
+    const badge = resolveSaveBadgeState({
+      dirtyN: 0,
+      needPerm: false,
+      hasDir: true,
+      hasLibDirty: getDirtyMap(state).libDirty,
+    });
+    expect(badge.kind).toBe("dirty");
+  });
+
+  it("edycja arkusza nie oznacza biblioteki", () => {
+    const lib = { dirty: false };
+    const sheet = { dirty: false };
+    const state = { sheets: [sheet], lib, active: sheet };
+    markActiveTargetDirty(state);
+    expect(sheet.dirty).toBe(true);
+    expect(lib.dirty).toBe(false);
   });
 
   it("settingsDirty przy 0 arkuszach daje countDirtyAll = 1", () => {

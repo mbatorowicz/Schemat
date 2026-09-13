@@ -56,7 +56,7 @@ import {
   sheetKey,
   findSheetByKey,
 } from "./sheet-persistence.js";
-import { countDirtyAll } from "./project-dirty.js";
+import { countDirtyAll, markActiveTargetDirty } from "./project-dirty.js";
 import {
   readFontSizePx,
   applyTextStyle,
@@ -4528,7 +4528,7 @@ wireSidebarLists();
 wireFileIo();
 
 function markActiveDirty() {
-  if (state.active && state.active !== state.lib) markSheetDirty(state.active);
+  markActiveTargetDirty(state);
   syncDirtyIndicator();
 }
 function syncDirtyIndicator() {

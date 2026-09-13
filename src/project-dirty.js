@@ -1,6 +1,6 @@
 /** Jedna mapa dirty: arkusze + biblioteka + ustawienia (spis). */
 
-import { countDirtySheets } from "./sheet-persistence.js";
+import { countDirtySheets, markSheetDirty } from "./sheet-persistence.js";
 
 let settingsDirty = false;
 
@@ -10,6 +10,13 @@ export function markLibDirty(lib) {
 
 export function clearLibDirty(lib) {
   if (lib) lib.dirty = false;
+}
+
+/** Edycja aktywnego celu: arkusz albo biblioteka (E-00). */
+export function markActiveTargetDirty(state) {
+  if (!state?.active) return;
+  if (state.active === state.lib) markLibDirty(state.lib);
+  else markSheetDirty(state.active);
 }
 
 export function markSettingsDirty() {
