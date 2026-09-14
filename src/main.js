@@ -1,6 +1,6 @@
 import { connAllCss, syncConnStylesInLib } from "./conn-theme.js";
 import { createConnModel } from "./conn-model.js";
-import { walkDir, getFileHandleByPath, normalizeRelPath, relinkExistingFileHandle } from "./project-files.js";
+import { walkDir, getFileHandleByPath, normalizeRelPath, relinkExistingFileHandle, isLikelyLibraryFileName } from "./project-files.js";
 import {
   sheetElementListLabel,
   instanceRefOf,
@@ -119,7 +119,7 @@ import {
   prefsSheetKey,
   libraryCacheScore,
 } from "./boot-cache.js";
-import { emptySvgMarkup, uniqueLibraryFileName, uniqueFileName } from "./document-scaffold.js";
+import { emptySvgMarkup, uniqueLibraryFileName, uniqueFileName, DEFAULT_LIBRARY_FILE } from "./document-scaffold.js";
 import {
   createSheetDocument,
   createLibraryInProject,
@@ -1225,7 +1225,7 @@ function syncToolbarContext() {
 function ensureLib() {
   if (!state.lib) {
     const p = parseSvg(baseDocText());
-    state.lib = { handle: null, name: "E-00_symbole.svg", svg: p.svg, doc: p.doc };
+    state.lib = { handle: null, name: DEFAULT_LIBRARY_FILE, svg: p.svg, doc: p.doc };
   }
 }
 
@@ -1460,7 +1460,7 @@ async function applyWalkedProject(walked, opts = {}) {
         id: sid,
         dirty: false,
       });
-    } else if (hasLibSymbols(p.svg) || /E-00/i.test(f.name))
+    } else if (hasLibSymbols(p.svg) || isLikelyLibraryFileName(f.name))
       libCandidates.push({ handle: f.handle, name: f.name, relPath: f.relPath, parsed: p, isSheet: false });
   }
   state.sheets = sheets;
@@ -5368,7 +5368,7 @@ try {
     _libCacheScoreFloor = libraryCacheScore(cachedLib);
     if (cachedLib) {
       const p = parseSvg(cachedLib.text);
-      if (p) adoptLibraryFromParsed(p, cachedLib.name || "E-00_symbole.svg", state.libHandle || null);
+      if (p) adoptLibraryFromParsed(p, cachedLib.name || DEFAULT_LIBRARY_FILE, state.libHandle || null);
     }
 
     let loadedFromDisk = false;
@@ -5389,7 +5389,7 @@ try {
         const libS = await restoreLibrary();
         if (libS) {
           const p = parseSvg(libS.text);
-          if (p) adoptLibraryFromParsed(p, libS.name || "E-00_symbole.svg", null);
+          if (p) adoptLibraryFromParsed(p, libS.name || DEFAULT_LIBRARY_FILE, null);
         }
       }
       if (state.libHandle && state.lib) state.lib.handle = state.libHandle;

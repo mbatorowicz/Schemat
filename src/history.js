@@ -65,7 +65,7 @@ export function snapshotByteSize(snap) {
 /**
  * Zapisuje tylko to, co undo musi przywrócić:
  * arkusz → grupa sch-* (+ style), nie klony symboli w defs;
- * biblioteka → aktualny symbol + lista id (add/delete bez kopii całej E-00).
+ * biblioteka → aktualny symbol + lista id (add/delete bez kopii całej biblioteki).
  */
 export function captureActiveSnapshot(state, focusNode) {
   const svg = state.srcSvg;

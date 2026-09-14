@@ -1,6 +1,6 @@
-# Edytor schematów CS-TB-48
+# Edytor schematów i symboli
 
-Aplikacja do edycji schematów SVG i biblioteki symboli. Wymagania: [PRD.md](PRD.md).
+Aplikacja do edycji schematów elektrycznych SVG i wspólnej biblioteki symboli. Wymagania: [PRD.md](PRD.md).
 
 ## Uruchomienie lokalne
 
@@ -10,7 +10,7 @@ npm install
 npm run dev
 ```
 
-Otwórz http://localhost:5173 — w **Otwórz projekt** wskaż folder konkretnego projektu, np. `schematy/project/CS-TB-48/`. Po zmianie plików SVG na dysku użyj **Otwórz projekt** ponownie lub **Przywróć dostęp** po F5. **Niezapisane zmiany nie są nadpisywane** przy odświeżeniu — edytor ostrzega przed zamknięciem karty. Zawsze kliknij **Zapisz** przed zamknięciem.
+Otwórz http://localhost:5173 — w **Otwórz projekt** wskaż folder z `projekt.json` i arkuszami SVG. Po zmianie plików SVG na dysku użyj **Otwórz projekt** ponownie lub **Przywróć dostęp** po F5. **Niezapisane zmiany nie są nadpisywane** przy odświeżeniu — edytor ostrzega przed zamknięciem karty. Zawsze kliknij **Zapisz** przed zamknięciem.
 
 ### Wymagania przeglądarki
 
@@ -76,7 +76,7 @@ Albo `npx vercel env pull`. Na Vercel wystarczy OIDC projektu (bez klucza w prze
 | `element-styles.js`                       | `applyTextStyle` — typografia bez nadpisywania                              |
 | `svg-dom.js` / `svg-constants.js`         | Pomocnicze operacje DOM SVG                                                 |
 | `symbol-resolver.js`                      | Rozwiązywanie `<use href="#…">` — **biblioteka jest źródłem prawdy**        |
-| `library-loader.js`                       | Wczytywanie E-00 z dysku (w tym `../../lib/` z projekt.json)                |
+| `library-loader.js`                       | Wczytywanie biblioteki z dysku (w tym `../../lib/` z projekt.json)          |
 | `sheet-persistence.js`                    | Flaga `dirty`, bezpieczny zapis `<defs>`, ochrona przed nadpisaniem z dysku |
 | `persistence.js`                          | IndexedDB/localStorage — kopia zapasowa między sesjami                      |
 | `conn-theme.js`                           | SSOT — kolory, promień punktów styku, CSS złączy                            |
@@ -97,4 +97,4 @@ Albo `npx vercel env pull`. Na Vercel wystarczy OIDC projektu (bez klucza w prze
 | `assistant-apply.js`                      | Zastosuj propozycję przez istniejące write-pathy                            |
 | `assistant-ui.js` / `assistant-client.js` | Panel czatu i strumień SSE                                                  |
 
-Dane projektu (poza repozytorium): `../schematy/lib/`, `../schematy/project/CS-TB-48/` (arkusze: Zasilanie, Bezpieczenstwo, Enable, Naped, Zator + `polaczenia_*.md`).
+Dane projektu (poza repozytorium): folder maszyny z `projekt.json`, arkuszami `*.svg` i wspólną biblioteką symboli (`symbole.svg` / `symbole-elek.svg`; starsze pliki `E-00_symbole.svg` nadal są rozpoznawane).

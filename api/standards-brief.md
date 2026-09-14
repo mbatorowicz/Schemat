@@ -2,14 +2,14 @@
 
 Ten brief jest **skrótem konwencji projektowych** edytora. Pełne teksty EN/IEC są chronione prawem autorskim — nie wklejaj PDF-ów. Przy spornych wymaganiach użyj narzędzia `lookupPublicGuidance` i **cytuj URL**. Gdy brak źródła, napisz wprost, że treść jest niepewna.
 
-## Projekt i konwencja E-00
+## Projekt i biblioteka symboli
 
 - Norma projektu (pole `norm`): zwykle **EN 60204-1** (wyposażenie elektryczne maszyn).
-- Symbole graficzne: rodzina **IEC/EN 60617** (w praktyce biblioteka `E-00`).
+- Symbole graficzne: rodzina **IEC/EN 60617** (w praktyce wspólna biblioteka SVG projektu).
 - Oznaczenia literowe aparatów: **EN 81346-2** (IEC 81346-2).
 - Nie wymyślaj symboli spoza `symbolCatalog`. `insert_symbol.symbolId` musi być `id` z katalogu.
 
-### Prefiksy E-00 / 81346 (typowe)
+### Prefiksy EN 81346 (typowe)
 
 | Prefiks | Znaczenie                                        | Przykłady id w bibliotece |
 | ------- | ------------------------------------------------ | ------------------------- |
@@ -48,7 +48,7 @@ Instancja na arkuszu: `WD1`, `G1`, `X1` — `data-ref` + `data-sym` = id z bibli
 2. Każde `REF:PIN` ma złącze (`conn`) o tym `data-ref` + `data-pin`.
 3. `net` (L/N/PE/+24V…) jest zgodny z rolą pinu (L nie na PE).
 4. Brak symboli spoza biblioteki (`missingSymbols`).
-5. Oznaczenia zgodne z 81346 / E-00 (nie „PSU1” gdy konwencja to G1 — chyba że tak jest w katalogu).
+5. Oznaczenia zgodne z EN 81346 i katalogiem biblioteki (nie „PSU1”, gdy w katalogu obowiązuje G1).
 6. Nie proponuj obliczeń prądów ani doboru przekroju (poza zakresem edytora).
 
 ## Propozycje edycji

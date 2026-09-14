@@ -1,18 +1,17 @@
-# PRD — Edytor schematów i symboli (CS-TB-48)
+# PRD — Edytor schematów i symboli
 
-|                      |                                           |
-| -------------------- | ----------------------------------------- |
-| **Produkt**          | `Schemat/` (Vite, `npm run dev`)          |
-| **Projekt**          | Transporter boczny do drukarki · CS-TB-48 |
-| **Wytwórca**         | CNC Solutions                             |
-| **Norma**            | EN 60204-1 (schematy elektryczne maszyn)  |
-| **Wersja dokumentu** | 1.8 · 2026-09-13                          |
+|                      |                                       |
+| -------------------- | ------------------------------------- |
+| **Produkt**          | Edytor schematów (`Schemat/`, Vite)   |
+| **Zakres**           | Dokumentacja elektryczna maszyn (SVG) |
+| **Norma bazowa**     | EN 60204-1                            |
+| **Wersja dokumentu** | 1.9 · 2026-09-14                      |
 
 ---
 
 ## 1. Cel produktu
 
-Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: wspólnej biblioteki symboli, arkuszy schematów (Zasilanie, Bezpieczeństwo, Enable, Napęd, Zator…) oraz powiązanego spisu połączeń. Edytor jest źródłem plików trafiających do DTR (`build/dtr.pdf`) i dokumentacji wytwórczej.
+Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: wspólnej biblioteki symboli, arkuszy schematów oraz powiązanego spisu połączeń. Edytor jest źródłem plików trafiających do DTR i dokumentacji wytwórczej.
 
 **Główna wartość:** jeden workflow od symbolu → instancji na schemacie → wpisu w netliście → trasowania przewodu.
 
@@ -20,11 +19,11 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 ## 2. Użytkownicy
 
-| Persona                         | Potrzeba                                                  |
-| ------------------------------- | --------------------------------------------------------- |
-| Konstruktor elektryczny         | Rysuje schemat, definiuje złącza, utrzymuje spis połączeń |
-| Wytwórca maszyn (CNC Solutions) | Standaryzuje symbole, numeruje instancje (G1, WD1, SK1…)  |
-| Audytor / klient                | Otrzymuje spójny SVG + PDF bez dostępu do edytora         |
+| Persona                 | Potrzeba                                                  |
+| ----------------------- | --------------------------------------------------------- |
+| Konstruktor elektryczny | Rysuje schemat, definiuje złącza, utrzymuje spis połączeń |
+| Wytwórca maszyn         | Standaryzuje symbole, numeruje instancje (G1, WD1, SK1…)  |
+| Audytor / klient        | Otrzymuje spójny SVG + PDF bez dostępu do edytora         |
 
 ---
 
@@ -33,7 +32,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ### W zakresie (MVP+)
 
 - Otwieranie folderu projektu (`projekt.json`, `*.svg`; legacy `polaczenia_*.md` tylko migracja)
-- Biblioteka symboli wspólna (`lib/E-00_symbole.svg`)
+- Biblioteka symboli wspólna (`symbole.svg` / `lib/symbole.svg`; legacy `E-00_symbole.svg`)
 - Edycja arkuszy schematów (ramka A4, tabelka dokumentu)
 - Rysowanie kształtów geometrycznych (linia, prostokąt, koło, łuk, tekst)
 - Złącza elektryczne: **punkt** (zacisk na schemacie) i **kreska** (przyłącze w symbolu)
@@ -56,7 +55,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 | Termin              | Znaczenie                                             | Reprezentacja SVG                                                 |
 | ------------------- | ----------------------------------------------------- | ----------------------------------------------------------------- |
-| **Symbol (typ)**    | Definicja graficzna w bibliotece                      | `<g id="WD">` w E-00                                              |
+| **Symbol (typ)**    | Definicja graficzna w bibliotece                      | `<g id="WD">` w bibliotece                                        |
 | **Instancja**       | Wystąpienie symbolu na schemacie                      | `<use data-ref="WD1" href="#WD">`                                 |
 | **Złącze — punkt**  | Zacisk / listwa na schemacie                          | `<g data-role="conn" data-kind="point">` — widoczne kółko         |
 | **Złącze — kreska** | Przyłącze kierunkowe w symbolu                        | `<g data-role="conn" data-kind="lead">` — widoczna linia          |
@@ -93,7 +92,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - Snap linii połączeniowych i trasowanie netlisty celują w **punkty styku**, nie w środek jointa.
 - **Punkt (`point`):** 4 markery na obwodzie to **jeden logiczny styk** — router przy trasowaniu wybiera najlepszą stronę (N/E/S/W) względem drugiego końca połączenia; użytkownik nie ustawia kierunku ręcznie.
 
-### Id symboli (konwencja E-00)
+### Id symboli (biblioteka)
 
 - Kanoniczne `id` w bibliotece: krótkie kody (`WD`, `Q`, `PSU`, `SK1`, `X-3`, `X-4`, `NO`, `F1`…).
 - Stare nazwy są mapowane przy migracji (`symbol-aliases.js`): np. `Przylacze`→`WD`, `Xx-3`→`X-3`, `sk1`→`SK1`.
@@ -106,7 +105,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ### Must have
 
 - Jako konstruktor dodaję przyłącza L/N/PE jako **kreski** w symbolu WD.
-- Jako konstruktor dodaję zaciski listwy X1 jako **punkty** na schemacie Zasilanie.
+- Jako konstruktor dodaję zaciski listwy X1 jako **punkty** na schemacie zasilania.
 - Jako konstruktor wstawiam symbol z biblioteki i otrzymuję auto-numerację (WD1, G1…).
 - Jako konstruktor wczytuję spis połączeń i trasuję wybrane połączenie.
 - Jako konstruktor zapisuję projekt do folderu bez utraty zmian.
@@ -134,16 +133,16 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 ### 6.1 Projekt i pliki
 
 - FR-01: Otwarcie folderu projektu z `showDirectoryPicker` lub fallback `<input type=file>`.
-- FR-02: Rekurencyjne skanowanie folderu: arkusze `sch-*` (np. `project/CS-TB-48/Zasilanie.svg`, `Bezpieczenstwo.svg`, `Enable.svg`, `Naped.svg`, `Zator.svg`), biblioteka `lib/E-00_symbole.svg`; opcjonalnie legacy `polaczenia_<arkusz>.md` (tylko migracja).
+- FR-02: Rekurencyjne skanowanie folderu: arkusze `sch-*` (`*.svg` z grupą arkusza), biblioteka `symbole.svg` / `symbole-elek.svg` (legacy `E-00_symbole.svg`); opcjonalnie legacy `polaczenia_<arkusz>.md` (tylko migracja).
 - FR-03: Wczytanie `projekt.json` (orientacja A4, metadane, `library`, **`sheetConnections`** — SSOT spisu połączeń per arkusz).
-- FR-03a: Konwencja: klucz arkusza = `relPath`/`name`; legacy `Zasilanie.svg` ↔ `polaczenia_Zasilanie.md` (migracja); biblioteka domyślnie `lib/E-00_symbole.svg`.
+- FR-03a: Konwencja: klucz arkusza = `relPath`/`name`; legacy `Arkusz.svg` ↔ `polaczenia_Arkusz.md` (migracja); biblioteka domyślnie `symbole.svg`.
 - FR-03b: Po otwarciu projektu: biblioteka + spis z `sheetConnections` (gdy brak — jednorazowa migracja z md).
 - FR-04: Zapis nadpisujący i „zapisz jako” dla aktywnego pliku SVG.
 - FR-05: Przywracanie dostępu do folderu (IndexedDB) po restarcie przeglądarki.
 
 ### 6.2 Biblioteka symboli
 
-- FR-10: Jedna biblioteka `E-00_symbole.svg` współdzielona między projektami.
+- FR-10: Jedna biblioteka symboli współdzielona między projektami (`symbole.svg` albo wskazana w `projekt.json`).
 - FR-11: CRUD symboli (nowy, duplikuj, eksportuj, usuń, zmień id).
 - FR-12: Miniatury symboli w panelu bocznym.
 - FR-13: Meta symbolu w bibliotece: **Nazwa** (`data-symbol-name`, tylko lib), **Oznaczenie** = prefix bez numeru (`data-inst-prefix`), **Opis** (`data-symbol-desc`) + numeracja (`data-inst-numbered`, `data-inst-start`); lista: nazwa z podtytułem oznaczenia.
@@ -176,7 +175,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - FR-45: Automatyczne punkty styku — punkt: 4 na obwodzie; kreska: 1 na końcu linii.
 - FR-46: Kolor złącza domyślnie jak symbol; punkty styku zawsze czerwone.
 - FR-47: `migrateConnModel()` uzupełnia brakujące `data-part="contact"` w istniejących złączach.
-- FR-48: SSOT stylów złączy w `src/conn-theme.js`; `syncConnStylesInLib()` synchronizuje CSS w E-00.
+- FR-48: SSOT stylów złączy w `src/conn-theme.js`; `syncConnStylesInLib()` synchronizuje CSS w bibliotece.
 - FR-49: `resolveConnectionEndpoints()` + `conn-contact-pick.js` — wzajemny hint końców; `connEndpointCoords(g, mapXY, towardXY)` wybiera najlepszy punkt styku punktu.
 
 ### 6.5a SSOT złączy (`conn-theme.js`)
@@ -222,7 +221,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - FR-80: Panel `#assistantPanel` — czat z kontekstem aktywnego arkusza (netlista, katalog, zaznaczenie) i zrzutem PNG widoku.
 - FR-81: Proxy `POST /api/assistant` (Vercel Function + AI Gateway). Klucz modelu nie trafia do przeglądarki; CSP `connect-src 'self'`.
 - FR-82: Propozycje edycji (`insert_symbol`, połączenia, trasa, etykieta, highlight) stosowane dopiero po **Zastosuj**, przez istniejące write-pathy.
-- FR-83: Wskazówki norm: brief E-00 + publiczne źródła (`lookupPublicGuidance`). Bez wgrywania pełnych tekstów EN/IEC.
+- FR-83: Wskazówki norm: brief biblioteki + publiczne źródła (`lookupPublicGuidance`). Bez wgrywania pełnych tekstów EN/IEC.
 
 ---
 
@@ -276,50 +275,45 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 ## 9. Integracje
 
-| Plik                                           | Rola                                                      |
-| ---------------------------------------------- | --------------------------------------------------------- |
-| `Schemat/index.html`                           | Aplikacja edytora (Vite), modal `#connMeta`               |
-| `Schemat/src/main.js`                          | UI, routing, integracja modułów                           |
-| `Schemat/src/draw-mode.js`                     | Tryb rysowania (punkty, preview, finish)                  |
-| `Schemat/src/sidebar-lists.js`                 | Listy sidebara (symbole, arkusze, elementy)               |
-| `Schemat/src/netlist-ui.js`                    | UI spisu połączeń + live validator                        |
-| `Schemat/src/file-io.js`                       | Zapis/odczyt plików                                       |
-| `Schemat/src/element-factory.js`               | Fabryka elementów SVG                                     |
-| `Schemat/src/dom-selectors.js`                 | Bezpieczne selektory CSS                                  |
-| `Schemat/src/conn-theme.js`                    | SSOT stylów złączy                                        |
-| `Schemat/src/conn-model.js`                    | Model złączy, `connEndpointCoords`                        |
-| `Schemat/src/symbol-aliases.js`                | Mapowanie starych id symboli → kanoniczne (WD, X-3, SK1…) |
-| `Schemat/src/netlist-model.js`                 | Parser i klasy przewodów (ESM)                            |
-| `Schemat/src/orthogonal-router.js`             | Trasowanie ortogonalne                                    |
-| `Schemat/src/wire-theme.js`                    | Kolory i style przewodów netlisty                         |
-| `Schemat/src/history.js`                       | Undo/redo                                                 |
-| `Schemat/src/svg-utils.js`                     | Pomocnicze operacje SVG, sanityzacja                      |
-| `Schemat/src/instance-refs.js`                 | Numeracja i edycja `data-ref`                             |
-| `Schemat/src/sheet-elements.js`                | Lista elementów arkusza                                   |
-| `Schemat/src/project-files.js`                 | Otwieranie/zapis projektu                                 |
-| `Schemat/tests/core.test.js`                   | Testy Vitest                                              |
-| `schematy/lib/E-00_symbole.svg`                | Biblioteka symboli                                        |
-| `schematy/project/CS-TB-48/Zasilanie.svg`      | Arkusz zasilania                                          |
-| `schematy/project/CS-TB-48/Bezpieczenstwo.svg` | Arkusz bezpieczeństwa                                     |
-| `schematy/project/CS-TB-48/Enable.svg`         | Arkusz enable (K2)                                        |
-| `schematy/project/CS-TB-48/Naped.svg`          | Arkusz napędu                                             |
-| `schematy/project/CS-TB-48/Zator.svg`          | Arkusz układu zatoru                                      |
-| `schematy/project/CS-TB-48/projekt.json`       | Metadane + SSOT spisu (`sheetConnections`)                |
-| `schematy/project/CS-TB-48/polaczenia_*.md`    | Legacy / migracja do `sheetConnections`                   |
-| `schematy/project/CS-TB-48/polaczenia.md`      | Legacy master (referencja DTR), nie SSOT edytora          |
-| `build/build.ps1`                              | PDF DTR (pre-commit hook)                                 |
+| Plik                                         | Rola                                                                     |
+| -------------------------------------------- | ------------------------------------------------------------------------ |
+| `Schemat/index.html`                         | Aplikacja edytora (Vite), modal `#connMeta`                              |
+| `Schemat/src/main.js`                        | UI, routing, integracja modułów                                          |
+| `Schemat/src/draw-mode.js`                   | Tryb rysowania (punkty, preview, finish)                                 |
+| `Schemat/src/sidebar-lists.js`               | Listy sidebara (symbole, arkusze, elementy)                              |
+| `Schemat/src/netlist-ui.js`                  | UI spisu połączeń + live validator                                       |
+| `Schemat/src/file-io.js`                     | Zapis/odczyt plików                                                      |
+| `Schemat/src/element-factory.js`             | Fabryka elementów SVG                                                    |
+| `Schemat/src/dom-selectors.js`               | Bezpieczne selektory CSS                                                 |
+| `Schemat/src/conn-theme.js`                  | SSOT stylów złączy                                                       |
+| `Schemat/src/conn-model.js`                  | Model złączy, `connEndpointCoords`                                       |
+| `Schemat/src/symbol-aliases.js`              | Mapowanie starych id symboli → kanoniczne (WD, X-3, SK1…)                |
+| `Schemat/src/netlist-model.js`               | Parser i klasy przewodów (ESM)                                           |
+| `Schemat/src/orthogonal-router.js`           | Trasowanie ortogonalne                                                   |
+| `Schemat/src/wire-theme.js`                  | Kolory i style przewodów netlisty                                        |
+| `Schemat/src/history.js`                     | Undo/redo                                                                |
+| `Schemat/src/svg-utils.js`                   | Pomocnicze operacje SVG, sanityzacja                                     |
+| `Schemat/src/instance-refs.js`               | Numeracja i edycja `data-ref`                                            |
+| `Schemat/src/sheet-elements.js`              | Lista elementów arkusza                                                  |
+| `Schemat/src/project-files.js`               | Otwieranie/zapis projektu                                                |
+| `Schemat/tests/core.test.js`                 | Testy Vitest                                                             |
+| `schematy/lib/symbole.svg`                   | Biblioteka symboli (także `symbole-elek.svg`, legacy `E-00_symbole.svg`) |
+| `schematy/project/<maszyna>/*.svg`           | Arkusze schematów maszyny                                                |
+| `schematy/project/<maszyna>/projekt.json`    | Metadane + SSOT spisu (`sheetConnections`)                               |
+| `schematy/project/<maszyna>/polaczenia_*.md` | Legacy / migracja do `sheetConnections`                                  |
+| `build/build.ps1`                            | PDF DTR (pre-commit hook)                                                |
 
 ---
 
 ## 10. Metryki sukcesu
 
 - Nowa **kreska** w symbolu WD: tylko linia w kolorze symbolu, bez kółka; czerwony punkt styku na końcu.
-- Nowy **punkt** na Zasilaniu: tylko kółko zacisku (obrys jak symbol), 4 czerwone punkty styku na obwodzie.
+- Nowy **punkt** na arkuszu: tylko kółko zacisku (obrys jak symbol), 4 czerwone punkty styku na obwodzie.
 - Snap i trasowanie łączą się z punktami styku (`data-part="contact"`), nie ze środkiem jointa.
 - Punkt złącza: router wybiera styk automatycznie; użytkownik nie ustawia kierunku w UI.
 - Netlista rozpoznaje wszystkie `[data-role="conn"][data-ref][data-pin]`.
 - `npm test` / lint / format:check przechodzą w CI.
-- Brak regresji wizualnej w E-00 po migracji (naprawione tagi joint, zsynchronizowane style CSS).
+- Brak regresji wizualnej w bibliotece po migracji (naprawione tagi joint, zsynchronizowane style CSS).
 
 ---
 

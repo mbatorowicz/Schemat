@@ -8,30 +8,40 @@ import {
 import {
   getFileHandleByPath,
   isAllowedLibraryParentPath,
+  isLikelyLibraryFileName,
   relinkExistingFileHandle,
   resolvePathViaParents,
 } from "../src/project-files.js";
 
 describe("project-paths", () => {
   it("defaultLibraryRelPath — plik w katalogu projektu", () => {
-    expect(defaultLibraryRelPath()).toBe("E-00_symbole.svg");
+    expect(defaultLibraryRelPath()).toBe("symbole.svg");
   });
 
   it("libraryDiscoveryRelPaths — płasko, lib/, ../lib/", () => {
     const paths = libraryDiscoveryRelPaths("shared/symbole.svg");
     expect(paths[0]).toBe("shared/symbole.svg");
+    expect(paths).toContain("symbole.svg");
+    expect(paths).toContain("lib/symbole.svg");
+    expect(paths).toContain("../lib/symbole.svg");
     expect(paths).toContain("E-00_symbole.svg");
-    expect(paths).toContain("lib/E-00_symbole.svg");
     expect(paths).toContain("../lib/E-00_symbole.svg");
   });
 
   it("existingLibrarySvgNames pomija schematy", () => {
     const files = [
-      { name: "E-00_symbole.svg", relPath: "E-00_symbole.svg" },
-      { name: "Zasilanie.svg", relPath: "arkusze/Zasilanie.svg" },
+      { name: "symbole.svg", relPath: "symbole.svg" },
+      { name: "Arkusz.svg", relPath: "arkusze/Arkusz.svg" },
     ];
-    const sheets = new Set(["arkusze/Zasilanie.svg"]);
-    expect(existingLibrarySvgNames(files, sheets)).toEqual(["E-00_symbole.svg"]);
+    const sheets = new Set(["arkusze/Arkusz.svg"]);
+    expect(existingLibrarySvgNames(files, sheets)).toEqual(["symbole.svg"]);
+  });
+
+  it("isLikelyLibraryFileName rozpoznaje domyślne i legacy nazwy", () => {
+    expect(isLikelyLibraryFileName("symbole.svg")).toBe(true);
+    expect(isLikelyLibraryFileName("symbole-elek.svg")).toBe(true);
+    expect(isLikelyLibraryFileName("E-00_symbole.svg")).toBe(true);
+    expect(isLikelyLibraryFileName("Arkusz.svg")).toBe(false);
   });
 
   it("sheetRelPathSet", () => {
@@ -85,10 +95,10 @@ describe("getFileHandleByPath — granice grantu", () => {
 
 describe("resolvePathViaParents", () => {
   it("pozwala tylko na ../lib biblioteki i nie tworzy pliku", async () => {
-    expect(isAllowedLibraryParentPath("../lib/E-00_symbole.svg")).toBe(true);
     expect(isAllowedLibraryParentPath("../lib/symbole.svg")).toBe(true);
+    expect(isAllowedLibraryParentPath("../lib/E-00_symbole.svg")).toBe(true);
     expect(isAllowedLibraryParentPath("../secret.txt")).toBe(false);
-    const file = { name: "E-00_symbole.svg" };
+    const file = { name: "symbole.svg" };
     const libDir = {
       getFileHandle: vi.fn(async (n, opts) => {
         expect(opts).toBeUndefined();
@@ -97,7 +107,7 @@ describe("resolvePathViaParents", () => {
     };
     const parent = { getDirectoryHandle: vi.fn(async () => libDir) };
     const dir = { getParent: vi.fn(async () => parent) };
-    const r = await resolvePathViaParents(dir, "../lib/E-00_symbole.svg");
+    const r = await resolvePathViaParents(dir, "../lib/symbole.svg");
     expect(r.handle).toBe(file);
     expect(parent.getDirectoryHandle).toHaveBeenCalledWith("lib");
     expect(await resolvePathViaParents(dir, "../secret.txt")).toBe(null);

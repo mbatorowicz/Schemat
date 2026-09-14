@@ -182,7 +182,7 @@ describe("relinkLibraryHandles", () => {
 
     const missing = new Error("nope");
     missing.name = "NotFoundError";
-    const viaLocal = await relinkLibraryHandles("dir", "E-00_symbole.svg", {
+    const viaLocal = await relinkLibraryHandles("dir", "symbole.svg", {
       resolveShared: async () => null,
       getByPath: async () => {
         throw missing;

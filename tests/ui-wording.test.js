@@ -26,10 +26,7 @@ describe("ui-wording SSOT", () => {
 
   it("main.js nie zawiera zakazanych etykiet UI (bez nazw plików/projektów)", () => {
     const main = readFileSync(join(root, "src/main.js"), "utf8");
-    const labelBans = BANNED_UI_TERMS.filter(
-      (t) => !["CS-TB", "Zasilanie", "E-01", "E-00_symbole", "Transporter boczny"].includes(t)
-    );
-    for (const banned of labelBans) {
+    for (const banned of BANNED_UI_TERMS) {
       expect(main).not.toContain(banned);
     }
   });

@@ -11,6 +11,7 @@ export const BANNED_UI_TERMS = [
   "Zasilanie",
   "E-01",
   "E-00_symbole",
+  "E-00",
   "np. B",
   "np. WD",
 ];
@@ -234,7 +235,7 @@ export const W = {
     send: "Wyślij",
     review: "Sprawdź arkusz",
     reviewPrompt:
-      "Sprawdź aktywny arkusz: symbole IEC/EN 60617 i konwencję E-00, oznaczenia EN 81346, spis vs rysunek, L/N/PE, braki pinów. Zaproponuj konkretne poprawki do akceptacji.",
+      "Sprawdź aktywny arkusz: symbole IEC/EN 60617, oznaczenia EN 81346, spis vs rysunek, L/N/PE, braki pinów. Zaproponuj konkretne poprawki do akceptacji.",
     apply: "Zastosuj",
     reject: "Odrzuć",
     applied: "Zastosowano propozycję.",

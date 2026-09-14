@@ -87,7 +87,7 @@ cd Schemat && npm test && npm run test:e2e
 
 Kluczowe scenariusze ręczne:
 
-1. Otwórz CS-TB-48 → arkusze Zasilanie/Bezpieczenstwo/Enable/Naped/Zator; symbole G1, F1, SK1, Q widoczne na Zasilaniu (E2E: G1/F1 na fixture Zasilanie)
+1. Otwórz projekt maszyny → arkusze i symbole z biblioteki widoczne na aktywnym arkuszu (E2E: G1/F1 na fixture zasilania)
 2. Przełącz arkusz → spis z `projekt.json` → `sheetConnections` (jednorazowa migracja z `polaczenia_*.md` jeśli brak SSOT)
 3. Przycisk **Trasuj** — zachowuje/adoptuje ręczną trasę; auto tylko przy braku geometrii lub świadomym „Zastąp”
 4. Zmień font etykiety złącza → Zapisz → F5 → font zostaje

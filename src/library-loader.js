@@ -1,7 +1,7 @@
 /** Wczytywanie i normalizacja biblioteki symboli z dysku projektu. */
 import { syncConnStylesInLib } from "./conn-theme.js";
 import { parseSvg } from "./svg-utils.js";
-import { pickLibraryFile, resolveSharedLibrary, normalizeRelPath } from "./project-files.js";
+import { pickLibraryFile, resolveSharedLibrary, normalizeRelPath, LIBRARY_FILE_NAMES } from "./project-files.js";
 import { libSymbolGroups } from "./symbol-resolver.js";
 import { qsById } from "./dom-selectors.js";
 
@@ -85,7 +85,7 @@ export async function findLibraryInProject(walked, settingsLibrary, svgCandidate
 export function createLibraryRecord(parsed, name, handle) {
   return {
     handle: handle || null,
-    name: name || "E-00_symbole.svg",
+    name: name || LIBRARY_FILE_NAMES[0],
     svg: parsed.svg,
     doc: parsed.doc,
   };

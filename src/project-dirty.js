@@ -12,7 +12,7 @@ export function clearLibDirty(lib) {
   if (lib) lib.dirty = false;
 }
 
-/** Edycja aktywnego celu: arkusz albo biblioteka (E-00). */
+/** Edycja aktywnego celu: arkusz albo biblioteka symboli. */
 export function markActiveTargetDirty(state) {
   if (!state?.active) return;
   if (state.active === state.lib) markLibDirty(state.lib);

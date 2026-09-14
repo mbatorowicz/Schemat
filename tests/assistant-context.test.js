@@ -69,7 +69,7 @@ describe("assistant-context", () => {
       state: {
         dir: { name: "proj" },
         active: sheet,
-        lib: { name: "E-00.svg", svg: document.createElementNS("http://www.w3.org/2000/svg", "svg") },
+        lib: { name: "symbole.svg", svg: document.createElementNS("http://www.w3.org/2000/svg", "svg") },
         srcSvg: svg,
         netlist: {
           connections: [

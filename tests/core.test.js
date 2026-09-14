@@ -69,28 +69,29 @@ describe("project-files", () => {
 
   it("preferuje spis z tego samego folderu co arkusz", () => {
     const netlists = [
-      { name: "polaczenia_E-01.md", relPath: "CS-TB-48/polaczenia_E-01.md" },
-      { name: "polaczenia_E-02.md", relPath: "inny/polaczenia_E-02.md" },
+      { name: "polaczenia_Arkusz.md", relPath: "projekt/polaczenia_Arkusz.md" },
+      { name: "polaczenia_Inny.md", relPath: "inny/polaczenia_Inny.md" },
     ];
-    const sheet = { name: "E-01.svg", relPath: "CS-TB-48/E-01.svg" };
-    expect(netlistsForSheet(netlists, sheet).map((f) => f.name)).toEqual(["polaczenia_E-01.md"]);
+    const sheet = { name: "Arkusz.svg", relPath: "projekt/Arkusz.svg" };
+    expect(netlistsForSheet(netlists, sheet).map((f) => f.name)).toEqual(["polaczenia_Arkusz.md"]);
   });
 
   it("szuka biblioteki w projekcie i folderach nadrzędnych", () => {
-    const paths = librarySearchRelPaths("../../lib/E-00_symbole.svg");
-    expect(paths[0]).toBe("../../lib/E-00_symbole.svg");
-    expect(paths).toContain("lib/E-00_symbole.svg");
+    const paths = librarySearchRelPaths("../../lib/symbole-elek.svg");
+    expect(paths[0]).toBe("../../lib/symbole-elek.svg");
+    expect(paths).toContain("lib/symbole.svg");
+    expect(paths).toContain("E-00_symbole.svg");
   });
 });
 
 describe("sheet-persistence", () => {
   it("zachowuje niezapisany arkusz przy przeładowaniu z dysku", async () => {
     const { preserveDirtySheets, sheetKey } = await import("../src/sheet-persistence.js");
-    const mem = { name: "E-01.svg", relPath: "CS-TB-48/E-01.svg", id: "sch-1", dirty: true, svg: { tag: "mem" } };
-    const disk = { name: "E-01.svg", relPath: "CS-TB-48/E-01.svg", id: "sch-1", dirty: false, svg: { tag: "disk" } };
+    const mem = { name: "Arkusz.svg", relPath: "projekt/Arkusz.svg", id: "sch-1", dirty: true, svg: { tag: "mem" } };
+    const disk = { name: "Arkusz.svg", relPath: "projekt/Arkusz.svg", id: "sch-1", dirty: false, svg: { tag: "disk" } };
     const out = preserveDirtySheets([mem], [disk]);
     expect(out[0].svg.tag).toBe("mem");
-    expect(sheetKey(mem)).toBe("CS-TB-48/E-01.svg");
+    expect(sheetKey(mem)).toBe("projekt/Arkusz.svg");
   });
 });
 

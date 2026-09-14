@@ -100,7 +100,7 @@ async function openMockProject(page, files) {
       const root = dirHandle(dirName, children);
       window.showDirectoryPicker = async () => root;
     },
-    { files, dirName: "CS-TB-48" }
+    { files, dirName: "projekt" }
   );
 
   await page.goto("/");
@@ -109,12 +109,12 @@ async function openMockProject(page, files) {
   await expect(page.locator("#schlist .sch-title")).toHaveText("Zasilanie", { timeout: 15_000 });
 }
 
-test.describe("CS-TB-48 Zasilanie", () => {
+test.describe("Arkusz zasilania", () => {
   test("symbole G1 i F1 są widoczne po otwarciu projektu", async ({ page }) => {
     await openMockProject(page, {
       "Zasilanie.svg": fixture("Zasilanie.svg"),
-      "E-00_symbole.svg": fixture("E-00_symbole.svg"),
-      "projekt.json": JSON.stringify({ library: "E-00_symbole.svg", sheetConnections: {} }),
+      "symbole.svg": fixture("E-00_symbole.svg"),
+      "projekt.json": JSON.stringify({ library: "symbole.svg", sheetConnections: {} }),
     });
 
     await expect(page.locator("#stage use[data-ref='G1']")).toHaveCount(1);
@@ -142,9 +142,9 @@ test.describe("CS-TB-48 Zasilanie", () => {
   test("Szkic ze spisu rozstawia brakujące G1 i F1", async ({ page }) => {
     await openMockProject(page, {
       "Zasilanie.svg": emptySheetSvg(),
-      "E-00_symbole.svg": fixture("E-00_symbole.svg"),
+      "symbole.svg": fixture("E-00_symbole.svg"),
       "projekt.json": JSON.stringify({
-        library: "E-00_symbole.svg",
+        library: "symbole.svg",
         sheetConnections: {
           "Zasilanie.svg": [{ id: "1", from: "G1:L", to: "F1:1", net: "L", wire: "", length: "", notes: "" }],
         },
@@ -176,9 +176,9 @@ test.describe("CS-TB-48 Zasilanie", () => {
   test("Połącz rysuje trasę ortogonalną między pinami", async ({ page }) => {
     await openMockProject(page, {
       "Zasilanie.svg": sheetWithPointConnectors(),
-      "E-00_symbole.svg": fixture("E-00_symbole.svg"),
+      "symbole.svg": fixture("E-00_symbole.svg"),
       "projekt.json": JSON.stringify({
-        library: "E-00_symbole.svg",
+        library: "symbole.svg",
         sheetConnections: {
           "Zasilanie.svg": [{ id: "1", from: "A1:1", to: "B1:1", net: "L", wire: "", length: "", notes: "" }],
         },

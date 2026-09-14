@@ -19,8 +19,17 @@ export function netlistNamesForSheet(sheetName) {
   return [`polaczenia_${base}.md`, `polaczenia-${base}.md`];
 }
 
-export const LIBRARY_FILE_NAMES = ["E-00_symbole.svg", "E-00.svg"];
+/** Domyślne i legacy nazwy pliku biblioteki (kolejność = preferencja przy tworzeniu). */
+export const LIBRARY_FILE_NAMES = ["symbole.svg", "symbole-elek.svg", "E-00_symbole.svg", "E-00.svg"];
 export const LIBRARY_DIR = "lib";
+
+/** Czy nazwa pliku wygląda na bibliotekę symboli, nie na arkusz. */
+export function isLikelyLibraryFileName(name) {
+  const n = String(name || "").trim();
+  if (!/\.svg$/i.test(n)) return false;
+  if (LIBRARY_FILE_NAMES.some((x) => foldFileName(x) === foldFileName(n))) return true;
+  return /^(e-?00|symbole)/i.test(n);
+}
 
 /** Ścieżki względem katalogu projektu lub workspace (do wyszukiwania biblioteki). */
 export function librarySearchRelPaths(settingsLibrary) {
@@ -103,14 +112,14 @@ export async function relinkExistingFileHandle(dir, relPath, name, getByPath = g
   return null;
 }
 
-/** Jedyny legalny `..`: jeden poziom w górę i tylko plik biblioteki (lib/E-00…). */
+/** Jedyny legalny `..`: jeden poziom w górę i tylko plik biblioteki (lib/symbole…). */
 export function isAllowedLibraryParentPath(relPath) {
   const parts = normalizeRelPath(relPath).split("/").filter(Boolean);
   if (parts[0] !== ".." || parts.includes(".")) return false;
   if (parts.slice(1).some((p) => p === "..")) return false;
   const rest = parts.slice(1);
   if (rest.length === 2 && rest[0] === LIBRARY_DIR && rest[1]) return true;
-  if (rest.length === 1 && LIBRARY_FILE_NAMES.includes(rest[0])) return true;
+  if (rest.length === 1 && isLikelyLibraryFileName(rest[0])) return true;
   return false;
 }
 
@@ -183,7 +192,7 @@ export function pickLibraryFile(svgFiles, settingsLibrary) {
     const hit = svgFiles.find((f) => norm(f.relPath) === rel);
     if (hit) return hit;
   }
-  return svgFiles.find((f) => /E-00/i.test(f.name) && !f.isSheet) || null;
+  return svgFiles.find((f) => isLikelyLibraryFileName(f.name) && !f.isSheet) || null;
 }
 
 /** Przechodzi w górę drzewa katalogów (getParent), jeśli przeglądarka na to pozwala. */
@@ -205,7 +214,7 @@ export async function ascendDirectoryHandles(dir, maxSteps = 6) {
 
 /**
  * Szuka wspólnej biblioteki: w folderze projektu, potem w katalogach nadrzędnych (np. schematy/lib/).
- * Umożliwia otwarcie folderu konkretnego projektu (CS-TB-48/) zamiast całego schematy/.
+ * Umożliwia otwarcie folderu konkretnej maszyny zamiast całego drzewa schematów.
  */
 export async function resolveSharedLibrary(projectDir, settingsLibrary) {
   if (!projectDir) return null;

@@ -1,5 +1,5 @@
 /**
- * Mapowanie starych id symboli / instancji na kanoniczne id z biblioteki E-00.
+ * Mapowanie starych id symboli / instancji na kanoniczne id z biblioteki.
  * Używane przy migracji SVG i rozwiązywaniu <use href="#…"> w edytorze.
  */
 

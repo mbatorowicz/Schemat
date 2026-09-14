@@ -1,5 +1,5 @@
 /**
- * Rozwiązywanie symboli: biblioteka E-00 jest źródłem prawdy.
+ * Rozwiązywanie symboli: biblioteka projektu jest źródłem prawdy.
  * Osadzone <defs> w arkuszu — tylko fallback offline.
  */
 import { canonicalSymbolId, parseSymbolIdAliases } from "./symbol-aliases.js";

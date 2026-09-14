@@ -59,15 +59,15 @@ function mockSheet({ name = "Zasilanie.svg", id = "sch-1", titleAttr = "", ttl =
 
 describe("sheet-catalog", () => {
   it("sheetDisplayTitle: atrybut arkusza > plik; ignoruje .ttl (tytuł projektu)", () => {
-    expect(sheetDisplayTitle(mockSheet({ titleAttr: "Zasilanie", ttl: "Transporter" }))).toBe("Zasilanie");
-    expect(sheetDisplayTitle(mockSheet({ ttl: "Transporter boczny", name: "Zasilanie.svg" }))).toBe("Zasilanie");
+    expect(sheetDisplayTitle(mockSheet({ titleAttr: "Zasilanie", ttl: "Nazwa maszyny" }))).toBe("Zasilanie");
+    expect(sheetDisplayTitle(mockSheet({ ttl: "Nazwa maszyny", name: "Zasilanie.svg" }))).toBe("Zasilanie");
     expect(sheetDisplayTitle(mockSheet({ name: "Bezpieczenstwo.svg" }))).toBe("Bezpieczenstwo");
   });
 
   it("odrzuca data-sheet-title skopiowany z tytułu projektu", () => {
     const sh = mockSheet({
-      titleAttr: "Transporter boczny do drukarki",
-      ttl: "Transporter boczny do drukarki",
+      titleAttr: "Nazwa maszyny",
+      ttl: "Nazwa maszyny",
       name: "Bezpieczenstwo.svg",
     });
     expect(isSheetTitlePollutedByDoc(sh)).toBe(true);
@@ -81,24 +81,24 @@ describe("sheet-catalog", () => {
   });
 
   it("applySheetDisplayTitle zapisuje atrybut i nie rusza .ttl", () => {
-    const sh = mockSheet({ name: "Zasilanie.svg", ttl: "Transporter" });
+    const sh = mockSheet({ name: "Zasilanie.svg", ttl: "Nazwa maszyny" });
     const res = applySheetDisplayTitle(sh, "1. Zasilanie");
     expect(res.ok).toBe(true);
     expect(sh._attrs[SHEET_TITLE_ATTR]).toBe("1. Zasilanie");
     expect(sh.dirty).toBe(true);
-    expect(sheetTitleFromChrome(sh)).toBe("Transporter");
+    expect(sheetTitleFromChrome(sh)).toBe("Nazwa maszyny");
   });
 
   it("migrateSheetDisplayTitle naprawia zanieczyszczenie i ustawia nazwę z pliku", () => {
     const polluted = mockSheet({
-      ttl: "Transporter",
-      titleAttr: "Transporter",
+      ttl: "Nazwa maszyny",
+      titleAttr: "Nazwa maszyny",
       name: "Enable.svg",
     });
     expect(migrateSheetDisplayTitle(polluted)).toBe(true);
     expect(polluted._attrs[SHEET_TITLE_ATTR]).toBe("Enable");
 
-    const bare = mockSheet({ name: "Naped.svg", ttl: "Transporter", titleAttr: "" });
+    const bare = mockSheet({ name: "Naped.svg", ttl: "Nazwa maszyny", titleAttr: "" });
     expect(migrateSheetDisplayTitle(bare)).toBe(true);
     expect(bare._attrs[SHEET_TITLE_ATTR]).toBe("Naped");
   });

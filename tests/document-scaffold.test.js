@@ -11,12 +11,15 @@ import {
 describe("document-scaffold", () => {
   it("uniqueFileName unika kolizji", () => {
     expect(uniqueFileName(["Schemat.svg"], "Schemat")).toBe("Schemat-2.svg");
-    expect(uniqueFileName([], "Zasilanie")).toBe("Zasilanie.svg");
+    expect(uniqueFileName([], "Arkusz")).toBe("Arkusz.svg");
   });
 
-  it("uniqueLibraryFileName preferuje E-00_symbole.svg", () => {
-    expect(uniqueLibraryFileName([])).toBe("E-00_symbole.svg");
-    expect(uniqueLibraryFileName(["E-00_symbole.svg"])).toBe("E-00.svg");
+  it("uniqueLibraryFileName preferuje symbole.svg", () => {
+    expect(uniqueLibraryFileName([])).toBe("symbole.svg");
+    expect(uniqueLibraryFileName(["symbole.svg"])).toBe("symbole-elek.svg");
+    expect(uniqueLibraryFileName(["symbole.svg", "symbole-elek.svg", "E-00_symbole.svg", "E-00.svg"])).toBe(
+      "symbole-2.svg"
+    );
   });
 
   it("nextSheetGroupId zwiększa numer", () => {
@@ -24,10 +27,10 @@ describe("document-scaffold", () => {
   });
 
   it("libraryRelPathInProject i projectSettingsForNewProject", () => {
-    expect(libraryRelPathInProject()).toBe("E-00_symbole.svg");
-    const cfg = projectSettingsForNewProject("CS-TB-48");
-    expect(cfg.library).toBe("E-00_symbole.svg");
-    expect(cfg.doc).toBe("CS-TB-48");
+    expect(libraryRelPathInProject()).toBe("symbole.svg");
+    const cfg = projectSettingsForNewProject("Maszyna-01");
+    expect(cfg.library).toBe("symbole.svg");
+    expect(cfg.doc).toBe("Maszyna-01");
   });
 
   it("emptySvgMarkup zawiera defs/style", () => {

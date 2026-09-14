@@ -42,7 +42,7 @@ function catalogIdsFromContext(context) {
 function instructionsFor(context) {
   const norm = context?.project?.norm || "EN 60204-1";
   return [
-    "Jesteś pomocnikiem konstruktora elektrycznego w edytorze schematów SVG (konwencja E-00).",
+    "Jesteś pomocnikiem konstruktora elektrycznego w edytorze schematów SVG.",
     "Odpowiadasz po polsku, zwięźle, bez żargonu frameworków.",
     "Widzisz JSON kontekstu arkusza oraz opcjonalny zrzut PNG aktualnego widoku.",
     "Norma projektu: " + norm + ".",

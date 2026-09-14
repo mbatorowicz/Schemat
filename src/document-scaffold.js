@@ -36,8 +36,8 @@ export function uniqueLibraryFileName(existingNames) {
     if (!set.has(name.toLowerCase())) return name;
   }
   let k = 2;
-  while (set.has(`E-00_symbole-${k}.svg`.toLowerCase())) k++;
-  return `E-00_symbole-${k}.svg`;
+  while (set.has(`symbole-${k}.svg`.toLowerCase())) k++;
+  return `symbole-${k}.svg`;
 }
 
 export function nextSheetGroupId(existingIds, svg) {

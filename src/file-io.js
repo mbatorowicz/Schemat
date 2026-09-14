@@ -4,6 +4,7 @@ import { clearLibDirty, clearSettingsDirty } from "./project-dirty.js";
 import { auditSymbolsOnSheet } from "./symbol-service.js";
 import { qsById } from "./dom-selectors.js";
 import { status } from "./ui-wording.js";
+import { DEFAULT_LIBRARY_FILE } from "./document-scaffold.js";
 
 /**
  * Zapis plików i uprawnienia File System Access API — wydzielone z main.js.
@@ -168,7 +169,7 @@ export function createFileIo(deps) {
         try {
           let h = state.lib.handle || state.libHandle;
           if (!h) {
-            const libName = state.lib.name || "E-00_symbole.svg";
+            const libName = state.lib.name || DEFAULT_LIBRARY_FILE;
             h = await state.dir.getFileHandle(libName, { create: true });
             state.lib.handle = h;
             state.libHandle = h;

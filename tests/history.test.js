@@ -147,7 +147,7 @@ describe("captureActiveSnapshot (M8)", () => {
     expect(snapBytes).toBeLessThan(fullBytes / 4);
   });
 
-  it("biblioteka: snapshot to aktualny symbol, nie cała E-00", () => {
+  it("biblioteka: snapshot to aktualny symbol, nie cała biblioteka", () => {
     const symbols = Array.from({ length: 30 }, (_, i) => fatSymbolMarkup(i === 0 ? "G1" : "S" + i)).join("");
     const full = parseSvg(`<svg xmlns="http://www.w3.org/2000/svg"><defs><style>.s{}</style>${symbols}</defs></svg>`);
     const lib = { svg: full.svg, doc: full.doc, id: "lib" };

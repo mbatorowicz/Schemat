@@ -6,7 +6,7 @@ describe("resolveBootStatusMessage", () => {
     const m = resolveBootStatusMessage({
       loadedFromDisk: true,
       sheetCount: 2,
-      libraryLabel: "lib/E-00.svg",
+      libraryLabel: "lib/symbole.svg",
       restoredFromCache: false,
       hasDir: true,
     });
