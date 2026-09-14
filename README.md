@@ -26,8 +26,11 @@ npm run build
 npm run preview
 npm test
 npm run test:coverage
+npm run test:e2e
 npm run lint
 ```
+
+E2E (`npm run test:e2e`) wymaga Chromium: `npx playwright install chromium`.
 
 ## Deploy na Vercel
 

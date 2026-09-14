@@ -489,7 +489,7 @@ Rób dopiero po części A–D. Nadal jeden krok = jedno okno.
 | 27 | H2 | nie klonuj surowego `<style>` z niezaufanego SVG albo ogranicz selektory |
 | 28 | L2 | jeden test integracyjny jsdom: otwórz fixture arkusza + `inlineSheetDefsSafe` ma `<defs>` |
 | 29 | L6 | `npm audit` devDeps — tylko jeśli nie psuje lockfile bez powodu — **zrobione** (`npm audit fix`, bez `--force`). Zostaje GHSA-82fw-gwwq-j7x9 w Vitest 3 (łatka od 4.1.11; skok na v5 poza zakresem). |
-| 30 | L2 | E2E Playwright CS-TB-48 (symbole G1/F1 na Zasilaniu) — osobny setup |
+| 30 | L2 | E2E Playwright CS-TB-48 (symbole G1/F1 na Zasilaniu) — osobny setup — **zrobione** (`npm run test:e2e`, mock FS Access, fixture Zasilanie). |
 
 ---
 

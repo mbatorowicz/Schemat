@@ -10,7 +10,9 @@
   <g id="sch-1" data-sheet-title="Zasilanie">
     <rect class="fr" x="12" y="12" width="1461" height="1026"/>
     <text class="ttl" x="34" y="52">Zasilanie</text>
-    <use href="#G1" data-sym="G1" x="120" y="160"/>
-    <use href="#F1" data-sym="F1" x="260" y="160"/>
+    <use href="#G1" data-sym="G1" data-ref="G1" x="120" y="160"/>
+    <text data-label="desig" data-owner-ref="G1" x="120" y="152">G1</text>
+    <use href="#F1" data-sym="F1" data-ref="F1" x="260" y="160"/>
+    <text data-label="desig" data-owner-ref="F1" x="260" y="152">F1</text>
   </g>
 </svg>
