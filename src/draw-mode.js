@@ -75,7 +75,7 @@ export function createDrawMode(deps) {
     styleText,
     styleNode,
     applyConnectionRecord,
-    prompt: promptFn = typeof window !== "undefined" ? window.prompt.bind(window) : () => null,
+    askText,
   } = deps;
 
   function attachProposal(el, proposal) {
@@ -236,7 +236,7 @@ export function createDrawMode(deps) {
     state.drawing.pts.push([x, y]);
     state.drawing.snaps.push(snapped);
     drawPreview();
-    if (state.drawing.need !== Infinity && state.drawing.pts.length >= state.drawing.need) finishShape();
+    if (state.drawing.need !== Infinity && state.drawing.pts.length >= state.drawing.need) void finishShape();
   }
 
   function arcPath(p0, p1, p2) {
@@ -527,13 +527,13 @@ export function createDrawMode(deps) {
       added.push(el);
     } else if (k === "text") {
       const c = pts[0];
-      const t = promptFn("Tekst:", "TXT");
-      if (t === null) {
+      const t = typeof askText === "function" ? await askText("Tekst", { defaultValue: "TXT", label: "Tekst" }) : null;
+      if (t == null) {
         render();
         return;
       }
       const el = mkEl("text", { x: c[0], y: c[1], class: "pin" });
-      el.textContent = t;
+      el.textContent = String(t);
       styleText(el);
       added.push(el);
     } else if (k === "node") {

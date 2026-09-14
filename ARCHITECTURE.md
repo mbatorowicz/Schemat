@@ -102,7 +102,7 @@ Kluczowe scenariusze ręczne:
 - [x] `selection-props-ui.js` + `createSelectionPropsUi` podpięte w `main.js`
 - [x] `connection-fields.js` (binder pól połączenia)
 - [x] `askRouteChoice` / `askText` / connMeta → `ui-dialog.js` (focus trap na confirm/choice)
-- [x] Draw-mode: infer sygnału zamiast `prompt` (modal `askText` dostępny)
+- [x] Draw-mode: infer sygnału; tekst przez modal `askText` (bez `window.prompt`)
 - [x] `wireDrawMode()` w `bootstrapEditorSync`, nie w `wireNetlistRouting`
 - [x] `exportSymbolSvg` — eksport przez te same klony defs co podgląd
 - [x] `route-opts-ui.js` wydzielony z `main.js`
