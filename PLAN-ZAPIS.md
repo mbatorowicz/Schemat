@@ -14,28 +14,28 @@ Po kroku: commit (`fix:` / `refactor:` / `docs:`) i zwykły `git push`.
 
 ## Rejestr: finding → krok
 
-| ID | Waga | Temat | Krok |
-|----|------|--------|------|
-| C1 | krytyczne | `#setSave` kasuje `sheetConnections` | 1 |
-| H1 | wysokie | XSS `innerHTML` w tabeli spisu | 8 |
-| H2 | wysokie | sanitize SVG tylko regex | 9 |
-| H3 | wysokie | `main.js` god-object / martwy UI / SSOT | 13, 14, 15 |
-| M1 | średnie | cache SVG + uchwyty FS w IDB | 7, 12 |
-| M2 | średnie | CSP tylko Vercel, dziurawy | 10 |
-| M3 | średnie | `library` przez `../` poza projekt | 11 |
-| M4 | średnie | confirm/choice bez focus trap | 16 |
-| M5 | średnie | `prompt()` w `conn-model` | 17 |
-| M6 | średnie | ESLint / coverage rozbrojone | 18 |
-| M7 | średnie | stringi poza `ui-wording.js` | 19 |
-| M8 | średnie | undo = 80 pełnych SVG | kolejka 2 |
-| M9 | średnie | zapis bez mutexa, boot bez blokady | 5, 21 |
-| M10 | średnie | `cloneNode` przy każdym `render()` | kolejka 2 |
-| L1 | niskie | puste `catch` | 12 (cache), reszta kolejka 2 |
-| L2 | niskie | luki testów / brak E2E | testy w każdym kroku; E2E = kolejka 2 |
-| L3 | niskie | CSS w `index.html` | kolejka 2 |
-| L4 | niskie | `clearEditorCache` niepełny | 12 |
-| L5 | niskie | PRD 1.7 zaległy | 20 |
-| L6 | niskie | `fs.allow` + CVE devDeps | 11 |
+| ID  | Waga      | Temat                                   | Krok                                  |
+| --- | --------- | --------------------------------------- | ------------------------------------- |
+| C1  | krytyczne | `#setSave` kasuje `sheetConnections`    | 1                                     |
+| H1  | wysokie   | XSS `innerHTML` w tabeli spisu          | 8                                     |
+| H2  | wysokie   | sanitize SVG tylko regex                | 9                                     |
+| H3  | wysokie   | `main.js` god-object / martwy UI / SSOT | 13, 14, 15                            |
+| M1  | średnie   | cache SVG + uchwyty FS w IDB            | 7, 12                                 |
+| M2  | średnie   | CSP tylko Vercel, dziurawy              | 10                                    |
+| M3  | średnie   | `library` przez `../` poza projekt      | 11                                    |
+| M4  | średnie   | confirm/choice bez focus trap           | 16                                    |
+| M5  | średnie   | `prompt()` w `conn-model`               | 17                                    |
+| M6  | średnie   | ESLint / coverage rozbrojone            | 18                                    |
+| M7  | średnie   | stringi poza `ui-wording.js`            | 19                                    |
+| M8  | średnie   | undo = 80 pełnych SVG                   | kolejka 2                             |
+| M9  | średnie   | zapis bez mutexa, boot bez blokady      | 5, 21                                 |
+| M10 | średnie   | `cloneNode` przy każdym `render()`      | kolejka 2                             |
+| L1  | niskie    | puste `catch`                           | 12 (cache), reszta kolejka 2          |
+| L2  | niskie    | luki testów / brak E2E                  | testy w każdym kroku; E2E = kolejka 2 |
+| L3  | niskie    | CSS w `index.html`                      | kolejka 2                             |
+| L4  | niskie    | `clearEditorCache` niepełny             | 12                                    |
+| L5  | niskie    | PRD 1.7 zaległy                         | 20                                    |
+| L6  | niskie    | `fs.allow` + CVE devDeps                | 11                                    |
 
 ---
 
@@ -89,12 +89,12 @@ Lepiej wyodrębnić `applySettingsForm(cfg, form)` do `src/project-settings.js` 
 
 **Zrób (rename + alias, to samo ciało):**
 
-| Dziś | Nowa nazwa | Znaczenie |
-|------|------------|-----------|
-| `persistNow` w main | `persistCache` | LS + IDB |
-| `saveProject` w main | alias → `persistCache` | cache, nie dysk |
-| `flushDoc` / `flushLibrary` | wołają `persistCache` | bez nowej logiki |
-| `persistNow` w netlist-ui | `commitNetlist` | sync + cache + (na razie) JSON na dysk |
+| Dziś                        | Nowa nazwa             | Znaczenie                              |
+| --------------------------- | ---------------------- | -------------------------------------- |
+| `persistNow` w main         | `persistCache`         | LS + IDB                               |
+| `saveProject` w main        | alias → `persistCache` | cache, nie dysk                        |
+| `flushDoc` / `flushLibrary` | wołają `persistCache`  | bez nowej logiki                       |
+| `persistNow` w netlist-ui   | `commitNetlist`        | sync + cache + (na razie) JSON na dysk |
 
 **Test:** `tests/persistence.test.js`, `tests/file-io-dirty.test.js`, `tests/boot-cache.test.js` bez zmian asercji.
 
@@ -479,17 +479,17 @@ Regex przed parse może zostać jako pierwsza linia.
 
 Rób dopiero po części A–D. Nadal jeden krok = jedno okno.
 
-| Krok | Finding | Cel w jednym zdaniu |
-|------|---------|---------------------|
-| 22 | M10 | `render()`: nie wołaj `rebuildEditDefs`, gdy symbole się nie zmieniły |
-| 23 | M8 | historia: limit 80 zostaje; snapshot tylko aktywnego dokumentu (już tak jest?) albo kompresja — zmierz, potem tnij |
-| 24 | L3 | wynieś CSS z `index.html` do `src/app.css` (bez zmiany wyglądu) |
-| 25 | L1 | zamień puste `catch` w `relinkHandles` / `persistCache` na `console.warn` + toast |
-| 26 | M7 | druga partia `setStatus` → `ui-wording` |
-| 27 | H2 | nie klonuj surowego `<style>` z niezaufanego SVG albo ogranicz selektory |
-| 28 | L2 | jeden test integracyjny jsdom: otwórz fixture arkusza + `inlineSheetDefsSafe` ma `<defs>` |
-| 29 | L6 | `npm audit` devDeps — tylko jeśli nie psuje lockfile bez powodu — **zrobione** (`npm audit fix`, bez `--force`). Zostaje GHSA-82fw-gwwq-j7x9 w Vitest 3 (łatka od 4.1.11; skok na v5 poza zakresem). |
-| 30 | L2 | E2E Playwright CS-TB-48 (symbole G1/F1 na Zasilaniu) — osobny setup — **zrobione** (`npm run test:e2e`, mock FS Access, fixture Zasilanie). |
+| Krok | Finding | Cel w jednym zdaniu                                                                                                                                                                                  |
+| ---- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 22   | M10     | `render()`: nie wołaj `rebuildEditDefs`, gdy symbole się nie zmieniły                                                                                                                                |
+| 23   | M8      | historia: limit 80 zostaje; snapshot tylko aktywnego dokumentu (już tak jest?) albo kompresja — zmierz, potem tnij                                                                                   |
+| 24   | L3      | wynieś CSS z `index.html` do `src/app.css` (bez zmiany wyglądu)                                                                                                                                      |
+| 25   | L1      | zamień puste `catch` w `relinkHandles` / `persistCache` na `console.warn` + toast                                                                                                                    |
+| 26   | M7      | druga partia `setStatus` → `ui-wording`                                                                                                                                                              |
+| 27   | H2      | nie klonuj surowego `<style>` z niezaufanego SVG albo ogranicz selektory                                                                                                                             |
+| 28   | L2      | jeden test integracyjny jsdom: otwórz fixture arkusza + `inlineSheetDefsSafe` ma `<defs>`                                                                                                            |
+| 29   | L6      | `npm audit` devDeps — tylko jeśli nie psuje lockfile bez powodu — **zrobione** (`npm audit fix`, bez `--force`). Zostaje GHSA-82fw-gwwq-j7x9 w Vitest 3 (łatka od 4.1.11; skok na v5 poza zakresem). |
+| 30   | L2      | E2E Playwright CS-TB-48 (symbole G1/F1 na Zasilaniu) — osobny setup — **zrobione** (`npm run test:e2e`, mock FS Access, fixture Zasilanie).                                                          |
 
 ---
 

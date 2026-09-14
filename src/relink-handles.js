@@ -11,11 +11,7 @@ function pathHasParentSegment(relPath) {
 function isExpectedHandleMiss(err) {
   const name = err?.name || "";
   const msg = String(err?.message || "");
-  return (
-    name === "NotFoundError" ||
-    name === "NotAllowedError" ||
-    /path escapes|empty path/i.test(msg)
-  );
+  return name === "NotFoundError" || name === "NotAllowedError" || /path escapes|empty path/i.test(msg);
 }
 
 /**

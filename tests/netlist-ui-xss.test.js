@@ -19,7 +19,7 @@ function mountEditorDom() {
 describe("fillEditorTable XSS", () => {
   it("payload w net nie tworzy węzła img — tekst zostaje widoczny", () => {
     mountEditorDom();
-    const payload = '<img src=x onerror=alert(1)>';
+    const payload = "<img src=x onerror=alert(1)>";
     const state = {
       sheets: [],
       netlist: {

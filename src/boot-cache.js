@@ -8,7 +8,7 @@ function sheetChars(snap) {
 
 export function isEmptyProjectSnap(snap) {
   if (!snap) return true;
-  return !(snap.sheets?.length) || sheetChars(snap) === 0;
+  return !snap.sheets?.length || sheetChars(snap) === 0;
 }
 
 /**
@@ -18,7 +18,7 @@ export function isEmptyProjectSnap(snap) {
 export function projectCacheScore(snap) {
   if (!snap) return 0;
   const chars = sheetChars(snap);
-  if (!(snap.sheets?.length) && !chars) return 0;
+  if (!snap.sheets?.length && !chars) return 0;
   const gen = snap.generation ?? 0;
   return gen * 1_000_000_000_000 + chars + (snap.savedAt ?? 0);
 }

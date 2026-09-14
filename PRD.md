@@ -317,12 +317,12 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 
 ## 11. Roadmap / dług techniczny
 
-| Priorytet | Element                                              | Status                                        |
-| --------- | ---------------------------------------------------- | --------------------------------------------- |
+| Priorytet | Element                                                                            | Status                                        |
+| --------- | ---------------------------------------------------------------------------------- | --------------------------------------------- |
 | Wysoki    | Dalszy podział `main.js` (project / handles / viewport; reszta statusów → wording) | Otwarte                                       |
-| Średni    | Walidator spójności netlisty vs schemat              | Zrobione — live `#netlistHealth`              |
-| Niski     | Rename pliku schematu na dysku (+ `polaczenia_*.md`) | Świadomie poza UI — lista zmienia tylko tytuł |
-| Niski     | Kolejny arkusz w tym samym edytorze                  | Otwarte                                       |
+| Średni    | Walidator spójności netlisty vs schemat                                            | Zrobione — live `#netlistHealth`              |
+| Niski     | Rename pliku schematu na dysku (+ `polaczenia_*.md`)                               | Świadomie poza UI — lista zmienia tylko tytuł |
+| Niski     | Kolejny arkusz w tym samym edytorze                                                | Otwarte                                       |
 
 **Zrealizowane (1.8):** SSOT spisu = `projekt.json` → `sheetConnections`; dirty/mutex zapisu; sanitize SVG po DOM; CSP; belka przez `createSelectionPropsUi`; eksport symbolu przez `exportSymbolSvg`; symbole tylko z `symbol-service.js`; `wireDrawMode` w bootstrap; focus trap; bez `window.prompt`; coverage w CI; partia statusów w `ui-wording`.
 

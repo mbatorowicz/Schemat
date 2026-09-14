@@ -22,9 +22,7 @@ describe("sanitizeSvgStyleText", () => {
   });
 
   it("zdejmuje błędny prefiks svg .klasa — odtwarza style po złym zapisie", () => {
-    expect(sanitizeSvgStyleText("svg .sym{stroke:#111}svg .fr{fill:none}")).toBe(
-      ".sym{stroke:#111}\n.fr{fill:none}"
-    );
+    expect(sanitizeSvgStyleText("svg .sym{stroke:#111}svg .fr{fill:none}")).toBe(".sym{stroke:#111}\n.fr{fill:none}");
   });
 
   it("zostawia #SymbolId", () => {
