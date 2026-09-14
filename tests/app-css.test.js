@@ -15,5 +15,8 @@ describe("app.css (L3)", () => {
     expect(css).toContain("#toolbar .toolbar-line");
     expect(css).toContain("#saveBadge");
     expect(css).toContain(".modal-bg");
+    expect(css).toContain(".split-btn");
+    expect(css).toContain(".tbtn.view-toggle");
+    expect(css).toContain(".toolbar-menu");
   });
 });

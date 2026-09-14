@@ -79,6 +79,17 @@ export function createNetlistUi(deps) {
     saveProject();
   }
 
+  function syncRouteActionButtons(state, selectedId) {
+    const hasList = !!state.netlist;
+    const n = (state.netlist?.connections || []).length;
+    const routeBtn = document.getElementById("btnRouteConn");
+    const routeAllBtn = document.getElementById("btnRouteAllConn");
+    const routeMenuBtn = document.getElementById("btnRouteMenu");
+    if (routeBtn) routeBtn.disabled = !hasList || !selectedId;
+    if (routeAllBtn) routeAllBtn.disabled = !hasList || !n;
+    if (routeMenuBtn) routeMenuBtn.disabled = !hasList || !n;
+  }
+
   function syncHighlight() {
     const state = getState();
     const sheet = targetSheet();
@@ -108,10 +119,7 @@ export function createNetlistUi(deps) {
     });
     if ([...sel.options].some((o) => o.value === prev)) sel.value = prev;
     else state.selectedConnId = "";
-    const routeBtn = document.getElementById("btnRouteConn");
-    if (routeBtn) routeBtn.disabled = !state.netlist || !sel.value;
-    const routeAllBtn = document.getElementById("btnRouteAllConn");
-    if (routeAllBtn) routeAllBtn.disabled = !state.netlist || !(state.netlist.connections || []).length;
+    syncRouteActionButtons(state, sel.value);
     const promoteBtn = document.getElementById("btnPromoteConn");
     const breakBtn = document.getElementById("btnBreakPoint");
     const wireEl = state.activeEl || state.selection?.[0];
@@ -463,9 +471,7 @@ export function createNetlistUi(deps) {
     document.getElementById("netlistConn").onchange = (e) => {
       const state = getState();
       state.selectedConnId = e.target.value;
-      document.getElementById("btnRouteConn").disabled = !state.selectedConnId;
-      const routeAllBtn = document.getElementById("btnRouteAllConn");
-      if (routeAllBtn) routeAllBtn.disabled = !state.netlist || !(state.netlist.connections || []).length;
+      syncRouteActionButtons(state, state.selectedConnId);
       syncHighlight();
       if (state.selectedConnId) {
         const r = state.netlist.connections.find((x) => x.id === state.selectedConnId);

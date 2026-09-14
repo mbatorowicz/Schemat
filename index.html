@@ -91,7 +91,7 @@
 
           <div class="grp" id="drawGroup">
             <div class="grp-row">
-              <button id="btnAddLine" class="tbtn" title="Linia"></button>
+              <button id="btnAddLine" class="tbtn" title="Linia / łamana"></button>
               <button id="btnAddRect" class="tbtn" title="Prostokąt"></button>
               <button id="btnAddCircle" class="tbtn" title="Koło"></button>
               <button id="btnAddArc" class="tbtn" title="Łuk"></button>
@@ -101,8 +101,8 @@
 
           <div class="grp" id="leadGroup">
             <div class="grp-row">
-              <button id="btnAddLead" class="tbtn" title="Kreska"></button>
-              <button id="btnAddPoint" class="tbtn" title="Punkt"></button>
+              <button id="btnAddLead" class="tbtn" title="Przyłącze"></button>
+              <button id="btnAddPoint" class="tbtn" title="Punkt styku"></button>
               <button id="btnAddNode" class="tbtn" title="Węzeł"></button>
             </div>
           </div>
@@ -119,25 +119,54 @@
           <div class="grp" id="netlistGroup">
             <div class="grp-row">
               <button id="btnNetlistOpen" class="tbtn" title="Edytuj spis połączeń">&#8801;</button>
-              <select id="netlistConn" title="Wybierz połączenie" style="width: 130px">
+              <select id="netlistConn" title="Wybierz połączenie" style="width: 140px">
                 <option value="">spis</option>
               </select>
-              <button id="btnRouteConn" class="btn-labeled tbtn" title="Połącz prostą linią" disabled>
-                <span class="btn-text">Połącz</span>
-              </button>
-              <button id="btnRouteAllConn" class="btn-labeled tbtn" title="Połącz wszystkie prostą linią" disabled>
-                <span class="btn-text">Wszystkie</span>
-              </button>
-              <button id="btnBreakPoint" class="btn-labeled tbtn" title="Dodaj punkt łamania" disabled>
+              <div class="split-btn" id="routeSplit">
+                <button
+                  id="btnRouteConn"
+                  class="btn-labeled tbtn split-main"
+                  title="Połącz wybrane prostą linią między pinami"
+                  disabled
+                >
+                  <span class="btn-text">Połącz</span>
+                </button>
+                <button
+                  type="button"
+                  id="btnRouteMenu"
+                  class="tbtn split-caret"
+                  title="Połącz wszystkie pozycje ze spisu"
+                  aria-label="Więcej opcji łączenia"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  disabled
+                ></button>
+                <div id="routeMenu" class="toolbar-menu" role="menu" aria-label="Połącz">
+                  <button type="button" role="menuitem" id="btnRouteAllConn" class="toolbar-menu-item" disabled>
+                    <span class="btn-text">Wszystkie</span>
+                  </button>
+                </div>
+              </div>
+              <button
+                id="btnBreakPoint"
+                class="btn-labeled tbtn"
+                title="Dodaj punkt łamania do zaznaczonej trasy"
+                disabled
+              >
                 <span class="btn-text">Łamanie</span>
               </button>
-              <select id="wireMarkMode" title="Konwencja nadruku na końcach przewodu" style="width: 118px">
+              <select id="wireMarkMode" title="Konwencja nadruku na końcach przewodu" style="width: 108px">
                 <option value="local">Lokalny</option>
                 <option value="other">Drugi koniec</option>
                 <option value="both">Skąd–dokąd</option>
               </select>
-              <button id="btnPromoteConn" class="btn-labeled tbtn" title="Promuj kreskę do połączenia" disabled>
-                <span class="btn-text">Połączenie</span>
+              <button
+                id="btnPromoteConn"
+                class="btn-labeled tbtn"
+                title="Zapisz zaznaczoną linię jako połączenie w spisie"
+                disabled
+              >
+                <span class="btn-text">Do spisu</span>
               </button>
               <button id="btnExportNetlist" class="tbtn" title="Propozycje">&#8644;</button>
               <span id="netlistHealth" title="Spójność spisu ze schematem"></span>
@@ -147,26 +176,45 @@
           <div class="grp" id="viewGroup">
             <div class="grp-row">
               <label class="mini" for="grid">Siatka</label>
-              <select id="grid" title="Siatka">
+              <select id="grid" title="Krok siatki">
                 <option value="1">1</option>
                 <option value="2.5">2.5</option>
                 <option value="5" selected>5</option>
               </select>
-              <label class="view-check"><input type="checkbox" id="snap" checked /> Snap</label>
-              <label class="view-check"><input type="checkbox" id="showHandles" checked /> Uchwyty</label>
-              <label class="view-check"><input type="checkbox" id="rotateOwnedLabels" checked /> Obracaj napisy</label>
+              <label class="tbtn view-toggle" title="Snap do siatki">
+                <input type="checkbox" id="snap" checked aria-label="Snap do siatki" />
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M5 5h5v5H5zM14 5h5v5h-5zM5 14h5v5H5zM14 14h5v5h-5z" />
+                </svg>
+              </label>
+              <label class="tbtn view-toggle" title="Uchwyty edycji">
+                <input type="checkbox" id="showHandles" checked aria-label="Uchwyty edycji" />
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <rect x="7" y="7" width="10" height="10" />
+                  <rect x="5" y="5" width="3.2" height="3.2" class="fillnode" />
+                  <rect x="15.8" y="5" width="3.2" height="3.2" class="fillnode" />
+                  <rect x="5" y="15.8" width="3.2" height="3.2" class="fillnode" />
+                  <rect x="15.8" y="15.8" width="3.2" height="3.2" class="fillnode" />
+                </svg>
+              </label>
+              <label class="tbtn view-toggle" title="Obracaj napisy wraz z symbolem">
+                <input type="checkbox" id="rotateOwnedLabels" checked aria-label="Obracaj napisy wraz z symbolem" />
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 9h8M11 9v8" />
+                  <path d="M16 11a5 5 0 1 1-1.2-3.4" />
+                  <path d="M16 5.5V9h-3.5" />
+                </svg>
+              </label>
               <span class="sep"></span>
               <button id="btnZoomOut" class="tbtn" title="Oddal"></button>
               <button id="btnZoomIn" class="tbtn" title="Przybliż"></button>
               <button id="btnFit" class="tbtn" title="Dopasuj"></button>
-              <button type="button" id="btnShortcuts" class="btn-labeled tbtn" title="Skróty">
-                <span class="btn-text">Skróty</span>
-              </button>
             </div>
           </div>
 
           <div class="grp" id="settingsGroup">
             <div class="grp-row">
+              <button type="button" id="btnShortcuts" class="tbtn" title="Skróty klawiszowe (?)"></button>
               <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
             </div>
           </div>

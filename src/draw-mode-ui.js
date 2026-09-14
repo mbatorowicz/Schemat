@@ -1,28 +1,20 @@
 /** SSOT etykiet i banera trybu rysowania (wydzielone z main.js). */
 
+import { W } from "./ui-wording.js";
+
 export const DRAW_LABELS = {
-  line: "Linia",
-  rect: "Prostokąt",
-  circle: "Koło",
-  arc: "Łuk",
-  text: "Tekst",
-  point: "Punkt",
-  node: "Węzeł",
-  lead: "Kreska",
-  branch: "Odgałęź",
+  line: W.draw.line,
+  rect: W.draw.rect,
+  circle: W.draw.circle,
+  arc: W.draw.arc,
+  text: W.draw.text,
+  point: W.draw.point,
+  node: W.draw.node,
+  lead: W.draw.lead,
+  branch: W.draw.branch,
 };
 
-export const DRAW_HINT = {
-  line: "Linia/łamana: klikaj punkty · Enter/dbl-klik = zakończ · Esc = anuluj.",
-  rect: "Prostokąt: klik = 1. narożnik, klik = 2. narożnik · Esc = anuluj.",
-  circle: "Okrąg: klik = środek, klik = promień · Esc = anuluj.",
-  arc: "Łuk: klik = początek, klik = szczyt, klik = koniec · Esc = anuluj.",
-  text: "Tekst: kliknij miejsce · Esc = anuluj.",
-  point: "Punkt: kliknij miejsce · Esc = anuluj.",
-  node: "Węzeł: kliknij miejsce · Esc = anuluj.",
-  lead: "Kreska: klik = początek, klik = koniec · Esc = anuluj.",
-  branch: "Odgałęź: klik szynę (wspólny odcinek), potem cel · Esc = anuluj.",
-};
+export const DRAW_HINT = { ...W.drawHint };
 
 /**
  * @param {{ drawBannerEl: HTMLElement|null, toolbarEl: HTMLElement|null, getDrawMode: () => string|null, onToolbarSync?: () => void }} deps

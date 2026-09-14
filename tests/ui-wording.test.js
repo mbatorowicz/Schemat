@@ -95,6 +95,17 @@ describe("ui-wording SSOT", () => {
     expect(status.loadFailed("y")).toContain("y");
   });
 
+  it("rozróżnia przyłącze od linii w belce i dialogach", () => {
+    expect(W.draw.lead).toBe("Przyłącze");
+    expect(W.draw.lineLong).toBe("Linia / łamana");
+    expect(W.draw.point).toBe("Punkt styku");
+    expect(W.chrome.promote).toBe("Do spisu");
+    expect(W.chrome.promoteTip).toMatch(/linię/i);
+    expect(W.confirm.adoptOrReroute).toMatch(/linię/i);
+    expect(W.confirm.adoptOrReroute).not.toMatch(/kresk/i);
+    expect(W.drawHint.lead).toMatch(/Przyłącze/);
+  });
+
   it("zapis i boot nie składają setStatus z gołych stringów", () => {
     const fileIo = readFileSync(join(root, "src/file-io.js"), "utf8");
     const persist = readFileSync(join(root, "src/persist-cache.js"), "utf8");

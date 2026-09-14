@@ -94,6 +94,18 @@ describe("draw-mode constants", () => {
     expect(main).not.toContain("btnAddPin");
     expect(html).toContain('id="btnAddText"');
   });
+
+  it("belka: przyłącze osobno od linii, bez etykiety Kreska", () => {
+    const html = readFileSync(join(root, "index.html"), "utf8");
+    expect(html).toMatch(/id="btnAddLead"[^>]*title="Przyłącze"/);
+    expect(html).toMatch(/id="btnAddLine"[^>]*title="Linia \/ łamana"/);
+    expect(html).toMatch(/id="btnAddPoint"[^>]*title="Punkt styku"/);
+    expect(html).not.toContain('title="Kreska"');
+    expect(html).toContain('id="btnRouteMenu"');
+    expect(html).toContain('id="routeMenu"');
+    expect(html).toContain("Do spisu");
+    expect(html).not.toContain("Promuj kreskę");
+  });
 });
 
 describe("createDrawMode startDraw", () => {

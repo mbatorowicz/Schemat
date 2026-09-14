@@ -122,8 +122,8 @@ const KIND_LABELS = {
   text: "Tekst",
   node: "Węzeł",
   junction: "Rozgałęzienie",
-  connLead: "Złącze · kreska",
-  connPoint: "Złącze · punkt",
+  connLead: "Złącze · przyłącze",
+  connPoint: "Złącze · punkt styku",
   other: "Element",
 };
 
@@ -170,7 +170,7 @@ export function sheetElementListLabel(el, index) {
   if (kind === "connLead" || kind === "connPoint") {
     const ref = el.getAttribute("data-ref") || "";
     const pin = el.getAttribute("data-pin") || "";
-    const tag = kind === "connLead" ? "kreska" : "punkt";
+    const tag = kind === "connLead" ? "przyłącze" : "punkt styku";
     return ref || pin ? `${ref}:${pin} (${tag})` : `Złącze ${index + 1} (${tag})`;
   }
   if (kind === "text") {

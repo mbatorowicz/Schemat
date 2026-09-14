@@ -213,9 +213,12 @@ const ICONS = {
   btnAddCircle: '<circle cx="12" cy="12" r="8"/>',
   btnAddArc: '<path d="M4 17a8 8 0 0 1 16 0"/>',
   btnAddText: '<path d="M6 6h12M12 6v13M9 19h6"/>',
-  btnAddPoint: '<circle cx="12" cy="12" r="5"/>',
-  btnAddNode: '<circle cx="12" cy="12" r="5" class="fillnode"/>',
-  btnAddLead: '<path d="M4 12h16"/>',
+  btnAddLead:
+    '<rect x="3" y="6" width="8" height="12" rx="1"/><path d="M11 12h8"/><circle cx="20.5" cy="12" r="1.6" class="fillnode"/>',
+  btnAddPoint: '<circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2" class="fillnode"/>',
+  btnAddNode: '<path d="M4 12h16M12 4v16"/><circle cx="12" cy="12" r="3.2" class="fillnode"/>',
+  btnRouteMenu: '<path d="M7 10l5 5 5-5"/>',
+  btnShortcuts: '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 11h2M11 11h2M15 11h2M8 15h8"/>',
   btnAlignLeft: '<path d="M4 4v16"/><path d="M8 7h8v3H8z"/><path d="M8 14h12v3H8z"/>',
   btnAlignCenterH: '<path d="M12 4v16"/><path d="M8 7h8v3H8z"/><path d="M6 14h12v3H6z"/>',
   btnAlignRight: '<path d="M20 4v16"/><path d="M8 7h8v3H8z"/><path d="M4 14h12v3H4z"/>',
@@ -922,6 +925,25 @@ function applyStaticWording() {
   setBtnText("btnRouteConn", W.chrome.route);
   setBtnText("btnRouteAllConn", W.chrome.routeAll);
   setBtnText("btnBreakPoint", W.chrome.breakPoint);
+  setBtnText("btnPromoteConn", W.chrome.promote);
+  const setTip = (id, text) => {
+    const el = document.getElementById(id);
+    if (el && text) el.title = text;
+  };
+  setTip("btnAddLine", W.draw.lineLong);
+  setTip("btnAddRect", W.draw.rect);
+  setTip("btnAddCircle", W.draw.circle);
+  setTip("btnAddArc", W.draw.arc);
+  setTip("btnAddText", W.draw.text);
+  setTip("btnAddLead", W.draw.lead);
+  setTip("btnAddPoint", W.draw.point);
+  setTip("btnAddNode", W.draw.node);
+  setTip("btnRouteConn", W.chrome.routeTip);
+  setTip("btnRouteAllConn", W.chrome.routeAllTip);
+  setTip("btnRouteMenu", W.chrome.routeMenuTip);
+  setTip("btnPromoteConn", W.chrome.promoteTip);
+  setTip("btnBreakPoint", W.chrome.breakPointTip);
+  setTip("btnShortcuts", W.chrome.shortcutsTip);
   const wireMarkSel = document.getElementById("wireMarkMode");
   if (wireMarkSel) {
     wireMarkSel.title = W.fieldTip.wireMarkMode;
@@ -3460,8 +3482,8 @@ function selectionTypeLabel(records) {
     path: "\u015bcie\u017cka",
     use: "symbol",
     node: "w\u0119ze\u0142",
-    point: "punkt",
-    lead: "kreska",
+    point: "punkt styku",
+    lead: "przy\u0142\u0105cze",
     pin: "pin",
   };
   const kind = (r) => (isConnGroup(r.el) ? connKind(r.el) : r.el.classList.contains("node") ? "node" : r.tag);
@@ -5151,6 +5173,31 @@ bindShortcutsHelp();
   };
   btn.addEventListener("click", (e) => {
     e.stopPropagation();
+    setOpen(!panel.classList.contains("open"));
+  });
+  document.addEventListener("pointerdown", (e) => {
+    if (!panel.classList.contains("open")) return;
+    if (panel.contains(e.target) || btn.contains(e.target)) return;
+    setOpen(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && panel.classList.contains("open")) setOpen(false);
+  });
+  panel.addEventListener("click", (e) => {
+    if (e.target.closest("button")) setOpen(false);
+  });
+})();
+(function wireRouteMenu() {
+  const btn = document.getElementById("btnRouteMenu");
+  const panel = document.getElementById("routeMenu");
+  if (!btn || !panel) return;
+  const setOpen = (open) => {
+    panel.classList.toggle("open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  };
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (btn.disabled) return;
     setOpen(!panel.classList.contains("open"));
   });
   document.addEventListener("pointerdown", (e) => {
