@@ -37,6 +37,7 @@ export function bootstrapEditorSync(ctx) {
     refreshNetlistUI,
     routeConnButton,
     routeAllConnButton,
+    generateFromNetlistButton,
     breakPointButton,
     toggleBreakEditMode,
   } = ctx;
@@ -59,6 +60,12 @@ export function bootstrapEditorSync(ctx) {
   if (routeAllConnButton && ctx.getRouteAllConnections) {
     routeAllConnButton.onclick = () => {
       const fn = ctx.getRouteAllConnections();
+      if (fn) fn();
+    };
+  }
+  if (generateFromNetlistButton && ctx.getGenerateFromNetlist) {
+    generateFromNetlistButton.onclick = () => {
+      const fn = ctx.getGenerateFromNetlist();
       if (fn) fn();
     };
   }

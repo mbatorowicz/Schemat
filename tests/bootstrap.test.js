@@ -58,6 +58,34 @@ describe("app-bootstrap", () => {
     expect(routeAllFn).toHaveBeenCalledOnce();
   });
 
+  it("podpina btnGenerateFromNetlist", () => {
+    let genFn = null;
+    const btn = { onclick: null };
+    bootstrapEditorSync({
+      injectIcons: () => {},
+      initConnMetaModal: () => {},
+      wireHistory: () => {},
+      wireConnModel: () => {},
+      wireProjectMigrate: () => {},
+      wireRenderPipeline: () => {},
+      scene: { build: () => {} },
+      applyView: () => {},
+      drawGrid: () => {},
+      wireNetlistRouting: () => {
+        genFn = vi.fn();
+      },
+      wireSelectionModel: () => {},
+      syncSelectionToolbar: () => {},
+      syncToolbarContext: () => {},
+      refreshNetlistUI: () => {},
+      generateFromNetlistButton: btn,
+      getGenerateFromNetlist: () => genFn,
+    });
+    expect(typeof btn.onclick).toBe("function");
+    btn.onclick();
+    expect(genFn).toHaveBeenCalledOnce();
+  });
+
   it("podpina btnBreakPoint", () => {
     const toggle = vi.fn();
     const btn = { onclick: null };

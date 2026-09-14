@@ -85,9 +85,11 @@ export function createNetlistUi(deps) {
     const routeBtn = document.getElementById("btnRouteConn");
     const routeAllBtn = document.getElementById("btnRouteAllConn");
     const routeMenuBtn = document.getElementById("btnRouteMenu");
+    const generateBtn = document.getElementById("btnGenerateFromNetlist");
     if (routeBtn) routeBtn.disabled = !hasList || !selectedId;
     if (routeAllBtn) routeAllBtn.disabled = !hasList || !n;
     if (routeMenuBtn) routeMenuBtn.disabled = !hasList || !n;
+    if (generateBtn) generateBtn.disabled = !hasList || !n;
   }
 
   function syncHighlight() {

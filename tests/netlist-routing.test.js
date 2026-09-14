@@ -203,4 +203,110 @@ describe("netlist-routing", () => {
     expect(pts[1]).toEqual([80, 40]);
     expect(el.getAttribute("data-conn-id")).toBe("10");
   });
+
+  function parsePts(el) {
+    return (el.getAttribute("points") || "")
+      .trim()
+      .split(/\s+/)
+      .map((p) => p.split(",").map(Number));
+  }
+
+  function expectAxisAligned(pts) {
+    for (let i = 1; i < pts.length; i++) {
+      expect(pts[i][0] === pts[i - 1][0] || pts[i][1] === pts[i - 1][1]).toBe(true);
+    }
+  }
+
+  it("placeOrthogonalConnection: łamana 90° między pinami", () => {
+    const sheet = {
+      id: "sch-1",
+      name: "A.svg",
+      svg: document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+    };
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute("id", "sch-1");
+    sheet.svg.appendChild(g);
+    const state = {
+      active: sheet,
+      sheets: [sheet],
+      lib: null,
+      netlist: { connections: [] },
+      step: 5,
+      routeOpts: { strokeWidth: "" },
+    };
+    const n = stubRouting(state, { currentSymNode: () => g });
+    const record = { id: "11", net: "N", from: { raw: "A:1" }, to: { raw: "B:1" } };
+    state.netlist.connections = [record];
+    const d = {
+      ok: true,
+      from: { x: 0, y: 0, dir: "E", element: null },
+      to: { x: 80, y: 40, dir: "W", element: null },
+    };
+    const placed = n.placeOrthogonalConnection(g, record, d, sheet);
+    expect(placed?.el).toBeTruthy();
+    expect(placed.fallback).toBe(false);
+    const pts = parsePts(placed.el);
+    expect(pts.length).toBeGreaterThanOrEqual(2);
+    expect(pts[0]).toEqual([0, 0]);
+    expect(pts[pts.length - 1]).toEqual([80, 40]);
+    expectAxisAligned(pts);
+    expect(placed.el.getAttribute("data-conn-id")).toBe("11");
+  });
+
+  it("placeOrthogonalConnection: omija bbox symbolu między pinami", () => {
+    const sheet = {
+      id: "sch-1",
+      name: "A.svg",
+      svg: document.createElementNS("http://www.w3.org/2000/svg", "svg"),
+    };
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute("id", "sch-1");
+    const wall = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+    wall.setAttribute("data-role", "other-sym");
+    g.appendChild(wall);
+    sheet.svg.appendChild(g);
+
+    const cloneRoot = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    cloneRoot.appendChild(wall.cloneNode(true));
+    const host = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    host.appendChild(cloneRoot);
+
+    const state = {
+      active: sheet,
+      sheets: [sheet],
+      lib: null,
+      netlist: { connections: [] },
+      step: 5,
+      routeOpts: { strokeWidth: "" },
+    };
+    const n = stubRouting(state, {
+      currentSymNode: () => g,
+      getHost: () => host,
+      bboxInRoot: () => ({ x: 30, y: 0, width: 20, height: 40 }),
+    });
+    const record = { id: "12", net: "N", from: { raw: "A:1" }, to: { raw: "B:1" } };
+    state.netlist.connections = [record];
+    const d = {
+      ok: true,
+      from: { x: 0, y: 20, dir: "E", element: null },
+      to: { x: 80, y: 20, dir: "W", element: null },
+    };
+    const placed = n.placeOrthogonalConnection(g, record, d, sheet);
+    expect(placed?.el).toBeTruthy();
+    const pts = parsePts(placed.el);
+    expectAxisAligned(pts);
+    const hitsWall = pts.some((p, i) => {
+      if (i === 0) return false;
+      const a = pts[i - 1];
+      const b = p;
+      for (let s = 1; s < 12; s++) {
+        const t = s / 12;
+        const x = a[0] + (b[0] - a[0]) * t;
+        const y = a[1] + (b[1] - a[1]) * t;
+        if (x > 32 && x < 48 && y > 2 && y < 38) return true;
+      }
+      return false;
+    });
+    expect(hitsWall).toBe(false);
+  });
 });

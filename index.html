@@ -126,7 +126,7 @@
                 <button
                   id="btnRouteConn"
                   class="btn-labeled tbtn split-main"
-                  title="Połącz wybrane prostą linią między pinami"
+                  title="Połącz wybrane trasą ortogonalną między pinami"
                   disabled
                 >
                   <span class="btn-text">Połącz</span>
@@ -135,7 +135,7 @@
                   type="button"
                   id="btnRouteMenu"
                   class="tbtn split-caret"
-                  title="Połącz wszystkie pozycje ze spisu"
+                  title="Połącz wszystkie albo wygeneruj szkic ze spisu"
                   aria-label="Więcej opcji łączenia"
                   aria-haspopup="menu"
                   aria-expanded="false"
@@ -144,6 +144,9 @@
                 <div id="routeMenu" class="toolbar-menu" role="menu" aria-label="Połącz">
                   <button type="button" role="menuitem" id="btnRouteAllConn" class="toolbar-menu-item" disabled>
                     <span class="btn-text">Wszystkie</span>
+                  </button>
+                  <button type="button" role="menuitem" id="btnGenerateFromNetlist" class="toolbar-menu-item" disabled>
+                    <span class="btn-text">Szkic ze spisu</span>
                   </button>
                 </div>
               </div>
@@ -604,6 +607,20 @@
         <div class="actions">
           <button type="button" id="askTextDialogCancel">Anuluj</button>
           <button type="button" id="askTextDialogOk" class="primary">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="askSelectDialog" class="modal-bg" role="dialog" aria-modal="true" aria-labelledby="askSelectDialogTitle">
+      <div class="modal" style="width: 380px">
+        <h2 id="askSelectDialogTitle">Wybór</h2>
+        <div class="frow">
+          <label for="askSelectDialogInput" id="askSelectDialogLabel">Wybór</label>
+          <select id="askSelectDialogInput"></select>
+        </div>
+        <div class="actions">
+          <button type="button" id="askSelectDialogCancel">Anuluj</button>
+          <button type="button" id="askSelectDialogOk" class="primary">OK</button>
         </div>
       </div>
     </div>

@@ -1,8 +1,11 @@
 /**
- * Rozwiązywanie końców połączeń netlisty i proste łączenie pinów (odcinek prosty).
+ * Rozwiązywanie końców połączeń netlisty i łączenie pinów (trasa ortogonalna, fallback: odcinek).
  */
 
 import { NetlistModel } from "./netlist-model.js";
+import { OrthogonalRouter } from "./orthogonal-router.js";
+import { sortConnectionsForRouting } from "./layout-from-netlist.js";
+import { status } from "./ui-wording.js";
 import { qsById } from "./dom-selectors.js";
 import { readUseOrient, mapLocalToSheet, flipDirWithOrient, rotateDir } from "./instance-orient.js";
 import { definitionForUseElement } from "./symbol-service.js";
@@ -484,6 +487,75 @@ export function createNetlistRouting(ctx) {
     );
   }
 
+  /**
+   * Trasa ortogonalna z omijaniem przeszkód; gdy router nie znajdzie ścieżki — odcinek prosty.
+   * @returns {{ el: Element, fallback: boolean } | null}
+   */
+  function placeOrthogonalConnection(node, record, d, sheet) {
+    if (!d?.ok || !d.from || !d.to) return null;
+    const step = Math.max(1, state.step || 5);
+    const endpoints = [
+      { x: d.from.x, y: d.from.y },
+      { x: d.to.x, y: d.to.y },
+    ];
+    const excluded = [d.from.element, d.to.element].filter(Boolean);
+    const obstacles = routeObstacles(sheet, excluded, endpoints, {
+      forNet: record.net,
+      skipConnIds: [String(record.id)],
+    });
+    const path = OrthogonalRouter.route({
+      start: endpoints[0],
+      end: endpoints[1],
+      startDir: d.from.dir || "E",
+      endDir: d.to.dir || "W",
+      step,
+      obstacles,
+    });
+    if (path && path.length >= 2) {
+      const el = placeWirePolyline(node, record, path, null, sheet);
+      return el ? { el, fallback: false } : null;
+    }
+    const el = placeStraightConnection(node, record, d, sheet);
+    return el ? { el, fallback: true } : null;
+  }
+
+  /**
+   * @param {object[]} records
+   * @param {{ skipManual?: boolean, onlyBare?: boolean, skipUndo?: boolean, skipRender?: boolean, replaceManual?: boolean }} [opts]
+   */
+  function routeConnectionBatch(records, opts = {}) {
+    const sheet = targetSheet();
+    const node = currentSymNode();
+    const result = { ok: 0, fail: 0, ortho: 0, straight: 0 };
+    if (!sheet || !node) return result;
+    const list = sortConnectionsForRouting(records || []);
+    const pending = list.filter((r) => {
+      if (opts.skipManual && isManualOwned(node, r.id) && !opts.replaceManual) return false;
+      if (opts.onlyBare && findWireByConnId(node, r.id)) return false;
+      return true;
+    });
+    if (!pending.length) return result;
+    if (!opts.skipUndo) pushUndo();
+    for (const record of pending) {
+      ensureRecordNet(record);
+      const d = resolveConnectionEndpoints(sheet, record);
+      if (!d.ok) {
+        result.fail++;
+        continue;
+      }
+      const placed = placeOrthogonalConnection(node, record, d, sheet);
+      if (!placed) {
+        result.fail++;
+        continue;
+      }
+      result.ok++;
+      if (placed.fallback) result.straight++;
+      else result.ortho++;
+    }
+    if (!opts.skipRender) render();
+    return result;
+  }
+
   function isManualOwned(node, recordId) {
     const el = findWireByConnId(node, recordId);
     return !!(el && el.getAttribute("data-route") === "manual");
@@ -573,7 +645,7 @@ export function createNetlistRouting(ctx) {
           ? await askRouteChoice(askChoice, W.confirm.adoptOrReroute, {
               title: "Połączenie",
               cancelLabel: "Anuluj",
-              localLabel: "Prosta linia",
+              localLabel: "Trasuj",
               libraryLabel: "Adoptuj",
             })
           : "library";
@@ -610,18 +682,21 @@ export function createNetlistRouting(ctx) {
 
     pushUndo();
     ensureRecordNet(record);
-    const poly = placeStraightConnection(node, record, d, sheet);
-    if (!poly) {
+    const placed = placeOrthogonalConnection(node, record, d, sheet);
+    if (!placed) {
       setStatus("Nie można połączyć pinów.", { toast: true, tone: "warning" });
       return;
     }
-    state.selection = [poly];
-    state.activeEl = poly;
+    state.selection = [placed.el];
+    state.activeEl = placed.el;
     render();
-    setStatus("Połączono " + record.id + " prostą linią.", { toast: true, tone: "success" });
+    setStatus(placed.fallback ? status.routedStraightFallback(record.id) : status.routedOrthogonal(record.id), {
+      toast: true,
+      tone: "success",
+    });
   }
 
-  /** Połącz wszystkie pending: prosta linia pin→pin. */
+  /** Połącz wszystkie pending: trasa ortogonalna, fallback do odcinka. */
   async function routeAllConnections() {
     if (!state.netlist?.connections?.length) {
       setStatus("Brak połączeń w spisie.", { toast: true, tone: "warning" });
@@ -658,25 +733,14 @@ export function createNetlistRouting(ctx) {
       return;
     }
 
-    pushUndo();
-    let ok = 0;
-    let fail = 0;
-    for (const record of pending) {
-      ensureRecordNet(record);
-      const d = resolveConnectionEndpoints(sheet, record);
-      if (!d.ok) {
-        fail++;
-        continue;
-      }
-      const poly = placeStraightConnection(node, record, d, sheet);
-      if (poly) ok++;
-      else fail++;
-    }
-
-    render();
-    setStatus("Połączono " + ok + " połączeń prostą linią" + (fail ? ", nieudanych: " + fail : "") + ".", {
+    const routed = routeConnectionBatch(pending, {
+      skipUndo: false,
+      skipRender: false,
+      replaceManual: forceManual,
+    });
+    setStatus(status.routedBatch(routed), {
       toast: true,
-      tone: fail && !ok ? "warning" : "success",
+      tone: routed.fail && !routed.ok ? "warning" : "success",
     });
   }
 
@@ -839,9 +903,11 @@ export function createNetlistRouting(ctx) {
     routeObstacles,
     routeSelectedConnection,
     routeAllConnections,
+    routeConnectionBatch,
     promoteSelectionToConnection,
     findAdoptCandidate,
     placeStraightConnection,
+    placeOrthogonalConnection,
     ensureRecordNet,
     sheetWireHealth,
     collectNetlistProposals,

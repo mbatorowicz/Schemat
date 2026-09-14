@@ -100,6 +100,8 @@ describe("ui-wording SSOT", () => {
     expect(W.draw.lineLong).toBe("Linia / łamana");
     expect(W.draw.point).toBe("Punkt styku");
     expect(W.chrome.promote).toBe("Do spisu");
+    expect(W.chrome.generateSketch).toBe("Szkic ze spisu");
+    expect(W.choice.onlyMissing).toBe("Tylko brakujące");
     expect(W.chrome.promoteTip).toMatch(/linię/i);
     expect(W.confirm.adoptOrReroute).toMatch(/linię/i);
     expect(W.confirm.adoptOrReroute).not.toMatch(/kresk/i);

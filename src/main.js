@@ -89,6 +89,7 @@ import {
 import { createProjectMigrator } from "./project-migrate.js";
 import { SETTINGS_DEFAULT, applySettingsForm } from "./project-settings.js";
 import { createNetlistRouting } from "./netlist-routing.js";
+import { createNetlistLayout } from "./netlist-layout.js";
 import { createSelectionModel, paintVisible } from "./selection-model.js";
 import { createStageLayers } from "./stage-layers.js";
 import { bootstrapEditorSync } from "./app-bootstrap.js";
@@ -161,6 +162,7 @@ import {
   createToastHost,
   bindModalA11y,
   createAskTextDialog,
+  createAskSelectDialog,
 } from "./ui-dialog.js";
 import { createSavePermBadge } from "./project-perm-ui.js";
 import { createSidebarLists, wireSidebarPanels } from "./sidebar-lists.js";
@@ -333,10 +335,13 @@ const choiceDialog = createChoiceDialog();
 choiceDialog.init();
 const askTextDialog = createAskTextDialog();
 askTextDialog.init();
+const askSelectDialog = createAskSelectDialog();
+askSelectDialog.init();
 const toastHost = createToastHost();
 const askConfirm = (message, cfg) => confirmDialog.ask(message, cfg);
 const askChoice = (message, cfg) => choiceDialog.ask(message, cfg);
 const askText = (title, cfg) => askTextDialog.ask(title, cfg);
+const askSelect = (title, cfg) => askSelectDialog.ask(title, cfg);
 let savePermBadge = null;
 let syncDrawBanner = () => {};
 let settingsModal = null;
@@ -368,6 +373,7 @@ let targetSheet = () => null,
   connectionDiagnostics = () => ({ ok: true, reason: "" }),
   routeSelectedConnection = () => {},
   routeAllConnections = () => {},
+  generateSketchFromNetlist = () => {},
   promoteSelectionToConnection = async () => null,
   sheetWireHealth = () => ({ orphans: [], bare: [], missing: [] }),
   collectNetlistProposals = () => [],
@@ -484,6 +490,22 @@ function wireNetlistRouting() {
     nextProposalId,
     resolveEndpoint,
   } = n);
+  const layout = createNetlistLayout({
+    state,
+    currentSymNode,
+    insertInstance: (symbolId, opts) => insertUse(symbolId, false, opts),
+    routeConnectionBatch: n.routeConnectionBatch,
+    pushUndo,
+    render,
+    setStatus,
+    askChoice,
+    askSelect,
+    selectSheet,
+    targetSheet,
+    ensureInstancePinLabels,
+    getOrient: () => settingsCfg?.orient || "landscape",
+  });
+  generateSketchFromNetlist = layout.generateSketchFromNetlist;
   const ui = createNetlistUi({
     getState: () => state,
     setStatus,
@@ -925,6 +947,7 @@ function applyStaticWording() {
   setBtnText("btnSave", W.chrome.save);
   setBtnText("btnRouteConn", W.chrome.route);
   setBtnText("btnRouteAllConn", W.chrome.routeAll);
+  setBtnText("btnGenerateFromNetlist", W.chrome.generateSketch);
   setBtnText("btnBreakPoint", W.chrome.breakPoint);
   setBtnText("btnPromoteConn", W.chrome.promote);
   const setTip = (id, text) => {
@@ -942,6 +965,7 @@ function applyStaticWording() {
   setTip("btnRouteConn", W.chrome.routeTip);
   setTip("btnRouteAllConn", W.chrome.routeAllTip);
   setTip("btnRouteMenu", W.chrome.routeMenuTip);
+  setTip("btnGenerateFromNetlist", W.chrome.generateSketchTip);
   setTip("btnPromoteConn", W.chrome.promoteTip);
   setTip("btnBreakPoint", W.chrome.breakPointTip);
   setTip("btnShortcuts", W.chrome.shortcutsTip);
@@ -4398,7 +4422,7 @@ function nextInstanceRef(node, symbolId) {
   while (used.has(base + n)) n++;
   return base + n;
 }
-function insertUse(idOverride, fromSidebar) {
+function insertUse(idOverride, fromSidebar, opts = {}) {
   if (fromSidebar) {
     const target =
       state.lastSheet && state.sheets.includes(state.lastSheet)
@@ -4425,10 +4449,20 @@ function insertUse(idOverride, fromSidebar) {
     return;
   }
   const c = viewCenterLocal();
-  const u = mkEl("use", { x: c.x, y: c.y });
+  const x = opts.x != null ? opts.x : c.x;
+  const y = opts.y != null ? opts.y : c.y;
+  const u = mkEl("use", { x, y });
   u.setAttributeNS(XLINK, "xlink:href", "#" + id);
   u.setAttribute("href", "#" + id);
-  const ref = nextInstanceRef(node, id);
+  const wantedRef = (opts.ref || "").trim();
+  if (
+    wantedRef &&
+    [...node.querySelectorAll("use[data-ref]")].some((el) => el.getAttribute("data-ref") === wantedRef)
+  ) {
+    setStatus("Instancja " + wantedRef + " już jest na arkuszu.");
+    return null;
+  }
+  const ref = wantedRef || nextInstanceRef(node, id);
   if (!isValidInstanceRef(ref)) {
     setStatus("Nie uda\u0142o si\u0119 wygenerowa\u0107 oznaczenia instancji.");
     return;
@@ -4436,7 +4470,7 @@ function insertUse(idOverride, fromSidebar) {
   u.setAttribute("data-ref", ref);
   u.setAttribute("data-sym", id);
   u.style.setProperty("--object-stroke", state.strokeColor);
-  pushUndo();
+  if (!opts.skipUndo) pushUndo();
   node.appendChild(u);
   ensureInstanceDesigLabel(u, ref);
   const libNode = resolveLibSymbol(state.lib?.svg, id);
@@ -4450,12 +4484,15 @@ function insertUse(idOverride, fromSidebar) {
     u.setAttribute("data-inst-desc2", desc2);
     ensureInstanceDescLabel(u, ref, desc2, { label: "desc2", yOff: 30 });
   }
-  ensureInstancePinLabels(node);
-  state.selection = expandToInstanceMembers(node, [u]);
-  state.activeEl = u;
-  render();
-  syncNameFields();
-  setStatus("Wstawiono " + ref + " (<use> #" + id + ")");
+  if (!opts.silent) ensureInstancePinLabels(node);
+  if (!opts.silent) {
+    state.selection = expandToInstanceMembers(node, [u]);
+    state.activeEl = u;
+    render();
+    syncNameFields();
+    setStatus("Wstawiono " + ref + " (<use> #" + id + ")");
+  }
+  return u;
 }
 function duplicateSymbol() {
   const sym = state.symbols.find((s) => s.id === state.selId);
@@ -5237,9 +5274,11 @@ try {
     refreshNetlistUI,
     routeConnButton: document.getElementById("btnRouteConn"),
     routeAllConnButton: document.getElementById("btnRouteAllConn"),
+    generateFromNetlistButton: document.getElementById("btnGenerateFromNetlist"),
     breakPointButton: document.getElementById("btnBreakPoint"),
     getRouteSelectedConnection: () => routeSelectedConnection,
     getRouteAllConnections: () => routeAllConnections,
+    getGenerateFromNetlist: () => generateSketchFromNetlist,
     toggleBreakEditMode,
   });
 } catch (e) {

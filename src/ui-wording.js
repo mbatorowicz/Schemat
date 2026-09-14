@@ -79,11 +79,15 @@ export const W = {
     deleteSymbol: "Usu\u0144 symbol",
     newSheet: "Nowy schemat",
     promoteScope: "Zakres zmiany",
+    generateSketch: "Szkic ze spisu",
+    pickSymbolForRef: "Wybierz symbol",
   },
   choice: {
     cancel: "Anuluj",
     local: "Tylko ten schemat",
     library: "Zaktualizuj bibliotek\u0119",
+    onlyMissing: "Tylko brakujące",
+    replaceAuto: "Zastąp auto",
     promotePrefix:
       "Zmieniono oznaczenie (prefix). Zaktualizowa\u0107 szablon w bibliotece (bez numeru elementu), czy tylko t\u0119 instancj\u0119 na schemacie?",
     promoteDesc:
@@ -187,9 +191,11 @@ export const W = {
       `Masz ${n} niezapisany(ych) arkusz(y). Otwarcie projektu nadpisze je wersją z dysku. Kontynuować?`,
     deleteSymbol: (id) => `Usunąć symbol ${id} z biblioteki?`,
     sheetNoProject: "Brak otwartego projektu — schemat zostanie utworzony tylko w pamięci. Kontynuować?",
-    replaceManualRoute: "Trasa jest ręczna. Zastąpić ją prostą linią między pinami?",
-    keepOrReplaceRoute: "Istnieje ręczna trasa dla tego połączenia. Zachować ją czy zastąpić prostą linią?",
-    adoptOrReroute: "Znaleziono linię między pinami tego połączenia. Adoptować geometrię czy połączyć prostą linią?",
+    replaceManualRoute: "Trasa jest ręczna. Zastąpić ją trasą ortogonalną?",
+    keepOrReplaceRoute: "Istnieje ręczna trasa dla tego połączenia. Zachować ją czy zastąpić trasą ortogonalną?",
+    adoptOrReroute:
+      "Znaleziono linię między pinami tego połączenia. Adoptować geometrię czy wytyczyć trasę ortogonalną?",
+    generateSketch: "Arkusz ma już elementy. Rozstawić tylko brakujące symbole, czy też zastąpić trasy automatyczne?",
   },
   toast: {
     saved: "Zapisano.",
@@ -203,9 +209,11 @@ export const W = {
     openLibrary: "Otw\u00f3rz bibliotek\u0119\u2026",
     route: "Połącz",
     routeAll: "Wszystkie",
-    routeTip: "Połącz wybrane prostą linią między pinami",
-    routeAllTip: "Połącz wszystkie pozycje ze spisu prostą linią",
-    routeMenuTip: "Połącz wszystkie pozycje ze spisu",
+    routeTip: "Połącz wybrane trasą ortogonalną między pinami",
+    routeAllTip: "Połącz wszystkie pozycje ze spisu trasami ortogonalnymi",
+    routeMenuTip: "Połącz wszystkie albo wygeneruj szkic ze spisu",
+    generateSketch: "Szkic ze spisu",
+    generateSketchTip: "Rozstaw brakujące symbole i wytycz trasy ortogonalne ze spisu",
     breakPoint: "Łamanie",
     breakPointTip: "Dodaj punkt łamania do zaznaczonej trasy",
     promote: "Do spisu",
@@ -397,6 +405,33 @@ export const status = {
   loadFailed(err) {
     return `Błąd wczytywania: ${err}`;
   },
+  routedOrthogonal(id) {
+    return `Połączono ${id} trasą ortogonalną.`;
+  },
+  routedStraightFallback(id) {
+    return `Połączono ${id} prostą linią (brak trasy ortogonalnej).`;
+  },
+  routedBatch({ ok = 0, fail = 0, ortho = 0, straight = 0 } = {}) {
+    const bits = [];
+    if (ortho) bits.push(ortho + " ortogonalnie");
+    if (straight) bits.push(straight + " prostą linią");
+    const how = bits.length ? " (" + bits.join(", ") + ")" : "";
+    return "Połączono " + ok + " połączeń" + how + (fail ? ", nieudanych: " + fail : "") + ".";
+  },
+  layoutNoNetlist: "Brak połączeń w spisie.",
+  layoutNoSheet: "Brak aktywnego arkusza.",
+  layoutNothingToPlace: "Brak brakujących symboli i tras do wytyczenia.",
+  layoutPickSymbol(ref) {
+    return `Wybierz symbol biblioteki dla ${ref}`;
+  },
+  layoutSketchDone({ placed = 0, routed = {}, unresolved = [] } = {}) {
+    const fail = routed.fail || 0;
+    const ok = routed.ok || 0;
+    const extra = unresolved.length ? ", bez symbolu: " + unresolved.join(", ") : "";
+    return (
+      "Szkic ze spisu: wstawiono " + placed + ", połączono " + ok + (fail ? ", nieudanych: " + fail : "") + extra + "."
+    );
+  },
 };
 
 export function emptyListCopy(kind) {
@@ -431,6 +466,7 @@ export function collectWordingStrings() {
     W.confirm.replaceManualRoute,
     W.confirm.keepOrReplaceRoute,
     W.confirm.adoptOrReroute,
+    W.confirm.generateSketch,
     ...Object.values(W.dialog),
     ...Object.values(W.choice),
     W.field.length,
@@ -465,6 +501,14 @@ export function collectWordingStrings() {
     status.cacheLibraryUnreadable,
     status.relinkSharedLibraryFailed,
     status.relinkLibraryFailed,
+    status.layoutNoNetlist,
+    status.layoutNoSheet,
+    status.layoutNothingToPlace,
+    status.routedOrthogonal("1"),
+    status.routedStraightFallback("1"),
+    status.routedBatch({ ok: 2, fail: 0, ortho: 2, straight: 0 }),
+    status.layoutSketchDone({ placed: 1, routed: { ok: 1, fail: 0 }, unresolved: [] }),
+    status.layoutPickSymbol("SB1"),
     status.saveNeedProject,
     status.saveNeedPerm,
     status.cacheQuota,

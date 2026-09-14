@@ -345,3 +345,84 @@ export function createAskTextDialog(opts = {}) {
 
   return { ask, init, close: () => finish(false) };
 }
+
+/**
+ * Modal wyboru z listy (symbol biblioteki przy niejednoznaczności).
+ * HTML: #askSelectDialog, #askSelectDialogTitle, #askSelectDialogLabel, #askSelectDialogInput
+ */
+export function createAskSelectDialog(opts = {}) {
+  const bgId = opts.id || "askSelectDialog";
+  let resolveFn = null;
+  let a11y = null;
+
+  /**
+   * @param {string} title
+   * @param {{ label?: string, options?: Array<{ value: string, label?: string }>, defaultValue?: string }} [cfg]
+   * @returns {Promise<string|null>}
+   */
+  function ask(title, cfg = {}) {
+    const bg = document.getElementById(bgId);
+    const titleEl = document.getElementById("askSelectDialogTitle");
+    const labelEl = document.getElementById("askSelectDialogLabel");
+    const input = document.getElementById("askSelectDialogInput");
+    const options = cfg.options || [];
+    if (!bg || !input) return Promise.resolve(null);
+    if (titleEl) titleEl.textContent = title || "Wybór";
+    if (labelEl) labelEl.textContent = cfg.label || title || "Wybór";
+    input.innerHTML = "";
+    options.forEach((opt) => {
+      const o = document.createElement("option");
+      o.value = opt.value;
+      o.textContent = opt.label || opt.value;
+      input.appendChild(o);
+    });
+    if (cfg.defaultValue != null && [...input.options].some((o) => o.value === cfg.defaultValue)) {
+      input.value = cfg.defaultValue;
+    } else if (input.options.length) {
+      input.selectedIndex = 0;
+    }
+    if (a11y) a11y.open();
+    else bg.classList.add("open");
+    return new Promise((resolve) => {
+      resolveFn = resolve;
+    });
+  }
+
+  function finish(ok) {
+    const input = document.getElementById("askSelectDialogInput");
+    const val = ok && input && input.value ? input.value : null;
+    const r = resolveFn;
+    resolveFn = null;
+    if (a11y) a11y.close();
+    else {
+      const bg = document.getElementById(bgId);
+      if (bg) bg.classList.remove("open");
+    }
+    if (r) r(val);
+  }
+
+  function init() {
+    a11y = bindModalA11y({
+      id: bgId,
+      labelledBy: opts.titleId || "askSelectDialogTitle",
+      initialFocus: "askSelectDialogInput",
+      onClose: () => {
+        if (resolveFn) {
+          const r = resolveFn;
+          resolveFn = null;
+          r(null);
+        }
+      },
+    });
+    document.getElementById("askSelectDialogOk")?.addEventListener("click", () => finish(true));
+    document.getElementById("askSelectDialogCancel")?.addEventListener("click", () => finish(false));
+    document.getElementById("askSelectDialogInput")?.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        finish(true);
+      }
+    });
+  }
+
+  return { ask, init, close: () => finish(false) };
+}

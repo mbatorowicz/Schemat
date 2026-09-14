@@ -103,6 +103,7 @@ describe("draw-mode constants", () => {
     expect(html).not.toContain('title="Kreska"');
     expect(html).toContain('id="btnRouteMenu"');
     expect(html).toContain('id="routeMenu"');
+    expect(html).toContain('id="btnGenerateFromNetlist"');
     expect(html).toContain("Do spisu");
     expect(html).not.toContain("Promuj kreskę");
   });
