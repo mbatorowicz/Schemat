@@ -18,5 +18,9 @@ describe("app.css (L3)", () => {
     expect(css).toContain(".split-btn");
     expect(css).toContain(".tbtn.view-toggle");
     expect(css).toContain(".toolbar-menu");
+    expect(css).toContain(".side-sec");
+    expect(css).toContain("grid-template-columns: 204px 1fr");
+    expect(html).toContain('class="side-sec side-sec--grow"');
+    expect(html).toContain('id="schCount"');
   });
 });

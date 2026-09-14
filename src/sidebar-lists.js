@@ -19,7 +19,7 @@ import { SVGNS, XLINK } from "./svg-constants.js";
 import { fmt } from "./svg-utils.js";
 import { EDITOR_STYLE_SCOPE, finalizeSvgStyleText } from "./svg-style.js";
 
-export { syncSidebarEmptyStates } from "./sidebar-empty.js";
+export { syncSidebarEmptyStates, wireSidebarPanels } from "./sidebar-empty.js";
 export { emptyListCopy } from "./ui-wording.js";
 
 /**

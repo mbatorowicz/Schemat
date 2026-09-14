@@ -104,6 +104,9 @@ describe("ui-wording SSOT", () => {
     expect(W.confirm.adoptOrReroute).toMatch(/linię/i);
     expect(W.confirm.adoptOrReroute).not.toMatch(/kresk/i);
     expect(W.drawHint.lead).toMatch(/Przyłącze/);
+    expect(W.sidebar.sheets).toBe("Schematy");
+    expect(W.sidebar.elements).toBe("Elementy");
+    expect(W.sidebar.collapseTip).toMatch(/Zwiń/);
   });
 
   it("zapis i boot nie składają setStatus z gołych stringów", () => {

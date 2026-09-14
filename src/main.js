@@ -163,7 +163,7 @@ import {
   createAskTextDialog,
 } from "./ui-dialog.js";
 import { createSavePermBadge } from "./project-perm-ui.js";
-import { createSidebarLists } from "./sidebar-lists.js";
+import { createSidebarLists, wireSidebarPanels } from "./sidebar-lists.js";
 import { createDrawBannerSync } from "./draw-mode-ui.js";
 import { createDrawMode } from "./draw-mode.js";
 import { bindShortcutsHelp } from "./shortcuts-help.js";
@@ -577,6 +577,7 @@ function renameSymbolTitleFromList(sym, title) {
   return res;
 }
 function wireSidebarLists() {
+  wireSidebarPanels(document.getElementById("left"));
   const s = createSidebarLists({
     state,
     symlist,

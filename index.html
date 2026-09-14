@@ -497,25 +497,54 @@
 
       <div id="main">
         <div id="left">
-          <div class="sec">Schematy</div>
-          <ul id="schlist"></ul>
-          <div id="schEmpty" class="list-empty" hidden>
-            <div>Brak schematów — otwórz projekt lub utwórz schemat.</div>
-            <button type="button" id="btnEmptyOpenProject" class="btn-labeled tbtn primary empty-cta">
-              <span class="btn-text">Otwórz projekt</span>
-            </button>
-          </div>
-          <div class="sec">Symbole</div>
           <svg id="sidebarSymbolDefs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs></defs></svg>
-          <ul id="symlist"></ul>
-          <div id="symEmpty" class="list-empty" hidden>Brak symboli — otwórz bibliotekę lub dodaj symbol.</div>
-          <div class="sec context-hidden" id="elemSec">Elementy schematu</div>
-          <ul id="elemList"></ul>
-          <div id="elemEmpty" class="list-empty context-hidden" hidden>Brak elementów na arkuszu.</div>
-          <div id="elemProps" class="context-hidden">
-            <div class="elem-props-title" id="elemPropsTitle">Właściwości</div>
-            <div id="elemPropsBody"></div>
-          </div>
+          <section class="side-sec" id="schSec" data-sec="sheets">
+            <button type="button" class="side-sec-head" aria-expanded="true" aria-controls="schBody">
+              <span class="side-sec-chevron" aria-hidden="true"></span>
+              <span class="side-sec-label">Schematy</span>
+              <span class="side-sec-count" id="schCount">0</span>
+            </button>
+            <div class="side-sec-body" id="schBody">
+              <ul id="schlist"></ul>
+              <div id="schEmpty" class="list-empty" hidden>
+                <div>Brak schematów — otwórz projekt lub utwórz schemat.</div>
+                <button type="button" id="btnEmptyOpenProject" class="btn-labeled tbtn primary empty-cta">
+                  <span class="btn-text">Otwórz projekt</span>
+                </button>
+              </div>
+            </div>
+          </section>
+          <section class="side-sec side-sec--grow" id="symSec" data-sec="symbols">
+            <button type="button" class="side-sec-head" aria-expanded="true" aria-controls="symBody">
+              <span class="side-sec-chevron" aria-hidden="true"></span>
+              <span class="side-sec-label">Symbole</span>
+              <span class="side-sec-count" id="symCount">0</span>
+            </button>
+            <div class="side-sec-body" id="symBody">
+              <ul id="symlist"></ul>
+              <div id="symEmpty" class="list-empty" hidden>Brak symboli — otwórz bibliotekę lub dodaj symbol.</div>
+            </div>
+          </section>
+          <section class="side-sec context-hidden" id="elemSec" data-sec="elements">
+            <button type="button" class="side-sec-head" aria-expanded="true" aria-controls="elemBody">
+              <span class="side-sec-chevron" aria-hidden="true"></span>
+              <span class="side-sec-label">Elementy</span>
+              <span class="side-sec-count" id="elemCount">0</span>
+            </button>
+            <div class="side-sec-body" id="elemBody">
+              <ul id="elemList"></ul>
+              <div id="elemEmpty" class="list-empty context-hidden" hidden>Brak elementów na arkuszu.</div>
+            </div>
+          </section>
+          <section class="side-sec context-hidden" id="elemProps" data-sec="props">
+            <button type="button" class="side-sec-head" aria-expanded="true" aria-controls="elemPropsBody">
+              <span class="side-sec-chevron" aria-hidden="true"></span>
+              <span class="side-sec-label" id="elemPropsTitle">Właściwości</span>
+            </button>
+            <div class="side-sec-body">
+              <div id="elemPropsBody"></div>
+            </div>
+          </section>
         </div>
 
         <div id="stagewrap">

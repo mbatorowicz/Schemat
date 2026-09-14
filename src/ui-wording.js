@@ -171,6 +171,13 @@ export const W = {
     elements: "Brak elementów na arkuszu.",
     openProjectCta: "Otwórz projekt",
   },
+  sidebar: {
+    sheets: "Schematy",
+    symbols: "Symbole",
+    elements: "Elementy",
+    props: "Właściwości",
+    collapseTip: "Zwiń lub rozwiń listę",
+  },
   confirm: {
     dirtyNewProject: (n) =>
       `Masz ${n} niezapisany(ych) schemat(ów). Utworzenie nowego projektu wyczyści bieżącą sesję. Kontynuować?`,
@@ -414,6 +421,7 @@ export function collectWordingStrings() {
     W.selection.pickSymbol,
     W.selection.newObjectStyle,
     ...Object.values(W.empty),
+    ...Object.values(W.sidebar),
     ...Object.values(W.chrome),
     ...Object.values(W.draw),
     ...Object.values(W.drawHint),
