@@ -3,6 +3,9 @@ dist/
 .vite/
 coverage/
 .vercel/
+.env
+.env.local
+.env*.local
 *.log
 .DS_Store
 Thumbs.db

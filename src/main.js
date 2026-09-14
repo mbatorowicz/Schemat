@@ -7,6 +7,11 @@ import {
   collectInstanceMembers,
   expandToInstanceMembers,
 } from "./sheet-elements.js";
+import { catalogFromLibrary } from "./symbol-from-ref.js";
+import { ensureNetlistForSheet } from "./sheet-connections.js";
+import { createAssistantApply } from "./assistant-apply.js";
+import { createAssistantPanel } from "./assistant-ui.js";
+import { resolveAssistantSheet, resolveAssistantSheetNode } from "./assistant-context.js";
 import { buildAlignUnits, resolveAlignElements, unionBox, computeAlignDeltas } from "./selection-align.js";
 import { flipPoint, flipAngleDeg, normalizeAngleDeg, collectFlipTargets } from "./selection-flip.js";
 import { readUseOrient, writeUseOrient, composeSheetFlip } from "./instance-orient.js";
@@ -221,6 +226,8 @@ const ICONS = {
   btnAddNode: '<path d="M4 12h16M12 4v16"/><circle cx="12" cy="12" r="3.2" class="fillnode"/>',
   btnRouteMenu: '<path d="M7 10l5 5 5-5"/>',
   btnShortcuts: '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M7 11h2M11 11h2M15 11h2M8 15h8"/>',
+  btnAssistant:
+    '<path d="M12 3l1.2 3.6L17 8l-3.8 1.4L12 13l-1.2-3.6L7 8l3.8-1.4z"/><path d="M6 14.5l.7 2.1L9 17.3l-2.3.8L6 20.2l-.7-2.1L3 17.3l2.3-.8z"/><path d="M18 14l.6 1.8 1.8.6-1.8.6L18 18.8l-.6-1.8-1.8-.6 1.8-.6z"/>',
   btnAlignLeft: '<path d="M4 4v16"/><path d="M8 7h8v3H8z"/><path d="M8 14h12v3H8z"/>',
   btnAlignCenterH: '<path d="M12 4v16"/><path d="M8 7h8v3H8z"/><path d="M6 14h12v3H6z"/>',
   btnAlignRight: '<path d="M20 4v16"/><path d="M8 7h8v3H8z"/><path d="M4 14h12v3H4z"/>',
@@ -5285,6 +5292,55 @@ try {
   console.error("Błąd inicjalizacji edytora:", e);
   setStatus(status.initFailed(e.message || e), { toast: true, tone: "danger" });
 }
+(function wireAssistant() {
+  const applyApi = createAssistantApply({
+    getState: () => state,
+    getSheetNode: () => {
+      const sheet = resolveAssistantSheet(state);
+      return resolveAssistantSheetNode(state, sheet) || currentSymNode();
+    },
+    catalogIds: () => catalogFromLibrary(state.lib?.svg).map((s) => s.id),
+    insertUse: (id, fromSidebar, opts) => insertUse(id, fromSidebar, opts),
+    applyConnectionRecord: (rec, opts) => applyConnectionRecord(rec, opts),
+    ensureNetlist: () => {
+      const sheet = resolveAssistantSheet(state);
+      if (sheet) ensureNetlistForSheet(state, sheet, settingsCfg);
+    },
+    routeConnection: async (id) => {
+      state.selectedConnId = id;
+      const sel = document.getElementById("netlistConn");
+      if (sel) sel.value = id;
+      if (typeof routeSelectedConnection === "function") await routeSelectedConnection();
+    },
+    setLabel: ({ use, ref, text, role }) => {
+      if (role === "desig") {
+        const lbl = ensureInstanceDesigLabel(use, ref);
+        if (lbl) lbl.textContent = text || "-" + ref;
+      } else {
+        ensureInstanceDescLabel(use, ref, text, { label: role, yOff: role === "desc2" ? 30 : 18 });
+      }
+    },
+    selectElements: (els) => selectSheetElements(els),
+    afterApply: () => {
+      markSettingsDirty();
+      persistCache();
+      if (typeof refreshNetlistUI === "function") refreshNetlistUI();
+      render();
+    },
+  });
+  const panel = createAssistantPanel({
+    getState: () => state,
+    getSettingsCfg: () => settingsCfg,
+    connectionDiagnostics,
+    getStage: () => stage,
+    applyProposal: async (p) => {
+      if (p?.type === "add_connection" || p?.type === "update_connection" || p?.type === "set_label") pushUndo();
+      return applyApi.applyProposal(p);
+    },
+    setStatus,
+  });
+  panel.init();
+})();
 (async function boot() {
   try {
     const prefs = await loadPrefs();

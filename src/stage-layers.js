@@ -23,12 +23,16 @@ export function createStageLayers(stageEl, svgNs) {
     refs.world.setAttribute("id", "world");
     stageEl.appendChild(refs.world);
     refs.grid = document.createElementNS(svgNs, "g");
+    refs.grid.setAttribute("data-stage-layer", "grid");
     refs.world.appendChild(refs.grid);
     refs.host = document.createElementNS(svgNs, "g");
+    refs.host.setAttribute("data-stage-layer", "host");
     refs.world.appendChild(refs.host);
     refs.sel = document.createElementNS(svgNs, "g");
+    refs.sel.setAttribute("data-stage-layer", "sel");
     refs.world.appendChild(refs.sel);
     refs.handles = document.createElementNS(svgNs, "g");
+    refs.handles.setAttribute("data-stage-layer", "handles");
     refs.world.appendChild(refs.handles);
     if (typeof afterBuild === "function") afterBuild();
   }

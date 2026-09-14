@@ -17,6 +17,7 @@ export const SHORTCUT_ROWS = [
   ["Esc", "Anuluj rysowanie / tryb łamania / dialog"],
   ["Enter", "Zakończ linię / zatwierdź dialog"],
   ["?", "Ten spis skrótów"],
+  ["AI (belka)", "Pomocnik — normy i symbole"],
 ];
 
 export function renderShortcutsList(container) {

@@ -217,6 +217,14 @@
 
           <div class="grp" id="settingsGroup">
             <div class="grp-row">
+              <button
+                type="button"
+                id="btnAssistant"
+                class="tbtn"
+                title="Pomocnik AI — normy, symbole, sprawdzenie arkusza"
+                aria-expanded="false"
+                aria-controls="assistantPanel"
+              ></button>
               <button type="button" id="btnShortcuts" class="tbtn" title="Skróty klawiszowe (?)"></button>
               <button id="btnSettings" class="tbtn" title="Ustawienia"></button>
             </div>
@@ -555,6 +563,37 @@
           <div id="drawBanner" role="status" aria-live="polite"></div>
           <div id="hud">&mdash;</div>
         </div>
+
+        <aside id="assistantPanel" hidden aria-hidden="true" aria-labelledby="assistantTitle">
+          <header class="assistant-head">
+            <h2 id="assistantTitle">Pomocnik AI</h2>
+            <button type="button" id="btnAssistantClose" class="assistant-close" title="Zamknij pomocnika">
+              &times;
+            </button>
+          </header>
+          <p id="assistantDisclaimer" class="assistant-disclaimer">
+            Arkusz i spis idą do modelu (Vercel AI Gateway), żeby sprawdzić zgodność z normami. To nie zastępuje
+            oficjalnego tekstu EN/IEC.
+          </p>
+          <div id="assistantMessages" class="assistant-messages" role="log" aria-live="polite"></div>
+          <div class="assistant-quick">
+            <button type="button" id="btnAssistantReview" class="btn-labeled tbtn">
+              <span class="btn-text">Sprawdź arkusz</span>
+            </button>
+          </div>
+          <form id="assistantForm" class="assistant-form">
+            <label class="visually-hidden" for="assistantInput">Wiadomość do pomocnika</label>
+            <textarea
+              id="assistantInput"
+              rows="3"
+              maxlength="4000"
+              placeholder="Pytanie o symbol, oznaczenie albo zgodność z normą…"
+            ></textarea>
+            <button type="submit" id="btnAssistantSend" class="btn-labeled tbtn primary">
+              <span class="btn-text">Wyślij</span>
+            </button>
+          </form>
+        </aside>
       </div>
     </div>
 

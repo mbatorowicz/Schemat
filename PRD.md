@@ -117,6 +117,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - Jako konstruktor klonuję złącze z auto-inkrementacją pinu.
 - Jako konstruktor widzę podgląd rysowania bez mylących markerów.
 - Jako konstruktor widzę walidator spójności netlisty vs schemat na żywo (`#netlistHealth`).
+- Jako konstruktor pytam pomocnika AI o symbole, oznaczenia i zgodność z EN 60204-1 / IEC 60617; propozycje edycji akceptuję ręcznie.
 
 ### Could have
 
@@ -216,13 +217,20 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 - FR-70: Pan (Shift+przeciąganie), zoom (kółko), dopasuj do widoku.
 - FR-71: Siatka 1 / 2.5 / 5 mm, przełącznik snap i uchwytów.
 
+### 6.9 Pomocnik AI
+
+- FR-80: Panel `#assistantPanel` — czat z kontekstem aktywnego arkusza (netlista, katalog, zaznaczenie) i zrzutem PNG widoku.
+- FR-81: Proxy `POST /api/assistant` (Vercel Function + AI Gateway). Klucz modelu nie trafia do przeglądarki; CSP `connect-src 'self'`.
+- FR-82: Propozycje edycji (`insert_symbol`, połączenia, trasa, etykieta, highlight) stosowane dopiero po **Zastosuj**, przez istniejące write-pathy.
+- FR-83: Wskazówki norm: brief E-00 + publiczne źródła (`lookupPublicGuidance`). Bez wgrywania pełnych tekstów EN/IEC.
+
 ---
 
 ## 7. Wymagania niefunkcjonalne
 
 | ID     | Wymaganie                                                                                                                                                    |
 | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| NFR-01 | Działanie offline po wczytaniu projektu                                                                                                                      |
+| NFR-01 | Działanie offline po wczytaniu projektu (edycja SVG/spisu). Pomocnik AI wymaga sieci i AI Gateway.                                                           |
 | NFR-02 | Chrome / Edge (File System Access API)                                                                                                                       |
 | NFR-03 | Vite (`Schemat/`: `npm run dev` / `npm run build` / deploy Vercel)                                                                                           |
 | NFR-04 | SVG jako format wymiany (kompatybilny z build DTR)                                                                                                           |
@@ -242,7 +250,7 @@ Lokalny edytor SVG do tworzenia i utrzymania dokumentacji elektrycznej maszyny: 
 5. **Połączenia** — spis, trasowanie, eksport, `#netlistHealth`
 6. **Akcje biblioteki** — gdy aktywna biblioteka
 7. **Więcej** — nowy schemat / biblioteka / projekt, siatka, …
-8. **Widok** — zoom, ustawienia
+8. **Widok** — zoom, ustawienia, **AI** (panel pomocnika)
 
 ### Linia kontekstowa (`#toolbarContext`)
 

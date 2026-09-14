@@ -1114,3 +1114,147 @@ label {
 .marq {
   pointer-events: none;
 }
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+#app.assistant-open #main {
+  grid-template-columns: 204px 1fr 320px;
+}
+#assistantPanel {
+  display: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #f8fafc;
+  border-left: 1px solid var(--line);
+}
+#app.assistant-open #assistantPanel {
+  display: flex;
+}
+.assistant-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 4px;
+  border-bottom: 1px solid var(--line);
+}
+.assistant-head h2 {
+  margin: 0;
+  font:
+    700 13px Arial,
+    sans-serif;
+  flex: 1;
+}
+.assistant-close {
+  border: 1px solid transparent;
+  background: transparent;
+  font:
+    18px/1 Arial,
+    sans-serif;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  color: #334155;
+  border-radius: 4px;
+}
+.assistant-close:hover {
+  background: #e2e8f0;
+}
+.assistant-disclaimer {
+  margin: 0;
+  padding: 8px 10px;
+  font:
+    11px/1.4 Arial,
+    sans-serif;
+  color: #64748b;
+  border-bottom: 1px solid var(--line);
+}
+.assistant-messages {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.assistant-msg {
+  max-width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font:
+    12px/1.45 Arial,
+    sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.assistant-msg--user {
+  align-self: flex-end;
+  background: #dbeafe;
+}
+.assistant-msg--assistant {
+  align-self: stretch;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+}
+.assistant-proposal {
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.assistant-proposal-title {
+  font:
+    700 12px Arial,
+    sans-serif;
+}
+.assistant-proposal-meta {
+  font:
+    11px Arial,
+    sans-serif;
+  color: #64748b;
+}
+.assistant-proposal-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.assistant-proposal.is-applied {
+  opacity: 0.7;
+  border-color: #86efac;
+}
+.assistant-proposal.is-rejected {
+  opacity: 0.5;
+}
+.assistant-quick {
+  padding: 6px 10px 0;
+}
+.assistant-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--line);
+}
+.assistant-form textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 54px;
+  font:
+    12px Arial,
+    sans-serif;
+  padding: 6px 8px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}

@@ -40,43 +40,61 @@ E2E (`npm run test:e2e`) wymaga Chromium: `npx playwright install chromium`.
 4. **Deploy** — otrzymasz URL produkcyjny; każdy PR dostaje preview URL
 5. Po wejściu na stronę: **Otwórz projekt** → wskaż lokalny folder z dysku (dane projektu nie są na serwerze Vercel)
 
-Konfiguracja: [`vercel.json`](vercel.json) (nagłówki CSP, static build).
+Konfiguracja: [`vercel.json`](vercel.json) (nagłówki CSP, static build, funkcja `/api/assistant`).
+
+### Pomocnik AI (lokalnie)
+
+Edytor działa offline. Czat pomocnika woła `POST /api/assistant` (Vite middleware w `npm run dev`, na produkcji Vercel Function).
+
+1. Załóż klucz w [Vercel AI Gateway](https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys)
+2. `cp` do `.env.local` (gitignored):
+
+```
+AI_GATEWAY_API_KEY=...
+```
+
+Albo `npx vercel env pull`. Na Vercel wystarczy OIDC projektu (bez klucza w przeglądarce).
 
 ## Struktura `src/`
 
-| Plik                              | Rola                                                                        |
-| --------------------------------- | --------------------------------------------------------------------------- |
-| `main.js`                         | UI edytora, routing, rysowanie                                              |
-| `app-bootstrap.js`                | Kolejność init sceny i modułów (`getRouteSelectedConnection`)               |
-| `netlist-ui.js`                   | UI spisu połączeń, ładowanie netlisty                                       |
-| `file-io.js`                      | Zapis/odczyt plików (File System Access API)                                |
-| `element-factory.js`              | Tworzenie elementów SVG (tekst, chrome, uchwyty)                            |
-| `dom-selectors.js`                | Bezpieczne selektory CSS (`CSS.escape`)                                     |
-| `stage-layers.js`                 | Warstwy sceny DOM (`createStageLayers`, gettery host/sel)                   |
-| `render-pipeline.js`              | `rebuildEditDefs`, `rebuildHost`, mapowanie src↔klon                        |
-| `defs-assembler.js`               | Składanie `<defs>` podglądu/zapisu, aliasy symboli                          |
-| `netlist-routing.js`              | Trasowanie netlisty, endpointy, propozycje                                  |
-| `selection-model.js`              | Zaznaczenie, style rekordów, pasek kontekstowy                              |
-| `project-migrate.js`              | Migracje projektu (aliasy id, osadzone defs)                                |
-| `symbol-service.js`               | Kanonizacja href, audit symboli na arkuszu                                  |
-| `dom-pairing.js`                  | `childPair` — mapowanie element src ↔ klon                                  |
-| `element-styles.js`               | `applyTextStyle` — typografia bez nadpisywania                              |
-| `svg-dom.js` / `svg-constants.js` | Pomocnicze operacje DOM SVG                                                 |
-| `symbol-resolver.js`              | Rozwiązywanie `<use href="#…">` — **biblioteka jest źródłem prawdy**        |
-| `library-loader.js`               | Wczytywanie E-00 z dysku (w tym `../../lib/` z projekt.json)                |
-| `sheet-persistence.js`            | Flaga `dirty`, bezpieczny zapis `<defs>`, ochrona przed nadpisaniem z dysku |
-| `persistence.js`                  | IndexedDB/localStorage — kopia zapasowa między sesjami                      |
-| `conn-theme.js`                   | SSOT — kolory, promień punktów styku, CSS złączy                            |
-| `conn-model.js`                   | Model złączy (point/lead, migracja, endpointy)                              |
-| `conn-contact-pick.js`            | Wybór styku punktu przy trasowaniu                                          |
-| `symbol-aliases.js`               | Migracja starych id symboli (Przylacze→WD, Xx-3→X-3, sk1/SK1/NO→SK…)        |
-| `netlist-model.js`                | Parser spisu połączeń (ESM)                                                 |
-| `orthogonal-router.js`            | Trasowanie ortogonalne przewodów                                            |
-| `wire-theme.js`                   | Kolory przewodów w netliście                                                |
-| `history.js`                      | Undo / redo                                                                 |
-| `svg-utils.js`                    | Operacje na SVG, sanityzacja przed parse                                    |
-| `instance-refs.js`                | Numeracja i edycja `data-ref`                                               |
-| `sheet-elements.js`               | Lista elementów arkusza                                                     |
-| `project-files.js`                | Otwieranie i zapis plików projektu                                          |
+| Plik                                      | Rola                                                                        |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `main.js`                                 | UI edytora, routing, rysowanie                                              |
+| `app-bootstrap.js`                        | Kolejność init sceny i modułów (`getRouteSelectedConnection`)               |
+| `netlist-ui.js`                           | UI spisu połączeń, ładowanie netlisty                                       |
+| `file-io.js`                              | Zapis/odczyt plików (File System Access API)                                |
+| `element-factory.js`                      | Tworzenie elementów SVG (tekst, chrome, uchwyty)                            |
+| `dom-selectors.js`                        | Bezpieczne selektory CSS (`CSS.escape`)                                     |
+| `stage-layers.js`                         | Warstwy sceny DOM (`createStageLayers`, gettery host/sel)                   |
+| `render-pipeline.js`                      | `rebuildEditDefs`, `rebuildHost`, mapowanie src↔klon                        |
+| `defs-assembler.js`                       | Składanie `<defs>` podglądu/zapisu, aliasy symboli                          |
+| `netlist-routing.js`                      | Trasowanie netlisty, endpointy, propozycje                                  |
+| `selection-model.js`                      | Zaznaczenie, style rekordów, pasek kontekstowy                              |
+| `project-migrate.js`                      | Migracje projektu (aliasy id, osadzone defs)                                |
+| `symbol-service.js`                       | Kanonizacja href, audit symboli na arkuszu                                  |
+| `dom-pairing.js`                          | `childPair` — mapowanie element src ↔ klon                                  |
+| `element-styles.js`                       | `applyTextStyle` — typografia bez nadpisywania                              |
+| `svg-dom.js` / `svg-constants.js`         | Pomocnicze operacje DOM SVG                                                 |
+| `symbol-resolver.js`                      | Rozwiązywanie `<use href="#…">` — **biblioteka jest źródłem prawdy**        |
+| `library-loader.js`                       | Wczytywanie E-00 z dysku (w tym `../../lib/` z projekt.json)                |
+| `sheet-persistence.js`                    | Flaga `dirty`, bezpieczny zapis `<defs>`, ochrona przed nadpisaniem z dysku |
+| `persistence.js`                          | IndexedDB/localStorage — kopia zapasowa między sesjami                      |
+| `conn-theme.js`                           | SSOT — kolory, promień punktów styku, CSS złączy                            |
+| `conn-model.js`                           | Model złączy (point/lead, migracja, endpointy)                              |
+| `conn-contact-pick.js`                    | Wybór styku punktu przy trasowaniu                                          |
+| `symbol-aliases.js`                       | Migracja starych id symboli (Przylacze→WD, Xx-3→X-3, sk1/SK1/NO→SK…)        |
+| `netlist-model.js`                        | Parser spisu połączeń (ESM)                                                 |
+| `orthogonal-router.js`                    | Trasowanie ortogonalne przewodów                                            |
+| `wire-theme.js`                           | Kolory przewodów w netliście                                                |
+| `history.js`                              | Undo / redo                                                                 |
+| `svg-utils.js`                            | Operacje na SVG, sanityzacja przed parse                                    |
+| `instance-refs.js`                        | Numeracja i edycja `data-ref`                                               |
+| `sheet-elements.js`                       | Lista elementów arkusza                                                     |
+| `project-files.js`                        | Otwieranie i zapis plików projektu                                          |
+| `assistant-context.js`                    | Zwięzły JSON arkusza dla pomocnika AI                                       |
+| `assistant-capture.js`                    | PNG widoku schematu (bez siatki i uchwytów)                                 |
+| `assistant-proposals.js`                  | Walidacja propozycji edycji                                                 |
+| `assistant-apply.js`                      | Zastosuj propozycję przez istniejące write-pathy                            |
+| `assistant-ui.js` / `assistant-client.js` | Panel czatu i strumień SSE                                                  |
 
 Dane projektu (poza repozytorium): `../schematy/lib/`, `../schematy/project/CS-TB-48/` (arkusze: Zasilanie, Bezpieczenstwo, Enable, Naped, Zator + `polaczenia_*.md`).

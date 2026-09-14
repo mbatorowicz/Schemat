@@ -30,6 +30,7 @@ Każdy obszar ma **jeden moduł** — reszta tylko importuje. Nie duplikuj logik
 | Netlista health       | `netlist-validate.js` + `createNetlistLiveValidator` | podsumowanie + debounce refresh                                                                     |
 | Połączenia write-path | `connection-apply.js` + `netlist-model.js`           | `applyConnectionRecord` — SVG ↔ spis                                                                |
 | Spis (SSOT)           | `sheet-connections.js` + `projekt.json`              | `sheetConnections`; md tylko legacy                                                                 |
+| Pomocnik AI           | `assistant-*.js` + `api/assistant.js`                | kontekst arkusza, zrzut PNG, SSE, propozycje → write-pathy po akceptacji                            |
 
 ### Słownik pól połączenia
 
