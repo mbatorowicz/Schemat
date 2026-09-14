@@ -23,6 +23,8 @@ const DENIED_STYLE_IDS = new Set([
   "toolbar",
   "toolbarmode",
   "toolbarcontext",
+  "toolbarprimary",
+  "toolbartrailing",
   "main",
   "left",
   "stage",

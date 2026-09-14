@@ -41,13 +41,31 @@ body.is-booting #stage {
   min-width: 0;
   width: 100%;
 }
-#toolbarMode {
+#toolbar #toolbarMode {
+  flex-wrap: nowrap;
   border-bottom: 1px solid var(--line);
 }
-#toolbarMode #viewGroup {
+#toolbar .toolbar-cluster {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  min-width: 0;
+  gap: 2px 4px;
+}
+#toolbarPrimary {
+  flex: 1 1 auto;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+#toolbarTrailing {
+  flex: 0 0 auto;
   margin-left: auto;
 }
-#toolbarContext {
+#toolbar #toolbarContext {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  min-height: 36px;
   background: #f8fafc;
   border-top: 1px solid var(--line);
 }
@@ -788,7 +806,8 @@ label {
 #drawBanner.open {
   display: flex;
 }
-#toolbar.draw-mode #arrangeGroup {
+#toolbar.draw-mode #arrangeGroup,
+#toolbar.draw-mode #netlistEditGroup {
   display: none;
 }
 #fileGroup {
@@ -905,7 +924,7 @@ label {
   cursor: not-allowed;
 }
 #viewGroup .grp-row {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 .list-empty {
   list-style: none;

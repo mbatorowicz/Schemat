@@ -13,11 +13,15 @@ describe("app.css (L3)", () => {
     expect(html).toContain('href="/src/app.css"');
     expect(css).toContain("body.is-booting #toolbar");
     expect(css).toContain("#toolbar .toolbar-line");
+    expect(css).toContain("#toolbar .toolbar-cluster");
+    expect(css).toContain("#toolbar #toolbarMode");
+    expect(css).toContain("#toolbarPrimary");
     expect(css).toContain("#saveBadge");
     expect(css).toContain(".modal-bg");
     expect(css).toContain(".split-btn");
     expect(css).toContain(".tbtn.view-toggle");
     expect(css).toContain(".toolbar-menu");
+    expect(css).toContain("#toolbar.draw-mode #netlistEditGroup");
     expect(css).toContain(".side-sec");
     expect(css).toContain("grid-template-columns: 204px 1fr");
     expect(css).toContain("#assistantPanel");

@@ -1,6 +1,12 @@
 import { connAllCss, syncConnStylesInLib } from "./conn-theme.js";
 import { createConnModel } from "./conn-model.js";
-import { walkDir, getFileHandleByPath, normalizeRelPath, relinkExistingFileHandle, isLikelyLibraryFileName } from "./project-files.js";
+import {
+  walkDir,
+  getFileHandleByPath,
+  normalizeRelPath,
+  relinkExistingFileHandle,
+  isLikelyLibraryFileName,
+} from "./project-files.js";
 import {
   sheetElementListLabel,
   instanceRefOf,
@@ -879,6 +885,7 @@ function applyStaticWording() {
   set("lblSelPropLen", W.field.length);
   set("lblSelPropDir", W.field.direction);
   set("lblSelPropSym", W.field.symbol);
+  set("lblWireMarkMode", W.field.wireMarkMode);
   set("lblInstStart", W.field.numberFrom);
   set("lblGroupSymbol", W.group.symbol);
   set("txtSaveSymbol", W.save.params);
@@ -1202,13 +1209,21 @@ function syncToolbarContext() {
     selection: state.selection,
     connLabelSel: state.connLabelSel,
   });
+  const records = typeof selectedRecords === "function" ? selectedRecords() : [];
+  const hasSelection = (state.selection || []).length > 0;
+  const el = state.activeEl || state.selection?.[0];
   const groups = resolveToolbarGroups({
     onLib,
     onSheet,
     symSelected,
-    hasSelection: state.selection.length > 0,
+    hasSelection,
     hasDir: !!state.dir,
     selectionPropsMode,
+    drawMode: state.drawMode || null,
+    hasStroke: hasSelection && typeof strokeRecords === "function" && strokeRecords(records).length > 0,
+    hasFill: hasSelection && typeof fillRecords === "function" && fillRecords(records).length > 0,
+    hasText: hasSelection && typeof textRecords === "function" && textRecords(records).length > 0,
+    canPromoteConn: onSheet && isWireGeometry(el),
   });
   const { resourceNameMode, selectionPropsMode: propsMode, ...flags } = groups;
   const toggle = (id, show) => {
@@ -3433,10 +3448,6 @@ document.getElementById("showHandles").onchange = (e) => {
   if (scene.handles) scene.handles.style.display = state.showHandles ? "" : "none";
   savePrefs();
 };
-document.getElementById("rotateOwnedLabels").onchange = (e) => {
-  state.rotateOwnedLabels = e.target.checked;
-  savePrefs();
-};
 document.getElementById("rotAng").onchange = savePrefs;
 function styleTargetCtx() {
   return {
@@ -3462,9 +3473,6 @@ function rgbToHex(c) {
   if (p.length < 3) return null;
   const h = (n) => ("0" + Math.round(n).toString(16)).slice(-2);
   return "#" + h(p[0]) + h(p[1]) + h(p[2]);
-}
-function setGroupVisible(id, on) {
-  document.getElementById(id).classList.toggle("context-hidden", !on);
 }
 function setMixedColor(inputId, markId, mixed, value) {
   const input = document.getElementById(inputId),
@@ -3573,10 +3581,6 @@ function syncSelectionToolbar() {
   const sr = strokeRecords(records),
     fr = fillRecords(records),
     tr = textRecords(records);
-  setGroupVisible("primaryStyleGroup", true);
-  setGroupVisible("strokeStyleGroup", !has || sr.length > 0);
-  setGroupVisible("fillStyleGroup", !has || fr.length > 0);
-  setGroupVisible("textStyleGroup", !has || tr.length > 0);
 
   const sw = document.getElementById("strokeW"),
     dash = document.getElementById("dashOn");
@@ -3966,7 +3970,7 @@ function rotateSelection(deg) {
   const els = collectFlipTargets(picked, node, {
     expandToInstanceMembers,
     instanceRefOf,
-    rotateOwnedLabels: state.rotateOwnedLabels,
+    rotateOwnedLabels: true,
   });
   const pickedSet = new Set(picked);
   const ns = els.map((el) => rotateElement(el, ctr[0], ctr[1], deg));
@@ -4122,7 +4126,7 @@ function flipSelection(axis) {
   const els = collectFlipTargets(picked, node, {
     expandToInstanceMembers,
     instanceRefOf,
-    rotateOwnedLabels: state.rotateOwnedLabels,
+    rotateOwnedLabels: true,
   });
   pushUndo();
   const pickedSet = new Set(picked);
@@ -4845,7 +4849,7 @@ function prefsPayload() {
     step: state.step,
     snap: state.snap,
     showHandles: state.showHandles,
-    rotateOwnedLabels: state.rotateOwnedLabels,
+    rotateOwnedLabels: true,
     wireMarkMode: normalizeWireMarkMode(state.wireMarkMode),
     strokeW: state.strokeW,
     strokeColor: state.strokeColor,
@@ -4900,10 +4904,7 @@ async function loadPrefs() {
     setC("showHandles", p.showHandles);
     if (scene.handles) scene.handles.style.display = state.showHandles ? "" : "none";
   }
-  if (p.rotateOwnedLabels != null) {
-    state.rotateOwnedLabels = !!p.rotateOwnedLabels;
-    setC("rotateOwnedLabels", p.rotateOwnedLabels);
-  }
+  state.rotateOwnedLabels = true;
   if (p.wireMarkMode != null) {
     state.wireMarkMode = normalizeWireMarkMode(p.wireMarkMode);
     setV("wireMarkMode", state.wireMarkMode);
